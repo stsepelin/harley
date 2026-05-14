@@ -1,6 +1,14 @@
 idf_component_register(
-    SRCS main.c
-    INCLUDE_DIRS .
+    SRCS
+        main.c
+        vehicle/vehicle_data.c
+        simulator/sim_engine.c
+        display/boot_screen.c
+    INCLUDE_DIRS
+        .
+        vehicle
+        simulator
+        display
     REQUIRES waveshare__esp32_p4_wifi6_touch_lcd_xc lvgl__lvgl
 )
 

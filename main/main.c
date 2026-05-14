@@ -1,6 +1,14 @@
-#include "lvgl.h"
 #include "bsp/esp-bsp.h"
 #include "bsp/display.h"
+#include "esp_log.h"
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
+
+#include "boot_screen.h"
+#include "vehicle_data.h"
+#include "sim_engine.h"
+
+static const char *TAG = "vrod_gauge";
 
 void app_main(void)
 {
@@ -14,15 +22,18 @@ void app_main(void)
     bsp_display_backlight_on();
 
     bsp_display_lock(-1);
-
-    lv_obj_t *scr = lv_screen_active();
-    lv_obj_set_style_bg_color(scr, lv_color_black(), 0);
-
-    lv_obj_t *label = lv_label_create(scr);
-    lv_label_set_text(label, "VROD");
-    lv_obj_set_style_text_color(label, lv_color_hex(0xFF6600), 0);
-    lv_obj_set_style_text_font(label, &lv_font_montserrat_48, 0);
-    lv_obj_center(label);
-
+    boot_screen_show();
     bsp_display_unlock();
+
+    vehicle_data_init();
+    sim_engine_start();
+
+    ESP_LOGI(TAG, "boot complete, simulator running");
+    while (1) {
+        vTaskDelay(pdMS_TO_TICKS(5000));
+        vehicle_data_t d;
+        vehicle_data_get(&d);
+        ESP_LOGI(TAG, "speed=%u km/h  rpm=%u  gear=%d  L=%d",
+                 d.speed_kmh, d.rpm, d.gear, d.turn_left);
+    }
 }

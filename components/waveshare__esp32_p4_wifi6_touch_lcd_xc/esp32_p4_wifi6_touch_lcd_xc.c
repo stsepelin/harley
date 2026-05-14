@@ -943,10 +943,15 @@ esp_err_t bsp_touch_new(const bsp_display_cfg_t *cfg, esp_lcd_touch_handle_t *re
 {
     assert(cfg != NULL);
 
-    /* Initilize I2C */
     BSP_ERROR_CHECK_RETURN_ERR(bsp_i2c_init());
 
-    /* Initialize touch */
+    // The GT911's I2C address (0x5d or 0x14) depends on its INT-pin state at
+    // the trailing edge of reset, and on this board INT is NC (floating) so
+    // the address is effectively random per power-up. The chip can also ACK
+    // before its config register is readable, causing the first init attempt
+    // to fail with ESP_ERR_INVALID_RESPONSE. Settle first, then retry.
+    vTaskDelay(pdMS_TO_TICKS(100));
+
     const esp_lcd_touch_config_t tp_cfg = {
         .x_max = BSP_LCD_H_RES,
         .y_max = BSP_LCD_V_RES,
@@ -962,29 +967,42 @@ esp_err_t bsp_touch_new(const bsp_display_cfg_t *cfg, esp_lcd_touch_handle_t *re
             .mirror_y = cfg->touch_flags.mirror_y,
         },
     };
-    esp_lcd_panel_io_handle_t tp_io_handle = NULL;
-    esp_lcd_panel_io_i2c_config_t tp_io_config;
-    if (ESP_OK == bsp_i2c_device_probe(ESP_LCD_TOUCH_IO_I2C_GT911_ADDRESS))
-    {
-        ESP_LOGI(TAG, "Touch 0x5d found");
-        esp_lcd_panel_io_i2c_config_t config = ESP_LCD_TOUCH_IO_I2C_GT911_CONFIG();
-        memcpy(&tp_io_config, &config, sizeof(config));
+
+    esp_err_t err = ESP_FAIL;
+    for (int attempt = 0; attempt < 3; attempt++) {
+        if (attempt > 0) {
+            ESP_LOGW(TAG, "GT911 init attempt %d failed (0x%x), retrying", attempt, err);
+            vTaskDelay(pdMS_TO_TICKS(50));
+        }
+
+        esp_lcd_panel_io_handle_t tp_io_handle = NULL;
+        esp_lcd_panel_io_i2c_config_t tp_io_config;
+        if (ESP_OK == bsp_i2c_device_probe(ESP_LCD_TOUCH_IO_I2C_GT911_ADDRESS)) {
+            ESP_LOGI(TAG, "Touch 0x5d found");
+            esp_lcd_panel_io_i2c_config_t config = ESP_LCD_TOUCH_IO_I2C_GT911_CONFIG();
+            memcpy(&tp_io_config, &config, sizeof(config));
+        } else if (ESP_OK == bsp_i2c_device_probe(ESP_LCD_TOUCH_IO_I2C_GT911_ADDRESS_BACKUP)) {
+            ESP_LOGI(TAG, "Touch 0x14 found");
+            esp_lcd_panel_io_i2c_config_t config = ESP_LCD_TOUCH_IO_I2C_GT911_CONFIG();
+            config.dev_addr = ESP_LCD_TOUCH_IO_I2C_GT911_ADDRESS_BACKUP;
+            memcpy(&tp_io_config, &config, sizeof(config));
+        } else {
+            err = ESP_ERR_NOT_FOUND;
+            continue;
+        }
+        tp_io_config.scl_speed_hz = CONFIG_BSP_I2C_CLK_SPEED_HZ;
+
+        err = esp_lcd_new_panel_io_i2c(i2c_handle, &tp_io_config, &tp_io_handle);
+        if (err != ESP_OK) continue;
+
+        err = esp_lcd_touch_new_i2c_gt911(tp_io_handle, &tp_cfg, ret_touch);
+        if (err == ESP_OK) return ESP_OK;
+
+        esp_lcd_panel_io_del(tp_io_handle);
     }
-    else if (ESP_OK == bsp_i2c_device_probe(ESP_LCD_TOUCH_IO_I2C_GT911_ADDRESS_BACKUP))
-    {
-        ESP_LOGI(TAG, "Touch 0x14 found");
-        esp_lcd_panel_io_i2c_config_t config = ESP_LCD_TOUCH_IO_I2C_GT911_CONFIG();
-        config.dev_addr = ESP_LCD_TOUCH_IO_I2C_GT911_ADDRESS_BACKUP;
-        memcpy(&tp_io_config, &config, sizeof(config));
-    }
-    else
-    {
-        ESP_LOGE(TAG, "Touch not found");
-        return ESP_ERR_NOT_FOUND;
-    }
-    tp_io_config.scl_speed_hz = CONFIG_BSP_I2C_CLK_SPEED_HZ;
-    ESP_RETURN_ON_ERROR(esp_lcd_new_panel_io_i2c(i2c_handle, &tp_io_config, &tp_io_handle), TAG, "");
-    return esp_lcd_touch_new_i2c_gt911(tp_io_handle, &tp_cfg, ret_touch);
+
+    ESP_LOGE(TAG, "GT911 init failed after 3 attempts");
+    return err;
 }
 
 #if (BSP_CONFIG_NO_GRAPHIC_LIB == 0)
