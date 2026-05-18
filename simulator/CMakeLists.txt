@@ -47,8 +47,10 @@ add_executable(vrod_sim
     external/freertos_shim/freertos_shim.c
 
     ${MAIN_DIR}/display/screen_ride.c
+    ${MAIN_DIR}/display/screen_settings.c
     ${MAIN_DIR}/display/format.c
     ${MAIN_DIR}/display/widget_util.c
+    ui_manager_shim.c
     ${MAIN_DIR}/display/widgets/tach_arc.c
     ${MAIN_DIR}/display/widgets/speed_display.c
     ${MAIN_DIR}/display/widgets/gear_indicator.c

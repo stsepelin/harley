@@ -18,88 +18,69 @@ Custom digital instrument cluster replacement for a **2009 Harley-Davidson VRSCF
 
 - **OS**: macOS (MacBook Pro)
 - **Editor**: Zed
-- **Framework**: ESP-IDF v5.5 (minimum v5.3.1 per Waveshare requirements)
+- **Framework**: ESP-IDF v6.0.1 (with patched Waveshare BSP — `esp_lvgl_adapter ^0.4`)
 - **Target chip**: esp32p4
 - **Project root**: `/Users/stsepelin/Workspace/My Projects/harley/cluster`
 
 ## Repository Structure
 
-The project root contains the cloned Waveshare repo:
 ```
 cluster/
-├── docs/                              # Project planning documents
-│   ├── 00-MASTER-PROJECT-PLAN.md      # Full v5 project plan
-│   ├── 01-PHASE2-DISPLAY-PLAN.md      # Current phase plan
-│   └── PROJECT-BRIEF.md               # This file
-├── examples/
-│   ├── arduino/
-│   └── esp-idf/
-│       ├── 01_HowToCreateProject
-│       ├── 02_HelloWorld
-│       ├── 03_i2c_tools
-│       ├── 04_wifistation
-│       ├── 05_sdmmc
-│       ├── 06_I2SCodec
-│       ├── 07_Displaycolorbar
-│       ├── 08_lvgl_demo_v9        ← USE AS BASE FOR vrod_gauge PROJECT
-│       ├── 09_video_lcd_display
-│       ├── 10_mp4_player
-│       ├── 11_esp_brookesia_phone
-│       └── 12_usb_extend_screen
-└── (other Waveshare repo files)
+├── CLAUDE.md                          # Working conventions (read this first)
+├── README docs in docs/               # Project planning + brief
+│   ├── PROJECT-BRIEF.md               # This file
+│   ├── 00-MASTER-PROJECT-PLAN.md      # Full v5 project plan + budget
+│   └── 01-PHASE2-DISPLAY-PLAN.md      # Phase 2 plan (✅ complete)
+├── main/                              # Firmware sources
+│   ├── main.c                         # app_main: BSP init + boot screen
+│   ├── assets/boot.gif                # Embedded boot animation
+│   ├── vehicle/                       # Shared mutex-guarded state
+│   ├── simulator/                     # Sim engine + sim math + gear table
+│   ├── display/                       # Screens + widgets + fonts + theme
+│   │   ├── boot_screen.{c,h}, screen_ride.{c,h}, ui_manager.{c,h}
+│   │   ├── format.{c,h}, theme.h, widget_util.{c,h}
+│   │   ├── fonts/                     # JBM Bold + MDI font subsets
+│   │   └── widgets/                   # tach_arc, speed, gear, fuel, temp,
+│   │                                  # turn signals, warning lamps, clock,
+│   │                                  # odo, trip, smooth helper
+│   └── CMakeLists.txt
+├── test_apps/host/                    # Unity + Linux-target unit tests
+├── simulator/                         # SDL2 + LVGL desktop simulator
+├── components/                        # Patched Waveshare BSP
+├── managed_components/                # LVGL, ESP LCD/Touch, esp_lvgl_adapter
+├── .github/workflows/                 # firmware-build.yml + host-tests.yml
+└── docs/waveshare-reference/          # Vendor examples kept for reference
 ```
 
-## Current Phase: Phase 2 — Display & Gauge UI Development
+## Current status
 
-**Goal**: Build a working 800×800 round speedometer gauge with simulated data (J1850 bus integration comes in Phase 3).
+- ✅ **Phase 2 — Display & Gauge UI** complete (see `01-PHASE2-DISPLAY-PLAN.md`).
+- ⏳ **Phase 2.5 — Off-bike feature work** in progress (see
+  `02-PHASE2.5-OFFBIKE-PLAN.md`): touch + screen switching, settings,
+  units toggle, BLE, speed-camera framework. All possible on the
+  board we already have while J1850 + GPS hardware ships.
+- 🟡 **Phase 3 — J1850 bus + IM simulation + GPS** blocked on parts.
 
-### Phase 2 Plan Status
+Phase 2 deliverable summary: working 800×800 round gauge running off a
+synthetic driving cycle. Includes tach (270° glow arc, redline split,
+zoom-on-cursor labels, baked Gaussian cursor sprite, shift-light flash
+at >9000 RPM), speed display, gear indicator, fuel bar, temperature,
+turn signals + hazard, 7 warning lamps in two chevrons (oil, engine,
+ABS, battery, immobiliser, low + high beam — beam slot rotates),
+clock + odometer + dual trip counters cycling in a shared slot, and
+an embedded GIF boot animation rendered via PPA hardware accelerator.
+Same widget code drives a desktop SDL2 simulator under `simulator/`
+for iteration without flashing.
 
-**The plan in `01-PHASE2-DISPLAY-PLAN.md` was written based on standard Espressif BSP patterns, NOT verified against the actual Waveshare `08_lvgl_demo_v9` example.**
+### Immediate next step: Phase 2.5 — Stage 1
 
-The plan's code uses guessed API names like:
-- `bsp_display_start_with_config()`
-- `bsp_display_lock()`
-- `bsp_display_backlight_on()`
-- `BSP_LCD_H_RES`, `BSP_LCD_V_RES`
+Touch + screen-switching infrastructure. Foundation for the settings
+screen / units toggle / BLE call overlay everything else in Phase 2.5
+hangs on. See `02-PHASE2.5-OFFBIKE-PLAN.md` for the full plan.
 
-**These need verification against the real example before applying.** The actual board likely uses the `waveshare/esp_lcd_dsi` component rather than a board-specific BSP.
-
-### Immediate Next Steps
-
-1. **Inspect the actual `08_lvgl_demo_v9` example** to understand:
-   - The real BSP/driver API being used
-   - Component dependencies in `idf_component.yml`
-   - Display initialization code in `main.c`
-   - CMakeLists.txt structure
-
-2. **Update the Phase 2 plan** to use verified API calls
-
-3. **Scaffold `vrod_gauge` project** based on the real working example, structured as:
-   ```
-   vrod_gauge/
-   ├── CMakeLists.txt
-   ├── sdkconfig.defaults
-   ├── main/
-   │   ├── CMakeLists.txt
-   │   ├── idf_component.yml
-   │   ├── main.c
-   │   ├── vehicle/
-   │   │   ├── vehicle_data.h     # Thread-safe shared state
-   │   │   └── vehicle_data.c
-   │   ├── display/
-   │   │   ├── ui_manager.h/.c
-   │   │   ├── screen_ride.h/.c
-   │   │   └── widgets/
-   │   │       ├── speedo_arc.h/.c
-   │   │       ├── rpm_bar.h/.c
-   │   │       └── gear_indicator.h/.c
-   │   └── simulator/
-   │       └── sim_engine.h/.c    # Phase 2: fake data
-   └── components/                 # Phase 3+: j1850, gps, ble modules
-   ```
-
-4. **First build and flash** to verify everything works on the actual board
+Phase 3 (J1850 + GPS) takes over the moment hardware lands; the
+data-abstraction layer (`vehicle_data_t`) means a sim → bus swap
+won't touch the UI.
 
 ## Design Decisions Already Made
 
@@ -145,6 +126,9 @@ The plan's code uses guessed API names like:
 
 ## How to Use This Brief
 
-When starting a new Claude Code session, paste:
+When starting a new Claude Code session, the repo's `CLAUDE.md` is read
+automatically — it has the always-true conventions. For project history
+and roadmap context, point at this file plus `00-MASTER-PROJECT-PLAN.md`.
 
-> Read `docs/PROJECT-BRIEF.md` for full context, then `docs/01-PHASE2-DISPLAY-PLAN.md` for current phase details. We're starting Phase 2. The display board works. Please inspect `examples/esp-idf/08_lvgl_demo_v9/` to verify the actual BSP API before applying anything from the plan.
+If you're picking up after Phase 2 (current state), the next-step is
+**Phase 3 (J1850 bus + IM simulation + GPS)** — see the master plan.

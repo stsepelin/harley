@@ -7,6 +7,7 @@ idf_component_register(
         simulator/sim_math.c
         display/boot_screen.c
         display/screen_ride.c
+        display/screen_settings.c
         display/ui_manager.c
         display/format.c
         display/widget_util.c
@@ -39,7 +40,7 @@ idf_component_register(
         display/fonts
     EMBED_FILES
         assets/boot.gif
-    REQUIRES waveshare__esp32_p4_wifi6_touch_lcd_xc lvgl__lvgl esp_driver_ppa
+    REQUIRES waveshare__esp32_p4_wifi6_touch_lcd_xc lvgl__lvgl
 )
 
 # Generated font files (from lv_font_conv) use `#ifdef LV_LVGL_H_INCLUDE_SIMPLE`
@@ -70,8 +71,3 @@ target_compile_definitions(${LVGL_LIB} PUBLIC
     "LV_ATTRIBUTE_FAST_MEM=__attribute__((section(\".iram1.lvgl_fast\")))"
 )
 
-# LVGL's managed esp.cmake adds esp_driver_ppa via PRIV_REQUIRES, but that
-# only sets up the link — it doesn't expose the dep's INCLUDE_DIRS, so
-# lv_draw_ppa*.c can't find <driver/ppa.h>. Link the deps directly so their
-# public headers are on the include path.
-target_link_libraries(${LVGL_LIB} PRIVATE idf::esp_driver_ppa idf::esp_mm)

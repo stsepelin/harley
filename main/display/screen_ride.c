@@ -10,9 +10,11 @@
 #include "odometer_display.h"
 #include "trip_display.h"
 #include "theme.h"
+#include "ui_manager.h"
 
 // Shift-light: flashing red ring at the bezel above SHIFT_LIGHT_RPM, telling
 // the rider to upshift now. ~5 Hz blink (3 frames on, 3 off at 30 FPS).
+#define SHIFT_LIGHT_ENABLED 1
 #define SHIFT_LIGHT_RPM     9000
 #define SHIFT_LIGHT_FRAMES  3
 
@@ -78,6 +80,7 @@ lv_obj_t *screen_ride_create(void)
     s_temp = temp_display_create(s_screen);
     lv_obj_align(s_temp, LV_ALIGN_BOTTOM_MID, 0, -25);
 
+#if SHIFT_LIGHT_ENABLED
     // Shift-light ring — added LAST so it draws on top of everything else.
     // 800×800 circular border at the bezel; hidden until rpm crosses the
     // shift threshold, then blinked by screen_ride_update.
@@ -91,6 +94,7 @@ lv_obj_t *screen_ride_create(void)
     lv_obj_center(s_shift_light);
     lv_obj_remove_flag(s_shift_light, LV_OBJ_FLAG_SCROLLABLE | LV_OBJ_FLAG_CLICKABLE);
     lv_obj_add_flag(s_shift_light, LV_OBJ_FLAG_HIDDEN);
+#endif
 
     return s_screen;
 }
@@ -98,6 +102,35 @@ lv_obj_t *screen_ride_create(void)
 void screen_ride_update(const vehicle_data_t *data)
 {
     if (!s_tach) return;
+
+    // Long-press detector: poll the indev directly and time how long the
+    // touch stays in PRESSED. At ~30 FPS (33 ms tick) this gives ~30 ms
+    // resolution, plenty for a 600 ms threshold. We poll instead of using
+    // LV_EVENT_LONG_PRESSED because LVGL's press hit-test wasn't reaching
+    // s_screen on this BSP — hover landed on the screen but pressed events
+    // never did. State polling is independent of that routing path.
+    // Only act when the ride screen is the active one, so a long press on
+    // settings doesn't bounce back here.
+    if (lv_screen_active() == s_screen) {
+        enum { LONG_PRESS_MS = 600, FRAME_MS = 33 };
+        static int  press_ms = 0;
+        static bool fired    = false;
+        lv_indev_t *indev = lv_indev_get_next(NULL);
+        if (indev) {
+            if (lv_indev_get_state(indev) == LV_INDEV_STATE_PRESSED) {
+                press_ms += FRAME_MS;
+                if (!fired && press_ms >= LONG_PRESS_MS) {
+                    fired = true;
+                    ui_manager_show_settings();
+                    return;
+                }
+            } else {
+                press_ms = 0;
+                fired    = false;
+            }
+        }
+    }
+
     tach_arc_set_value(s_tach, data->rpm);
     speed_display_set_value(s_speed, data->speed_kmh);
     gear_indicator_set(s_gear, data->gear);
@@ -130,6 +163,7 @@ void screen_ride_update(const vehicle_data_t *data)
         case 3: trip_display_set(s_trip2, data->trip2_m);                           break;
     }
 
+#if SHIFT_LIGHT_ENABLED
     // Shift-light blink. Toggle visibility only when the *displayed* state
     // changes — most frames stay quiet (rpm below threshold, or mid-blink
     // half-cycle still showing the same on/off as last frame).
@@ -144,4 +178,5 @@ void screen_ride_update(const vehicle_data_t *data)
         else      lv_obj_add_flag(s_shift_light, LV_OBJ_FLAG_HIDDEN);
         shift_shown = show;
     }
+#endif
 }

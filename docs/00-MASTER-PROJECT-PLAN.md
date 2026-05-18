@@ -312,7 +312,7 @@ J1850 VPW uses CRC-8 with polynomial 0x1D. Implement in firmware or use existing
 
 ## PROJECT PHASES
 
-### Phase 1: Sniffing & Capture (Weekends 1-2)
+### Phase 1: Sniffing & Capture (Weekends 1-2) — ⏳ pending
 - Build J1850 transceiver circuit on breadboard
 - Wire proxy box with T-taps to bike harness
 - Pass-through to stock cluster (bike still works normally)
@@ -320,13 +320,38 @@ J1850 VPW uses CRC-8 with polynomial 0x1D. Implement in firmware or use existing
 - Identify IM response messages for simulation
 - Verify speed, RPM, gear, temp decode against real values
 
-### Phase 2: Gauge Display (Weekends 3-4)
-- Set up ESP-IDF + LVGL for P4's 800×800 round display
-- Build gauge widgets: speedo arc, RPM bar, gear indicator, temp, fuel
-- Connect live J1850 data → UI
-- Aim for 30+ FPS rendering
+> Phase 1 was effectively deferred — we built the gauge UI against a
+> synthetic driving cycle first (Phase 2 below) so the display side could
+> be verified without the bike. Sniffing returns when the bench transceiver
+> is wired up and the bike's available.
 
-### Phase 3: IM Simulation + GPS (Weekends 5-6)
+### Phase 2: Gauge Display (Weekends 3-4) — ✅ complete
+- ESP-IDF v6.0.1 + LVGL 9.4 on the 800×800 round display
+- Full widget set: tach (270° glow arc + redline + zoom labels +
+  shift-light), speedometer, gear, fuel, temp, turn signals, 7 warning
+  lamps in chevrons, clock + odo + dual trip counters
+- UI driven by `vehicle_data_t` (mutex-guarded), produced by a
+  synthetic 32-s driving cycle in `main/simulator/sim_engine.c`
+- 30 FPS rendering with skip-if-unchanged caches; sim/UI core-pinned
+- See `01-PHASE2-DISPLAY-PLAN.md` "Outcome" for the full delta
+
+### Phase 2.5: Off-bike feature work — ⏳ next
+While J1850 + GPS hardware ships, work the features that need only the
+board we already have (Waveshare ESP32-P4 with onboard ESP32-C6 BLE/WiFi).
+
+- Touch + screen-switching framework (GT911 → LVGL indev, screen
+  manager swapping ride / settings)
+- NVS persistence (settings survive reboot)
+- Settings screen with kph/mph toggle, trip reset, brightness
+- Units conversion threaded through every speed/distance widget
+- BLE phone integration (iOS ANCS/AMS via the onboard C6; Android
+  companion app deferred)
+- Speed-camera alert framework — data format + alert engine + fake
+  GPS test harness; end-to-end validation when GPS arrives
+
+See `02-PHASE2.5-OFFBIKE-PLAN.md` for the full plan + ordering.
+
+### Phase 3: IM Simulation + GPS (Weekends 5-6) — ⏳ blocked on hardware
 - Program IM message replay via IRLZ44N TX
 - Test: disconnect stock cluster, verify no U1255
 - Wire NEO-6M/M8N to P4 UART

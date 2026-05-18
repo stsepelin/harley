@@ -5,7 +5,11 @@
 // Acquires the LVGL lock internally.
 void ui_manager_init(void);
 
-// Same as ui_manager_init() but assumes the LVGL lock is already held by the
-// caller — used from boot_screen's lv_timer callback, which runs on the LVGL
-// task with the lock implicitly held.
+// Switch to the ride screen. Lazy-creates the screen on first call and
+// starts the 30 FPS update task. Assumes the LVGL lock is already held
+// (true when called from an LVGL event / timer callback).
 void ui_manager_show_ride(void);
+
+// Switch to the settings screen. Lazy-creates on first call. Assumes
+// the LVGL lock is already held.
+void ui_manager_show_settings(void);

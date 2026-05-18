@@ -1,7 +1,17 @@
 # Phase 2: Display & Gauge UI Development
 ## ESP32-P4-WIFI6-Touch-LCD-3.4C — Building the Speedometer UI
 
-**Status**: Board is working, display tested ✓
+> **Status: ✅ COMPLETE**
+>
+> Phase 2 shipped. Gauge UI runs against a synthetic driving cycle; every
+> stage from "create the project" through "polish" is in. See *Outcome*
+> at the bottom of this file for the delta between the original plan and
+> what actually got built — mostly the plan got *more* than it called for
+> (richer widget set, full host-test harness, desktop SDL2 simulator,
+> shift-light, hardware-accelerated boot animation). This document is
+> retained as the historical Phase 2 record; for current architecture see
+> the repo's `CLAUDE.md` and `docs/PROJECT-BRIEF.md`.
+
 **Editor**: Zed
 **Goal**: Build a working 800×800 round speedometer gauge with simulated data. By the end of this phase you'll have a beautiful gauge UI running on your desk, ready to receive real J1850 data in Phase 3.
 
@@ -925,3 +935,65 @@ The simulator stays in the codebase as a fallback — useful for UI iteration wi
 **Total: ~8 hours over 2 weekends to have a beautiful working gauge.**
 
 When you see your first orange needle sweep across the round display, you'll know it's all worth it. 🏍️⚡
+
+---
+
+## Outcome — what actually shipped vs the plan
+
+Phase 2 delivered everything in the plan plus a few things that weren't.
+Brief delta — for the full file map see `docs/PROJECT-BRIEF.md`.
+
+### As planned, shipped
+
+- **Project scaffold** based on the Waveshare `08_lvgl_demo_v9` example,
+  with the BSP patched up to ESP-IDF v6.0.1.
+- **Thread-safe `vehicle_data_t`** as the single source of truth between
+  the producer (sim now, J1850 driver in Phase 3) and the UI thread.
+- **Dual-core split**: sim task on core 0 at prio 8, LVGL pthreads on
+  core 1 (via `CONFIG_PTHREAD_DEFAULT_CORE_1=y`).
+- **Synthetic 32-second driving cycle** exercising every phase:
+  idle/hazard, accel through gears, WOT redline pull, cruise with
+  high-beam + signal, deceleration.
+- **Widgets**: speedometer, tach, gear, fuel, turn signals, plus the
+  ones in the polish list (custom large font, tach redline, turn
+  arrows, round-screen mask, V-Rod colour theme).
+- **Performance tuning**: PSRAM framebuffer, double-buffered display,
+  PPA hardware-accelerator path for image blit, RGB565 framebuffer.
+- **Shift light** at >9000 RPM (red bezel ring flashing ~5 Hz).
+- **Round-screen mask**: all elements live within the inscribed circle.
+
+### Beyond the plan
+
+- **Tach** is more elaborate than "needle pointer": pre-baked Gaussian
+  glow ring as the arc brush, orange→red split at REDLINE_RPM, a baked
+  cursor sprite with rounded pill ends, zoom-on-cursor labels.
+- **Engine "breathing"** in the sim — slow swell + fast chatter + LCG
+  noise — so the needle is never dead-still.
+- **Per-widget skip-if-unchanged caches** on every setter; UI work
+  collapses to near-zero when readings hold steady.
+- **Full warning-lamp set** (oil, engine, ABS, battery, immobiliser,
+  low + high beam) in two chevron groups, with the beam slot rotating
+  low↔high every 5 s. Low-fuel and high-temp also trip icons inside
+  the existing widgets.
+- **Rotating info slot** above the fuel bar: clock → odometer → trip A
+  → trip B, cycled every 5 s. Updates only the visible widget.
+- **Boot animation**: an embedded 800×800 GIF rendered through the PPA
+  accelerator, handed off to the ride screen on `LV_EVENT_READY`.
+  (Lottie/ThorVG was tried first — vector rasterisation at that size
+  isn't real-time on the P4.)
+- **Host unit-test harness** under `test_apps/host/` — Unity + FreeRTOS
+  stub + LVGL stub, 6 suites covering pure-logic modules (`gear_table`,
+  `sim_math`, `format`, `smooth`, `vehicle_data`) at 100 % line + branch
+  coverage, plus a widget cache-regression suite.
+- **Desktop SDL2 simulator** at `simulator/` — the same widget code
+  running in an 800×800 SDL window driven by the sim engine on a real
+  pthread. Iterate on layout/colours/animation timing without flashing.
+- **CI**: `host-tests.yml` (coverage gate on every push), `firmware-build.yml`
+  (espressif/idf container builds artifacts).
+
+### Hand-off to Phase 3
+
+The data-abstraction layer made the migration shape trivial:
+`main/simulator/sim_engine.c` becomes `components/j1850/j1850_driver.c`,
+writing the same `vehicle_data_t` struct. The UI, tests, and simulator
+stay unchanged.

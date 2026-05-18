@@ -37,13 +37,10 @@ CONFIG_LV_DRAW_SW_DRAW_UNIT_CNT=2
 # with zero LVGL scaling.
 CONFIG_LV_USE_GIF=y
 
-# PPA hardware accelerator on the P4 handles the big-buffer blit from the
-# cooked GIF frame to the display. PPA requires draw buffers aligned to the
-# 64-byte L1 cache line size — bumping LVGL's two alignment knobs to match.
-CONFIG_LV_USE_PPA=y
-CONFIG_LV_USE_PPA_IMG=y
-CONFIG_LV_DRAW_BUF_ALIGN=64
-CONFIG_LV_ATTRIBUTE_MEM_ALIGN_SIZE=64
+# PPA hardware accelerator was tried for the cooked-GIF blit but causes
+# horizontal banding on this BSP's DSI tear-avoid triple-buffer setup, so
+# it's off. Re-enable only with a known-good buffer alignment story.
+# CONFIG_LV_USE_PPA is not set
 
 # Pin pthreads to core 1 so any LVGL draw worker stays off the sim core.
 CONFIG_PTHREAD_DEFAULT_CORE_1=y

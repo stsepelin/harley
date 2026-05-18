@@ -14,6 +14,7 @@
 #include "vehicle_data.h"
 #include "sim_engine.h"
 #include "screen_ride.h"
+#include "ui_manager.h"
 
 #include <stdio.h>
 #include <unistd.h>
@@ -38,9 +39,10 @@ int main(void)
     vehicle_data_init();
     sim_engine_start();
 
-    // 3) Build the ride screen against the running sim
-    lv_obj_t *ride = screen_ride_create();
-    lv_screen_load(ride);
+    // 3) Build the ride screen against the running sim. Going through the
+    //    ui_manager shim caches the screen so the settings → back path
+    //    rejoins the original instead of building a fresh ride each time.
+    ui_manager_show_ride();
 
     // 4) Main loop: pump vehicle data into the UI, then let LVGL render.
     //    The sim updates s_data on its own thread; vehicle_data_get gives
