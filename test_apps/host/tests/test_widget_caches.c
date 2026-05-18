@@ -30,9 +30,9 @@
 static void test_speed_cache_skips_unchanged(void)
 {
     lv_obj_t *w = speed_display_create(NULL);
-    speed_display_set_value(w, 50);          // prime
+    speed_display_set_value(w, 50, UNITS_KPH);          // prime
     lv_stub_reset();
-    for (int i = 0; i < REPEAT; i++) speed_display_set_value(w, 50);
+    for (int i = 0; i < REPEAT; i++) speed_display_set_value(w, 50, UNITS_KPH);
     TEST_ASSERT_EQUAL_INT_MESSAGE(0, g_lv_label_set_text_calls,
         "identical speed must not re-render");
 }
@@ -40,10 +40,22 @@ static void test_speed_cache_skips_unchanged(void)
 static void test_speed_cache_fires_on_change(void)
 {
     lv_obj_t *w = speed_display_create(NULL);
-    speed_display_set_value(w, 50);
+    speed_display_set_value(w, 50, UNITS_KPH);
     lv_stub_reset();
-    speed_display_set_value(w, 51);
+    speed_display_set_value(w, 51, UNITS_KPH);
     TEST_ASSERT_EQUAL_INT(1, g_lv_label_set_text_calls);
+}
+
+// Switching the displayed unit must repaint both the value digits and
+// the "km/h" / "mph" subtitle even when the underlying km/h value is
+// identical — same input, different output.
+static void test_speed_cache_fires_on_units_change(void)
+{
+    lv_obj_t *w = speed_display_create(NULL);
+    speed_display_set_value(w, 50, UNITS_KPH);
+    lv_stub_reset();
+    speed_display_set_value(w, 50, UNITS_MPH);
+    TEST_ASSERT_EQUAL_INT(2, g_lv_label_set_text_calls);  // value + unit
 }
 
 // --- gear_indicator --------------------------------------------------------
@@ -161,11 +173,11 @@ static void test_clock_cache_fires_on_minute_change(void)
 static void test_odometer_cache_skips_sub_km(void)
 {
     lv_obj_t *w = odometer_display_create(NULL);
-    odometer_display_set(w, 12847000);   // 12,847 km
+    odometer_display_set(w, 12847000, UNITS_KPH);   // 12,847 km
     lv_stub_reset();
     // Same km value reached via several sub-km updates — must stay quiet.
     for (uint32_t m = 12847001; m < 12847000 + 1000; m += 7) {
-        odometer_display_set(w, m);
+        odometer_display_set(w, m, UNITS_KPH);
     }
     TEST_ASSERT_EQUAL_INT(0, g_lv_label_set_text_calls);
 }
@@ -173,9 +185,18 @@ static void test_odometer_cache_skips_sub_km(void)
 static void test_odometer_cache_fires_on_km_change(void)
 {
     lv_obj_t *w = odometer_display_create(NULL);
-    odometer_display_set(w, 12847000);
+    odometer_display_set(w, 12847000, UNITS_KPH);
     lv_stub_reset();
-    odometer_display_set(w, 12848000);   // next km
+    odometer_display_set(w, 12848000, UNITS_KPH);   // next km
+    TEST_ASSERT_EQUAL_INT(1, g_lv_label_set_text_calls);
+}
+
+static void test_odometer_cache_fires_on_units_change(void)
+{
+    lv_obj_t *w = odometer_display_create(NULL);
+    odometer_display_set(w, 12847000, UNITS_KPH);
+    lv_stub_reset();
+    odometer_display_set(w, 12847000, UNITS_MPH);   // same metres, different unit
     TEST_ASSERT_EQUAL_INT(1, g_lv_label_set_text_calls);
 }
 
@@ -185,18 +206,27 @@ static void test_odometer_cache_fires_on_km_change(void)
 static void test_trip_cache_skips_sub_tenth_km(void)
 {
     lv_obj_t *w = trip_display_create(NULL, "TRIP1");
-    trip_display_set(w, 1234);            // 1.2 km
+    trip_display_set(w, 1234, UNITS_KPH);            // 1.2 km
     lv_stub_reset();
-    for (uint32_t m = 1235; m < 1300; m++) trip_display_set(w, m);
+    for (uint32_t m = 1235; m < 1300; m++) trip_display_set(w, m, UNITS_KPH);
     TEST_ASSERT_EQUAL_INT(0, g_lv_label_set_text_calls);
 }
 
 static void test_trip_cache_fires_on_tenth_change(void)
 {
     lv_obj_t *w = trip_display_create(NULL, "TRIP1");
-    trip_display_set(w, 1234);            // 1.2 km
+    trip_display_set(w, 1234, UNITS_KPH);            // 1.2 km
     lv_stub_reset();
-    trip_display_set(w, 1300);            // 1.3 km
+    trip_display_set(w, 1300, UNITS_KPH);            // 1.3 km
+    TEST_ASSERT_EQUAL_INT(1, g_lv_label_set_text_calls);
+}
+
+static void test_trip_cache_fires_on_units_change(void)
+{
+    lv_obj_t *w = trip_display_create(NULL, "TRIP1");
+    trip_display_set(w, 1234, UNITS_KPH);
+    lv_stub_reset();
+    trip_display_set(w, 1234, UNITS_MPH);
     TEST_ASSERT_EQUAL_INT(1, g_lv_label_set_text_calls);
 }
 
@@ -240,6 +270,7 @@ void RunTests(void)
 {
     RUN_TEST(test_speed_cache_skips_unchanged);
     RUN_TEST(test_speed_cache_fires_on_change);
+    RUN_TEST(test_speed_cache_fires_on_units_change);
     RUN_TEST(test_gear_cache_skips_unchanged);
     RUN_TEST(test_gear_cache_fires_on_change);
     RUN_TEST(test_temp_cache_skips_unchanged);
@@ -252,8 +283,10 @@ void RunTests(void)
     RUN_TEST(test_clock_cache_fires_on_minute_change);
     RUN_TEST(test_odometer_cache_skips_sub_km);
     RUN_TEST(test_odometer_cache_fires_on_km_change);
+    RUN_TEST(test_odometer_cache_fires_on_units_change);
     RUN_TEST(test_trip_cache_skips_sub_tenth_km);
     RUN_TEST(test_trip_cache_fires_on_tenth_change);
+    RUN_TEST(test_trip_cache_fires_on_units_change);
     RUN_TEST(test_warning_lights_cache_idle);
     RUN_TEST(test_warning_lights_only_changed_lamp_repaints);
 }

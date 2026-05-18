@@ -11,9 +11,11 @@ LV_FONT_DECLARE(jbm_bold_144);
 LV_FONT_DECLARE(jbm_bold_33);
 
 typedef struct {
-    lv_obj_t *value_label;
-    uint16_t  last_kmh;
-    bool      has_value;
+    lv_obj_t       *value_label;
+    lv_obj_t       *unit_label;
+    uint16_t        last_kmh;
+    display_units_t last_units;
+    bool            has_value;
 } speed_data_t;
 
 lv_obj_t *speed_display_create(lv_obj_t *parent)
@@ -29,25 +31,35 @@ lv_obj_t *speed_display_create(lv_obj_t *parent)
     lv_obj_t *unit = lv_label_create(cont);
     lv_obj_set_style_text_color(unit, lv_color_hex(VROD_TEXT_DIM), 0);
     lv_obj_set_style_text_font(unit, &jbm_bold_33, 0);
-    lv_label_set_text(unit, "km/h");
+    lv_label_set_text(unit, units_speed_label(UNITS_KPH));
     lv_obj_align(unit, LV_ALIGN_CENTER, 0, 95);
 
     speed_data_t *sd = lv_malloc(sizeof(speed_data_t));
     sd->value_label = value;
-    sd->last_kmh = 0;
-    sd->has_value = false;
+    sd->unit_label  = unit;
+    sd->last_kmh    = 0;
+    sd->last_units  = UNITS_KPH;
+    sd->has_value   = false;
     lv_obj_set_user_data(cont, sd);
     return cont;
 }
 
-void speed_display_set_value(lv_obj_t *cont, uint16_t kmh)
+void speed_display_set_value(lv_obj_t *cont, uint16_t kmh, display_units_t units)
 {
     speed_data_t *sd = lv_obj_get_user_data(cont);
     if (!sd) return;
-    if (sd->has_value && sd->last_kmh == kmh) return;
-    sd->last_kmh = kmh;
-    sd->has_value = true;
+    if (sd->has_value && sd->last_kmh == kmh && sd->last_units == units) return;
+
+    bool units_changed = sd->last_units != units;
+    sd->last_kmh   = kmh;
+    sd->last_units = units;
+    sd->has_value  = true;
+
     char buf[8];
-    snprintf(buf, sizeof(buf), "%u", (unsigned)kmh);
+    snprintf(buf, sizeof(buf), "%u", (unsigned)units_speed_display(kmh, units));
     lv_label_set_text(sd->value_label, buf);
+
+    if (units_changed) {
+        lv_label_set_text(sd->unit_label, units_speed_label(units));
+    }
 }

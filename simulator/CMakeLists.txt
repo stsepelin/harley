@@ -49,7 +49,9 @@ add_executable(vrod_sim
     ${MAIN_DIR}/display/screen_ride.c
     ${MAIN_DIR}/display/screen_settings.c
     ${MAIN_DIR}/display/format.c
+    ${MAIN_DIR}/display/units.c
     ${MAIN_DIR}/display/widget_util.c
+    ${MAIN_DIR}/settings/settings.c
     ui_manager_shim.c
     ${MAIN_DIR}/display/widgets/tach_arc.c
     ${MAIN_DIR}/display/widgets/speed_display.c
@@ -77,6 +79,7 @@ target_include_directories(vrod_sim PRIVATE
     ${MAIN_DIR}/display
     ${MAIN_DIR}/display/widgets
     ${MAIN_DIR}/display/fonts
+    ${MAIN_DIR}/settings
     ${MAIN_DIR}/simulator
     ${MAIN_DIR}/vehicle
     ${SIM_DIR}/external/freertos_shim

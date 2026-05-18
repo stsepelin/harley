@@ -1,5 +1,4 @@
 #include "trip_display.h"
-#include "format.h"
 #include "theme.h"
 #include "widget_util.h"
 #include <stdio.h>
@@ -10,10 +9,11 @@ LV_FONT_DECLARE(jbm_bold_26);
 #define LABEL_MAX  8   // "TRIPN" with a little headroom
 
 typedef struct {
-    lv_obj_t *value;
-    char      label[LABEL_MAX];
-    uint32_t  last_tenths_km;   // (meters / 100); changes once per 100 m
-    bool      has_value;
+    lv_obj_t       *value;
+    char            label[LABEL_MAX];
+    uint32_t        last_tenths;   // changes once per 0.1 unit
+    display_units_t last_units;
+    bool            has_value;
 } trip_data_t;
 
 lv_obj_t *trip_display_create(lv_obj_t *parent, const char *label)
@@ -29,29 +29,32 @@ lv_obj_t *trip_display_create(lv_obj_t *parent, const char *label)
     td->value = lbl;
     strncpy(td->label, label, LABEL_MAX - 1);
     td->label[LABEL_MAX - 1] = '\0';
-    td->last_tenths_km = 0;
-    td->has_value = false;
+    td->last_tenths = 0;
+    td->last_units  = UNITS_KPH;
+    td->has_value   = false;
     lv_obj_set_user_data(cont, td);
 
-    trip_display_set(cont, 0);
+    trip_display_set(cont, 0, UNITS_KPH);
     return cont;
 }
 
-// One decimal of km (e.g. "TRIP1 12.3 km") — integer math, no float printf.
-void trip_display_set(lv_obj_t *cont, uint32_t meters)
+// One decimal of the active unit, e.g. "TRIP1 12.3 km" or "TRIP1 7.6 mi".
+void trip_display_set(lv_obj_t *cont, uint32_t meters, display_units_t units)
 {
     trip_data_t *td = lv_obj_get_user_data(cont);
     if (!td) return;
 
-    uint32_t tenths_km = meters / 100;
-    if (td->has_value && td->last_tenths_km == tenths_km) return;
-    td->last_tenths_km = tenths_km;
-    td->has_value = true;
+    uint32_t tenths = units_distance_tenths(meters, units);
+    if (td->has_value && td->last_tenths == tenths && td->last_units == units) return;
+    td->last_tenths = tenths;
+    td->last_units  = units;
+    td->has_value   = true;
 
-    char km_str[16];
-    format_km_tenth(meters, km_str, sizeof(km_str));
+    unsigned whole = (unsigned)(tenths / 10);
+    unsigned frac  = (unsigned)(tenths % 10);
 
     char buf[32];
-    snprintf(buf, sizeof(buf), "%s %s km", td->label, km_str);
+    snprintf(buf, sizeof(buf), "%s %u.%u %s",
+             td->label, whole, frac, units_distance_label(units));
     lv_label_set_text(td->value, buf);
 }

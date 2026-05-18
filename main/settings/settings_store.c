@@ -1,0 +1,74 @@
+#include "settings_store.h"
+#include "esp_log.h"
+#include "nvs.h"
+#include "nvs_flash.h"
+
+static const char *TAG = "settings";
+
+#define NS         "vrod"
+#define KEY_UNITS  "units"
+#define KEY_BRIGHT "brightness"
+
+static settings_t s_current;
+
+static void load_into(settings_t *out)
+{
+    settings_default(out);
+
+    nvs_handle_t h;
+    if (nvs_open(NS, NVS_READONLY, &h) != ESP_OK) {
+        // First boot: namespace not yet created, keep defaults.
+        return;
+    }
+
+    uint8_t v;
+    if (nvs_get_u8(h, KEY_UNITS,  &v) == ESP_OK) out->units      = (display_units_t)v;
+    if (nvs_get_u8(h, KEY_BRIGHT, &v) == ESP_OK) out->brightness = v;
+    nvs_close(h);
+
+    settings_validate(out);
+}
+
+static bool save_from(const settings_t *s)
+{
+    nvs_handle_t h;
+    esp_err_t err = nvs_open(NS, NVS_READWRITE, &h);
+    if (err != ESP_OK) {
+        ESP_LOGW(TAG, "nvs_open: %s", esp_err_to_name(err));
+        return false;
+    }
+
+    bool ok = nvs_set_u8(h, KEY_UNITS,  (uint8_t)s->units) == ESP_OK
+           && nvs_set_u8(h, KEY_BRIGHT, s->brightness)      == ESP_OK
+           && nvs_commit(h)                                  == ESP_OK;
+
+    nvs_close(h);
+    if (!ok) ESP_LOGW(TAG, "save failed");
+    return ok;
+}
+
+void settings_store_init(void)
+{
+    esp_err_t err = nvs_flash_init();
+    if (err == ESP_ERR_NVS_NO_FREE_PAGES || err == ESP_ERR_NVS_NEW_VERSION_FOUND) {
+        ESP_LOGW(TAG, "NVS unreadable (%s) — erasing and re-initialising", esp_err_to_name(err));
+        nvs_flash_erase();
+        err = nvs_flash_init();
+    }
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "nvs_flash_init failed: %s", esp_err_to_name(err));
+    }
+    load_into(&s_current);
+}
+
+const settings_t *settings_store_current(void)
+{
+    return &s_current;
+}
+
+bool settings_store_apply(const settings_t *s)
+{
+    s_current = *s;
+    settings_validate(&s_current);
+    return save_from(&s_current);
+}

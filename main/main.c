@@ -7,6 +7,7 @@
 #include "boot_screen.h"
 #include "vehicle_data.h"
 #include "sim_engine.h"
+#include "settings_store.h"
 
 static const char *TAG = "vrod_gauge";
 
@@ -19,6 +20,12 @@ void app_main(void)
         .touch_flags = { .swap_xy = 0, .mirror_x = 0, .mirror_y = 0 },
     };
     bsp_display_start_with_config(&cfg);
+
+    // Load persisted brightness and apply it BEFORE enabling the
+    // backlight; otherwise the panel would flash at 100% for a beat
+    // until we set the user-chosen duty cycle.
+    settings_store_init();
+    bsp_display_brightness_set(settings_store_current()->brightness);
     bsp_display_backlight_on();
 
     vehicle_data_init();

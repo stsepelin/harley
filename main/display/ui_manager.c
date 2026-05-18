@@ -1,6 +1,7 @@
 #include "ui_manager.h"
 #include "screen_ride.h"
 #include "screen_settings.h"
+#include "settings_store.h"
 #include "vehicle_data.h"
 #include "bsp/esp-bsp.h"
 #include "bsp/display.h"
@@ -22,9 +23,10 @@ static void ui_update_task(void *arg)
     while (1) {
         vehicle_data_t d;
         vehicle_data_get(&d);
+        const settings_t *s = settings_store_current();
 
         bsp_display_lock(-1);
-        screen_ride_update(&d);
+        screen_ride_update(&d, s);
         bsp_display_unlock();
 
         vTaskDelay(pdMS_TO_TICKS(33));   // ~30 FPS; matches LVGL render budget

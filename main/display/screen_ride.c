@@ -33,6 +33,36 @@ static lv_obj_t *s_trip1;
 static lv_obj_t *s_trip2;
 static lv_obj_t *s_shift_light;
 
+// Long-press → settings, polled from the indev's raw state. Times the
+// hold with lv_tick_elapsed so a stalled frame doesn't make the press
+// feel sluggish (frame-count timing would lose ~33 ms per dropped frame).
+// LVGL's own LV_EVENT_LONG_PRESSED is not used here because press events
+// were not reaching the ride screen on this BSP — see commit history.
+#define LONG_PRESS_MS 600
+
+static bool long_press_should_fire(void)
+{
+    static uint32_t press_start_tick;
+    static bool     pressing;
+    static bool     fired;
+
+    lv_indev_t *indev = lv_indev_get_next(NULL);
+    if (!indev || lv_indev_get_state(indev) != LV_INDEV_STATE_PRESSED) {
+        pressing = false;
+        fired    = false;
+        return false;
+    }
+
+    if (!pressing) {
+        pressing         = true;
+        press_start_tick = lv_tick_get();
+    }
+    if (fired) return false;
+    if (lv_tick_elaps(press_start_tick) < LONG_PRESS_MS) return false;
+    fired = true;
+    return true;
+}
+
 lv_obj_t *screen_ride_create(void)
 {
     s_screen = lv_obj_create(NULL);
@@ -82,13 +112,13 @@ lv_obj_t *screen_ride_create(void)
 
 #if SHIFT_LIGHT_ENABLED
     // Shift-light ring — added LAST so it draws on top of everything else.
-    // 800×800 circular border at the bezel; hidden until rpm crosses the
-    // shift threshold, then blinked by screen_ride_update.
+    // Full-screen 800×800 circular border at the bezel; hidden until rpm
+    // crosses the shift threshold, then blinked by screen_ride_update.
     s_shift_light = lv_obj_create(s_screen);
     lv_obj_set_size(s_shift_light, 800, 800);
     lv_obj_set_style_bg_opa(s_shift_light, LV_OPA_TRANSP, 0);
     lv_obj_set_style_border_color(s_shift_light, lv_color_hex(VROD_RED_BRIGHT), 0);
-    lv_obj_set_style_border_width(s_shift_light, 30, 0);
+    lv_obj_set_style_border_width(s_shift_light, 15, 0);
     lv_obj_set_style_radius(s_shift_light, 400, 0);
     lv_obj_set_style_pad_all(s_shift_light, 0, 0);
     lv_obj_center(s_shift_light);
@@ -99,40 +129,21 @@ lv_obj_t *screen_ride_create(void)
     return s_screen;
 }
 
-void screen_ride_update(const vehicle_data_t *data)
+void screen_ride_update(const vehicle_data_t *data, const settings_t *settings)
 {
     if (!s_tach) return;
 
-    // Long-press detector: poll the indev directly and time how long the
-    // touch stays in PRESSED. At ~30 FPS (33 ms tick) this gives ~30 ms
-    // resolution, plenty for a 600 ms threshold. We poll instead of using
-    // LV_EVENT_LONG_PRESSED because LVGL's press hit-test wasn't reaching
-    // s_screen on this BSP — hover landed on the screen but pressed events
-    // never did. State polling is independent of that routing path.
-    // Only act when the ride screen is the active one, so a long press on
-    // settings doesn't bounce back here.
-    if (lv_screen_active() == s_screen) {
-        enum { LONG_PRESS_MS = 600, FRAME_MS = 33 };
-        static int  press_ms = 0;
-        static bool fired    = false;
-        lv_indev_t *indev = lv_indev_get_next(NULL);
-        if (indev) {
-            if (lv_indev_get_state(indev) == LV_INDEV_STATE_PRESSED) {
-                press_ms += FRAME_MS;
-                if (!fired && press_ms >= LONG_PRESS_MS) {
-                    fired = true;
-                    ui_manager_show_settings();
-                    return;
-                }
-            } else {
-                press_ms = 0;
-                fired    = false;
-            }
-        }
+    // Guard the long-press hand-off so a hold on the settings screen
+    // doesn't bounce straight back here.
+    if (lv_screen_active() == s_screen && long_press_should_fire()) {
+        ui_manager_show_settings();
+        return;
     }
 
+    display_units_t units = settings->units;
+
     tach_arc_set_value(s_tach, data->rpm);
-    speed_display_set_value(s_speed, data->speed_kmh);
+    speed_display_set_value(s_speed, data->speed_kmh, units);
     gear_indicator_set(s_gear, data->gear);
     fuel_bar_set_level(s_fuel, data->fuel_level);
     turn_signals_set(s_turn, data->turn_left, data->turn_right);
@@ -158,9 +169,9 @@ void screen_ride_update(const vehicle_data_t *data)
     }
     switch (mode) {
         case 0: clock_display_set(s_clock, data->clock_hours, data->clock_minutes); break;
-        case 1: odometer_display_set(s_odo, data->odometer_m);                      break;
-        case 2: trip_display_set(s_trip1, data->trip1_m);                           break;
-        case 3: trip_display_set(s_trip2, data->trip2_m);                           break;
+        case 1: odometer_display_set(s_odo, data->odometer_m, units);               break;
+        case 2: trip_display_set(s_trip1, data->trip1_m, units);                    break;
+        case 3: trip_display_set(s_trip2, data->trip2_m, units);                    break;
     }
 
 #if SHIFT_LIGHT_ENABLED

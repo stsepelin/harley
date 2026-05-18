@@ -14,6 +14,7 @@
 #include "vehicle_data.h"
 #include "sim_engine.h"
 #include "screen_ride.h"
+#include "settings_store.h"
 #include "ui_manager.h"
 
 #include <stdio.h>
@@ -39,18 +40,20 @@ int main(void)
     vehicle_data_init();
     sim_engine_start();
 
-    // 3) Build the ride screen against the running sim. Going through the
-    //    ui_manager shim caches the screen so the settings → back path
-    //    rejoins the original instead of building a fresh ride each time.
-    ui_manager_show_ride();
+    // 3) Init settings (desktop shim — defaults only) and build the ride
+    //    screen against the running sim. The ui_manager shim caches both
+    //    screens so the settings → back path rejoins the original instead
+    //    of rebuilding the ride each time.
+    ui_manager_init();
 
-    // 4) Main loop: pump vehicle data into the UI, then let LVGL render.
-    //    The sim updates s_data on its own thread; vehicle_data_get gives
-    //    us a snapshot under the mutex so we never see a torn struct.
+    // 4) Main loop: pump vehicle data + settings into the UI, then let
+    //    LVGL render. The sim updates s_data on its own thread;
+    //    vehicle_data_get gives us a snapshot under the mutex so we never
+    //    see a torn struct.
     while (1) {
         vehicle_data_t snapshot;
         vehicle_data_get(&snapshot);
-        screen_ride_update(&snapshot);
+        screen_ride_update(&snapshot, settings_store_current());
 
         lv_timer_handler();
         usleep(UI_TICK_MS * 1000);
