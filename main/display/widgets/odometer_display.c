@@ -1,4 +1,5 @@
 #include "odometer_display.h"
+#include "format.h"
 #include "theme.h"
 #include <stdio.h>
 
@@ -6,6 +7,8 @@ LV_FONT_DECLARE(jbm_bold_26);
 
 typedef struct {
     lv_obj_t *label;
+    uint32_t  last_km;
+    bool      has_value;
 } odo_data_t;
 
 lv_obj_t *odometer_display_create(lv_obj_t *parent)
@@ -25,6 +28,8 @@ lv_obj_t *odometer_display_create(lv_obj_t *parent)
 
     odo_data_t *od = lv_malloc(sizeof(odo_data_t));
     od->label = lbl;
+    od->last_km = 0;
+    od->has_value = false;
     lv_obj_set_user_data(cont, od);
     return cont;
 }
@@ -36,21 +41,12 @@ void odometer_display_set(lv_obj_t *cont, uint32_t meters)
     if (!od) return;
 
     uint32_t km = meters / 1000;
-    char num[16];
-    int n = snprintf(num, sizeof(num), "%u", (unsigned)km);
+    if (od->has_value && od->last_km == km) return;
+    od->last_km = km;
+    od->has_value = true;
 
     char grouped[20];
-    int gi = 0;
-    int digits_until_comma = ((n - 1) % 3) + 1;
-    for (int i = 0; i < n && gi < (int)sizeof(grouped) - 1; i++) {
-        grouped[gi++] = num[i];
-        digits_until_comma--;
-        if (digits_until_comma == 0 && i < n - 1 && gi < (int)sizeof(grouped) - 1) {
-            grouped[gi++] = ',';
-            digits_until_comma = 3;
-        }
-    }
-    grouped[gi] = '\0';
+    format_km_grouped(km, grouped, sizeof(grouped));
 
     char buf[32];
     snprintf(buf, sizeof(buf), "ODO %s km", grouped);

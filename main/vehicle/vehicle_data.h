@@ -25,7 +25,8 @@ typedef struct {
     bool     battery_warning;
     bool     immobiliser_warning;
     uint32_t odometer_m;
-    uint32_t trip_m;
+    uint32_t trip1_m;
+    uint32_t trip2_m;
     // Mock time-of-day driven by the sim until we have an RTC/SNTP source.
     uint8_t  clock_hours;
     uint8_t  clock_minutes;

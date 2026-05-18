@@ -8,6 +8,7 @@
 #include "warning_lights.h"
 #include "clock_display.h"
 #include "odometer_display.h"
+#include "trip_display.h"
 
 static lv_obj_t *s_screen;
 static lv_obj_t *s_tach;
@@ -20,6 +21,8 @@ static lv_obj_t *s_warn_l;
 static lv_obj_t *s_warn_r;
 static lv_obj_t *s_clock;
 static lv_obj_t *s_odo;
+static lv_obj_t *s_trip1;
+static lv_obj_t *s_trip2;
 
 lv_obj_t *screen_ride_create(void)
 {
@@ -49,14 +52,20 @@ lv_obj_t *screen_ride_create(void)
     s_warn_r = warning_lights_create(s_screen, LAMPS_RIGHT, 3, WARN_LAYOUT_CHEVRON);
     lv_obj_align(s_warn_r, LV_ALIGN_RIGHT_MID, -125, 0);
 
-    // Clock + odometer share one slot above the fuel bar — they alternate
-    // every few seconds (see screen_ride_update). Both widgets sit at the
-    // same alignment; one is always hidden.
+    // Clock, odometer, and the two trip counters share one slot above the
+    // fuel bar — they cycle every few seconds (see screen_ride_update). All
+    // four widgets share the same alignment; three are always hidden.
     s_clock = clock_display_create(s_screen);
     lv_obj_align(s_clock, LV_ALIGN_BOTTOM_MID, 0, -203);
     s_odo   = odometer_display_create(s_screen);
     lv_obj_align(s_odo, LV_ALIGN_BOTTOM_MID, 0, -203);
     lv_obj_add_flag(s_odo, LV_OBJ_FLAG_HIDDEN);
+    s_trip1 = trip_display_create(s_screen, "TRIP1");
+    lv_obj_align(s_trip1, LV_ALIGN_BOTTOM_MID, 0, -203);
+    lv_obj_add_flag(s_trip1, LV_OBJ_FLAG_HIDDEN);
+    s_trip2 = trip_display_create(s_screen, "TRIP2");
+    lv_obj_align(s_trip2, LV_ALIGN_BOTTOM_MID, 0, -203);
+    lv_obj_add_flag(s_trip2, LV_OBJ_FLAG_HIDDEN);
     s_fuel = fuel_bar_create(s_screen);
     lv_obj_align(s_fuel, LV_ALIGN_BOTTOM_MID, 0, -95);
     s_temp = temp_display_create(s_screen);
@@ -76,18 +85,26 @@ void screen_ride_update(const vehicle_data_t *data)
     temp_display_set_value(s_temp, data->engine_temp_c);
     warning_lights_update(s_warn_l, data);
     warning_lights_update(s_warn_r, data);
-    clock_display_set(s_clock, data->clock_hours, data->clock_minutes);
-    odometer_display_set(s_odo, data->odometer_m);
 
-    // Rotate clock/odo every ~5 s (UI runs at ~30 FPS, 150 frames = 5 s).
+    // Rotating info slot: cycle clock → odo → trip1 → trip2 every ~5 s
+    // (30 FPS × 150 frames). Only update the visible widget — the hidden
+    // ones get a fresh value when they cycle in. And only flip HIDDEN flags
+    // on actual mode changes, otherwise every frame would invalidate all
+    // four slot widgets for nothing.
     static uint32_t info_tick = 0;
+    static int      prev_mode = -1;
     info_tick++;
-    bool show_odo = ((info_tick / 150) & 1) != 0;
-    if (show_odo) {
-        lv_obj_add_flag(s_clock, LV_OBJ_FLAG_HIDDEN);
-        lv_obj_remove_flag(s_odo, LV_OBJ_FLAG_HIDDEN);
-    } else {
-        lv_obj_remove_flag(s_clock, LV_OBJ_FLAG_HIDDEN);
-        lv_obj_add_flag(s_odo, LV_OBJ_FLAG_HIDDEN);
+    int mode = (info_tick / 150) % 4;
+    if (mode != prev_mode) {
+        lv_obj_t *slots[4] = { s_clock, s_odo, s_trip1, s_trip2 };
+        for (int i = 0; i < 4; i++) lv_obj_add_flag(slots[i], LV_OBJ_FLAG_HIDDEN);
+        lv_obj_remove_flag(slots[mode], LV_OBJ_FLAG_HIDDEN);
+        prev_mode = mode;
+    }
+    switch (mode) {
+        case 0: clock_display_set(s_clock, data->clock_hours, data->clock_minutes); break;
+        case 1: odometer_display_set(s_odo, data->odometer_m);                      break;
+        case 2: trip_display_set(s_trip1, data->trip1_m);                           break;
+        case 3: trip_display_set(s_trip2, data->trip2_m);                           break;
     }
 }

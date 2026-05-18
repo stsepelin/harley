@@ -11,6 +11,8 @@ LV_FONT_DECLARE(mdi_36);
 typedef struct {
     lv_obj_t *icon;
     lv_obj_t *value;
+    int8_t    last_c;
+    bool      has_value;
 } temp_data_t;
 
 lv_obj_t *temp_display_create(lv_obj_t *parent)
@@ -40,6 +42,8 @@ lv_obj_t *temp_display_create(lv_obj_t *parent)
     temp_data_t *td = lv_malloc(sizeof(temp_data_t));
     td->icon  = icon;
     td->value = value;
+    td->last_c = 0;
+    td->has_value = false;
     lv_obj_set_user_data(cont, td);
     return cont;
 }
@@ -48,6 +52,9 @@ void temp_display_set_value(lv_obj_t *cont, int8_t celsius)
 {
     temp_data_t *td = lv_obj_get_user_data(cont);
     if (!td) return;
+    if (td->has_value && td->last_c == celsius) return;
+    td->last_c = celsius;
+    td->has_value = true;
     char buf[16];
     snprintf(buf, sizeof(buf), "%d\xC2\xB0""C", (int)celsius);
     lv_label_set_text(td->value, buf);

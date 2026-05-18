@@ -12,7 +12,7 @@ LV_FONT_DECLARE(mdi_50);
 #define ICON_LOW_BEAM     "\xF3\xB0\xB1\x8A"   // U+F0C4A  (car-light-dimmed)
 #define ICON_HIGH_BEAM    "\xF3\xB0\xB1\x8C"   // U+F0C4C  (car-light-high)
 
-#define LAMP_GAP             10
+#define LAMP_GAP             16
 #define LAMP_CELL            56      // generous cell so glyph variance is covered
 #define BEAM_ROTATE_FRAMES   150     // ~5 s at 30 FPS
 #define MAX_LAMPS            LAMP_COUNT_
@@ -34,11 +34,13 @@ static const lamp_spec_t k_specs[LAMP_COUNT_] = {
 };
 
 typedef struct {
-    int       count;
-    lamp_id_t ids[MAX_LAMPS];
-    lv_obj_t *lamps[MAX_LAMPS];
-    uint32_t  beam_tick;
-    bool      beam_show_high;   // virtual-beam slot currently showing high?
+    int         count;
+    lamp_id_t   ids[MAX_LAMPS];
+    lv_obj_t   *lamps[MAX_LAMPS];
+    const char *last_icon[MAX_LAMPS];
+    uint32_t    last_color[MAX_LAMPS];
+    uint32_t    beam_tick;
+    bool        beam_show_high;   // virtual-beam slot currently showing high?
 } warn_data_t;
 
 static void lamp_apply_appearance(lv_obj_t *lbl, const char *icon, uint32_t color)
@@ -89,6 +91,8 @@ lv_obj_t *warning_lights_create(lv_obj_t *parent,
         lv_obj_set_style_text_font(lbl, &mdi_50, 0);
         lv_obj_set_style_text_color(lbl, lv_color_hex(VROD_LAMP_OFF), 0);
         lv_label_set_text(lbl, k_specs[id].icon);
+        wd->last_icon[i]  = k_specs[id].icon;
+        wd->last_color[i] = VROD_LAMP_OFF;
 
         if (layout == WARN_LAYOUT_CHEVRON) {
             // Cell-based positioning: 2 lamps top, 1 lamp bottom-centre.
@@ -148,6 +152,12 @@ void warning_lights_update(lv_obj_t *cont, const vehicle_data_t *data)
             on_color = k_specs[id].on_color;
         }
         uint32_t color = lamp_state(id, data, wd->beam_show_high) ? on_color : VROD_LAMP_OFF;
+
+        // Most lamps stay off most of the time. Skip the LVGL calls when
+        // the rendered appearance hasn't actually changed since last frame.
+        if (wd->last_icon[i] == icon && wd->last_color[i] == color) continue;
+        wd->last_icon[i]  = icon;
+        wd->last_color[i] = color;
         lamp_apply_appearance(wd->lamps[i], icon, color);
     }
 }

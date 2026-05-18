@@ -1,5 +1,7 @@
 #include "sim_engine.h"
 #include "vehicle_data.h"
+#include "gear_table.h"
+#include "sim_math.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include <math.h>
@@ -24,37 +26,13 @@
 // drains so the low-fuel warning trips, engine_temp rises with RPM, odometer
 // integrates speed, clock minute ticks ~2x real-time so it visibly advances.
 
-static gear_t gear_for_speed(float speed, float *out_rpm)
-{
-    if (speed < 15) {
-        *out_rpm = 900 + (speed / 15.0f) * 5000;
-        return GEAR_1;
-    }
-    if (speed < 35) {
-        *out_rpm = 2500 + ((speed - 15.0f) / 20.0f) * 4000;
-        return GEAR_2;
-    }
-    if (speed < 60) {
-        *out_rpm = 2800 + ((speed - 35.0f) / 25.0f) * 4000;
-        return GEAR_3;
-    }
-    if (speed < 90) {
-        *out_rpm = 3000 + ((speed - 60.0f) / 30.0f) * 5000;
-        return GEAR_4;
-    }
-    if (speed < 115) {
-        *out_rpm = 3500 + ((speed - 90.0f) / 25.0f) * 5000;
-        return GEAR_5;
-    }
-    *out_rpm = 4500 + ((speed - 115.0f) / 15.0f) * 5500;
-    return GEAR_6;
-}
-
 static void sim_task(void *arg)
 {
     float t = 0.0f;
-    float odo_m_accum = 12847000.0f;   // float so fractional metres carry over ticks
-    float fuel_progress = 0.0f;        // 0..(FUEL_CYCLE_S) — drives fuel cycling
+    float odo_m_accum   = 12847000.0f;  // float so fractional metres carry over ticks
+    float trip1_m_accum = 0.0f;         // resets at boot — typical "trip A" behaviour
+    float trip2_m_accum = 47800.0f;     // pre-loaded so trip B looks lived-in
+    float fuel_progress = 0.0f;         // 0..(FUEL_CYCLE_S) — drives fuel cycling
     float clock_seconds = 8 * 3600 + 24 * 60;  // start at 08:24
     vehicle_data_t data = {
         .engine_temp_c = 92,
@@ -138,27 +116,25 @@ static void sim_task(void *arg)
         if (cycle_t >= 18.0f && cycle_t < 20.5f) temp_f += 8.0f;  // redline overshoot
         data.engine_temp_c = (int8_t)(temp_f + 0.5f);
 
-        // Odometer: integrate speed (km/h → m/s = /3.6).
-        odo_m_accum += (speed / 3.6f) * TICK_S;
+        // Odometer + trips: integrate speed each tick. Trip 1 starts at zero
+        // each boot so we can watch it climb; trip 2 keeps a larger pre-set
+        // value so the two are distinguishable in the demo.
+        float dm = integrate_distance_m(speed, TICK_S);
+        odo_m_accum   += dm;
+        trip1_m_accum += dm;
+        trip2_m_accum += dm;
         data.odometer_m = (uint32_t)odo_m_accum;
+        data.trip1_m    = (uint32_t)trip1_m_accum;
+        data.trip2_m    = (uint32_t)trip2_m_accum;
 
         // Fuel: drain 1 segment every ~10 s of sim time, refill from 0 → 6.
         // Picks up the icon-red threshold (≤1) clearly during the demo.
-        fuel_progress += TICK_S;
-        const float FUEL_STEP_S = 10.0f;
-        if (fuel_progress >= FUEL_STEP_S) {
-            fuel_progress -= FUEL_STEP_S;
-            if (data.fuel_level == 0) data.fuel_level = 6;
-            else                      data.fuel_level--;
-        }
+        fuel_tick(&fuel_progress, &data.fuel_level, TICK_S, 10.0f, 6);
 
         // Mock clock: advance ~30x real-time so the minute digit visibly
         // ticks every two seconds.
-        clock_seconds += TICK_S * 30.0f;
-        if (clock_seconds >= 24 * 3600) clock_seconds -= 24 * 3600;
-        int total_min = (int)(clock_seconds / 60.0f);
-        data.clock_hours   = (uint8_t)(total_min / 60);
-        data.clock_minutes = (uint8_t)(total_min % 60);
+        clock_seconds = clock_advance(clock_seconds, TICK_S * 30.0f, 24.0f * 3600.0f);
+        clock_seconds_to_hm(clock_seconds, &data.clock_hours, &data.clock_minutes);
 
         vehicle_data_set(&data);
         vTaskDelay(pdMS_TO_TICKS(50));
@@ -167,5 +143,5 @@ static void sim_task(void *arg)
 
 void sim_engine_start(void)
 {
-    xTaskCreatePinnedToCore(sim_task, "sim", 4096, NULL, 5, NULL, 0);
+    xTaskCreatePinnedToCore(sim_task, "sim", 4096, NULL, 8, NULL, 0);
 }

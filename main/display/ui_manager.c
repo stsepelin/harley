@@ -6,6 +6,8 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 
+static bool s_task_started = false;
+
 static void ui_update_task(void *arg)
 {
     while (1) {
@@ -20,12 +22,19 @@ static void ui_update_task(void *arg)
     }
 }
 
+void ui_manager_show_ride(void)
+{
+    lv_obj_t *ride = screen_ride_create();
+    lv_screen_load(ride);
+    if (!s_task_started) {
+        xTaskCreatePinnedToCore(ui_update_task, "ui_upd", 8192, NULL, 4, NULL, 1);
+        s_task_started = true;
+    }
+}
+
 void ui_manager_init(void)
 {
     bsp_display_lock(-1);
-    lv_obj_t *ride = screen_ride_create();
-    lv_screen_load(ride);
+    ui_manager_show_ride();
     bsp_display_unlock();
-
-    xTaskCreatePinnedToCore(ui_update_task, "ui_upd", 8192, NULL, 4, NULL, 1);
 }

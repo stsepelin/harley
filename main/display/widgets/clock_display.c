@@ -6,6 +6,9 @@ LV_FONT_DECLARE(jbm_bold_26);
 
 typedef struct {
     lv_obj_t *label;
+    uint8_t   last_h;
+    uint8_t   last_m;
+    bool      has_value;
 } clock_data_t;
 
 lv_obj_t *clock_display_create(lv_obj_t *parent)
@@ -25,6 +28,8 @@ lv_obj_t *clock_display_create(lv_obj_t *parent)
 
     clock_data_t *cd = lv_malloc(sizeof(clock_data_t));
     cd->label = lbl;
+    cd->last_h = cd->last_m = 0;
+    cd->has_value = false;
     lv_obj_set_user_data(cont, cd);
     return cont;
 }
@@ -33,6 +38,10 @@ void clock_display_set(lv_obj_t *cont, uint8_t hours, uint8_t minutes)
 {
     clock_data_t *cd = lv_obj_get_user_data(cont);
     if (!cd) return;
+    if (cd->has_value && cd->last_h == hours && cd->last_m == minutes) return;
+    cd->last_h = hours;
+    cd->last_m = minutes;
+    cd->has_value = true;
     char buf[8];
     snprintf(buf, sizeof(buf), "%02u:%02u", (unsigned)hours, (unsigned)minutes);
     lv_label_set_text(cd->label, buf);

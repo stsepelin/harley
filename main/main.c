@@ -5,7 +5,6 @@
 #include "freertos/task.h"
 
 #include "boot_screen.h"
-#include "ui_manager.h"
 #include "vehicle_data.h"
 #include "sim_engine.h"
 
@@ -22,13 +21,14 @@ void app_main(void)
     bsp_display_start_with_config(&cfg);
     bsp_display_backlight_on();
 
+    vehicle_data_init();
+    sim_engine_start();
+
+    // boot_screen_show() draws the Lottie splash, then schedules a one-shot
+    // timer that swaps to the ride screen and starts the UI update task.
     bsp_display_lock(-1);
     boot_screen_show();
     bsp_display_unlock();
-
-    vehicle_data_init();
-    sim_engine_start();
-    ui_manager_init();
 
     ESP_LOGI(TAG, "boot complete, simulator running");
     while (1) {

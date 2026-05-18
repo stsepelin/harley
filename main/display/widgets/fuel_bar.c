@@ -15,6 +15,8 @@ LV_FONT_DECLARE(mdi_60);
 typedef struct {
     lv_obj_t *icon;
     lv_obj_t *segments[FUEL_SEGMENTS];
+    uint8_t   last_level;
+    bool      has_value;
 } fuel_data_t;
 
 lv_obj_t *fuel_bar_create(lv_obj_t *parent)
@@ -45,6 +47,8 @@ lv_obj_t *fuel_bar_create(lv_obj_t *parent)
     int seg_w = (BAR_W - (FUEL_SEGMENTS - 1) * SEG_GAP) / FUEL_SEGMENTS;
     fuel_data_t *fd = lv_malloc(sizeof(fuel_data_t));
     fd->icon = icon;
+    fd->last_level = 0;
+    fd->has_value = false;
     for (int i = 0; i < FUEL_SEGMENTS; i++) {
         lv_obj_t *seg = lv_obj_create(bar);
         lv_obj_set_size(seg, seg_w, BAR_H);
@@ -66,6 +70,9 @@ void fuel_bar_set_level(lv_obj_t *cont, uint8_t level)
     fuel_data_t *fd = lv_obj_get_user_data(cont);
     if (!fd) return;
     if (level > FUEL_SEGMENTS) level = FUEL_SEGMENTS;
+    if (fd->has_value && fd->last_level == level) return;
+    fd->last_level = level;
+    fd->has_value = true;
     for (int i = 0; i < FUEL_SEGMENTS; i++) {
         uint32_t color = VROD_SEGMENT_OFF;
         if (i < level) {

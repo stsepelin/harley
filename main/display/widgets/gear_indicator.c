@@ -7,6 +7,8 @@ LV_FONT_DECLARE(jbm_bold_33);
 
 typedef struct {
     lv_obj_t *value;
+    gear_t    last_gear;
+    bool      has_value;
 } gear_data_t;
 
 lv_obj_t *gear_indicator_create(lv_obj_t *parent)
@@ -33,6 +35,8 @@ lv_obj_t *gear_indicator_create(lv_obj_t *parent)
 
     gear_data_t *gd = lv_malloc(sizeof(gear_data_t));
     gd->value = value;
+    gd->last_gear = GEAR_NEUTRAL;
+    gd->has_value = false;
     lv_obj_set_user_data(cont, gd);
     return cont;
 }
@@ -41,6 +45,9 @@ void gear_indicator_set(lv_obj_t *cont, gear_t gear)
 {
     gear_data_t *gd = lv_obj_get_user_data(cont);
     if (!gd) return;
+    if (gd->has_value && gd->last_gear == gear) return;
+    gd->last_gear = gear;
+    gd->has_value = true;
     const char *text;
     switch (gear) {
         case GEAR_NEUTRAL: text = "N"; break;

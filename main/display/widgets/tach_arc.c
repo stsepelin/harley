@@ -1,6 +1,7 @@
 #include "tach_arc.h"
 #include "lvgl.h"
 #include "theme.h"
+#include "smooth.h"
 #include "esp_heap_caps.h"
 #include "esp_log.h"
 #include <math.h>
@@ -62,6 +63,9 @@ typedef struct {
     lv_obj_t *cursor_img;
     lv_obj_t *labels[MAJOR_LABEL_COUNT];
     int32_t  displayed_rpm;
+    int32_t  last_applied_rpm;      // last value pushed through to LVGL
+    bool     last_redline;          // last cursor red-state we applied
+    bool     has_applied;
 } tach_data_t;
 
 static const int32_t k_label_values[MAJOR_LABEL_COUNT] = {0, 2000, 4000, 6000, 8000, 10000};
@@ -311,6 +315,9 @@ lv_obj_t *tach_arc_create(lv_obj_t *parent)
 
     tach_data_t *td = lv_malloc(sizeof(tach_data_t));
     td->displayed_rpm = 0;
+    td->last_applied_rpm = 0;
+    td->last_redline = false;
+    td->has_applied = false;
 
     // Glow tail
     lv_obj_t *tail = make_arc(cont, TAIL_ARC_DIA, START_DEG, START_DEG + SWEEP_DEG);
@@ -429,11 +436,21 @@ void tach_arc_set_value(lv_obj_t *cont, uint16_t target_rpm)
     if (!td) return;
     if (target_rpm > RPM_MAX) target_rpm = RPM_MAX;
 
-    int32_t diff = (int32_t)target_rpm - td->displayed_rpm;
-    td->displayed_rpm += diff / 4;
-    if (diff != 0 && (diff / 4) == 0) {
-        td->displayed_rpm += (diff > 0) ? 1 : -1;
+    td->displayed_rpm = smooth_step(td->displayed_rpm, (int32_t)target_rpm);
+
+    // Skip the (relatively expensive) arc/cursor/label updates when nothing
+    // visible has changed since the last frame. Once smoothing has caught
+    // up to a steady target_rpm, this turns the entire tach update into a
+    // no-op until the rider's input moves again.
+    bool redline = target_rpm > REDLINE_RPM;
+    if (td->has_applied
+        && td->last_applied_rpm == td->displayed_rpm
+        && td->last_redline == redline) {
+        return;
     }
+    td->last_applied_rpm = td->displayed_rpm;
+    td->last_redline = redline;
+    td->has_applied = true;
 
     lv_arc_set_value(td->tail_arc, td->displayed_rpm);
 
@@ -446,6 +463,6 @@ void tach_arc_set_value(lv_obj_t *cont, uint16_t target_rpm)
     if (redline_v < REDLINE_RPM) redline_v = REDLINE_RPM;
     lv_arc_set_value(td->line_arc_redline, redline_v);
 
-    cursor_set_state(td, td->displayed_rpm, target_rpm > REDLINE_RPM);
+    cursor_set_state(td, td->displayed_rpm, redline);
     labels_update(td, td->displayed_rpm);
 }

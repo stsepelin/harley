@@ -29,6 +29,25 @@ CONFIG_LV_USE_CLIB_SPRINTF=y
 CONFIG_LV_DEF_REFR_PERIOD=15
 CONFIG_LV_OS_FREERTOS=y
 CONFIG_LV_DRAW_SW_DRAW_UNIT_CNT=2
+
+# Boot animation: GIF (LZW + bitmap blit — cheap on the P4). Vector / Lottie
+# was dropped because ThorVG rasterization at 800×800 wasn't real-time on
+# this MCU. The bundled AnimatedGIF decoder caps width at 480 px by default;
+# we patch MAX_WIDTH up to 1024 so the boot GIF can run at native panel size
+# with zero LVGL scaling.
+CONFIG_LV_USE_GIF=y
+
+# PPA hardware accelerator on the P4 handles the big-buffer blit from the
+# cooked GIF frame to the display. PPA requires draw buffers aligned to the
+# 64-byte L1 cache line size — bumping LVGL's two alignment knobs to match.
+CONFIG_LV_USE_PPA=y
+CONFIG_LV_USE_PPA_IMG=y
+CONFIG_LV_DRAW_BUF_ALIGN=64
+CONFIG_LV_ATTRIBUTE_MEM_ALIGN_SIZE=64
+
+# Pin pthreads to core 1 so any LVGL draw worker stays off the sim core.
+CONFIG_PTHREAD_DEFAULT_CORE_1=y
+CONFIG_PTHREAD_TASK_CORE_DEFAULT=1
 # IRAM-placement of LVGL fast-mem functions is replaced by a stable section
 # override in main/CMakeLists.txt (GCC 15 rejects IRAM_ATTR's __COUNTER__).
 # CONFIG_LV_ATTRIBUTE_FAST_MEM_USE_IRAM is not set
