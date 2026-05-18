@@ -12,15 +12,18 @@
 #define SECONDS_PER_DAY    (24.0f * 3600.0f)
 
 // 32-second synthetic driving cycle that exercises every gear, the redline,
-// neutral, turn signals, hazard flashers, and every warning lamp.
+// neutral, turn signals, hazard flashers, every warning lamp, and the
+// shift-light. Phases:
 //
-// Phases:
 //   0..3 s    idle (N, ~900 rpm, 0 km/h), HAZARD blinking, immobiliser lit,
 //             oil + battery warnings (pre-start lamp test)
 //   3..5 s    idle, neutral, no signals — lamps clear
-//   5..20 s   accelerating through gears 1..6, briefly hits redline. ABS
-//             warning pulses around 9..11 s, check-engine 13..15 s
-//  20..25 s   cruise at 130 km/h, gear 6, left turn signal, HIGH BEAM on
+//   5..16 s   accelerating through gears 1..6 up to ~125 km/h. ABS warning
+//             pulses 9..11 s, check-engine 13..15 s
+//  16..21 s   WOT pull held at ~9500 rpm — shift-light flashes the whole
+//             time. RPM is overridden directly so engine breathing wobbles
+//             it within the shift-light band rather than dropping out.
+//  21..25 s   cruise at 128 km/h, gear 6, left turn signal, HIGH BEAM on
 //  25..31 s   deceleration, downshifting
 //  31..32 s   idle stop, neutral
 //
@@ -45,10 +48,18 @@ static void phase_outputs(float cycle_t,
         *hazard = true;
     } else if (cycle_t < 5.0f) {
         // quiet idle — already initialised above
-    } else if (cycle_t < 20.0f) {
-        float a = (cycle_t - 5.0f) / 15.0f;
-        *speed = 130.0f * a;
+    } else if (cycle_t < 16.0f) {
+        // Acceleration ramp 0 -> ~125 km/h over 11 s.
+        float a = (cycle_t - 5.0f) / 11.0f;
+        *speed = 125.0f * a;
         *gear  = gear_for_speed(*speed, rpm);
+    } else if (cycle_t < 21.0f) {
+        // WOT pull near redline: hold RPM in the shift-light band so the
+        // bezel ring flashes for the full 5 s window. Speed climbs slightly
+        // from end-of-accel toward cruise.
+        *speed = 125.0f + 3.0f * (cycle_t - 16.0f) / 5.0f;  // 125 -> 128
+        *rpm   = 9500;
+        *gear  = GEAR_6;
     } else if (cycle_t < 25.0f) {
         *speed = 128.0f;
         *rpm   = 6200;
@@ -57,7 +68,7 @@ static void phase_outputs(float cycle_t,
         *high_beam   = true;
     } else if (cycle_t < 31.0f) {
         float a = (cycle_t - 25.0f) / 6.0f;
-        *speed = 130.0f * (1.0f - a);
+        *speed = 128.0f * (1.0f - a);
         *gear  = gear_for_speed(*speed, rpm);
     }
 }
@@ -90,14 +101,14 @@ static void apply_warning_lamps(vehicle_data_t *d, float cycle_t)
     d->check_engine         = (cycle_t >= 13.0f && cycle_t < 15.0f);
 }
 
-// Engine temp: idles at 92, climbs with RPM, briefly overshoots into the
-// high-temp warning band near the redline burst.
+// Engine temp: idles at 92, climbs with RPM, overshoots into the high-temp
+// warning band during the WOT pull.
 static int8_t compute_engine_temp(float rpm, float cycle_t)
 {
     float rpm_factor = (rpm - 900.0f) / 9100.0f;
     if (rpm_factor < 0.0f) rpm_factor = 0.0f;
     float temp_f = 92.0f + 25.0f * rpm_factor;
-    if (cycle_t >= 18.0f && cycle_t < 20.5f) temp_f += 8.0f;  // redline overshoot
+    if (cycle_t >= 16.0f && cycle_t < 21.0f) temp_f += 8.0f;  // WOT-pull overshoot
     return (int8_t)(temp_f + 0.5f);
 }
 

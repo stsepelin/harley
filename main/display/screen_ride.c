@@ -9,6 +9,12 @@
 #include "clock_display.h"
 #include "odometer_display.h"
 #include "trip_display.h"
+#include "theme.h"
+
+// Shift-light: flashing red ring at the bezel above SHIFT_LIGHT_RPM, telling
+// the rider to upshift now. ~5 Hz blink (3 frames on, 3 off at 30 FPS).
+#define SHIFT_LIGHT_RPM     9000
+#define SHIFT_LIGHT_FRAMES  3
 
 static lv_obj_t *s_screen;
 static lv_obj_t *s_tach;
@@ -23,6 +29,7 @@ static lv_obj_t *s_clock;
 static lv_obj_t *s_odo;
 static lv_obj_t *s_trip1;
 static lv_obj_t *s_trip2;
+static lv_obj_t *s_shift_light;
 
 lv_obj_t *screen_ride_create(void)
 {
@@ -71,6 +78,20 @@ lv_obj_t *screen_ride_create(void)
     s_temp = temp_display_create(s_screen);
     lv_obj_align(s_temp, LV_ALIGN_BOTTOM_MID, 0, -25);
 
+    // Shift-light ring — added LAST so it draws on top of everything else.
+    // 800×800 circular border at the bezel; hidden until rpm crosses the
+    // shift threshold, then blinked by screen_ride_update.
+    s_shift_light = lv_obj_create(s_screen);
+    lv_obj_set_size(s_shift_light, 800, 800);
+    lv_obj_set_style_bg_opa(s_shift_light, LV_OPA_TRANSP, 0);
+    lv_obj_set_style_border_color(s_shift_light, lv_color_hex(VROD_RED_BRIGHT), 0);
+    lv_obj_set_style_border_width(s_shift_light, 30, 0);
+    lv_obj_set_style_radius(s_shift_light, 400, 0);
+    lv_obj_set_style_pad_all(s_shift_light, 0, 0);
+    lv_obj_center(s_shift_light);
+    lv_obj_remove_flag(s_shift_light, LV_OBJ_FLAG_SCROLLABLE | LV_OBJ_FLAG_CLICKABLE);
+    lv_obj_add_flag(s_shift_light, LV_OBJ_FLAG_HIDDEN);
+
     return s_screen;
 }
 
@@ -107,5 +128,20 @@ void screen_ride_update(const vehicle_data_t *data)
         case 1: odometer_display_set(s_odo, data->odometer_m);                      break;
         case 2: trip_display_set(s_trip1, data->trip1_m);                           break;
         case 3: trip_display_set(s_trip2, data->trip2_m);                           break;
+    }
+
+    // Shift-light blink. Toggle visibility only when the *displayed* state
+    // changes — most frames stay quiet (rpm below threshold, or mid-blink
+    // half-cycle still showing the same on/off as last frame).
+    static uint32_t shift_tick = 0;
+    static bool     shift_shown = false;
+    shift_tick++;
+    bool above_threshold = data->rpm > SHIFT_LIGHT_RPM;
+    bool show = above_threshold
+             && ((shift_tick / SHIFT_LIGHT_FRAMES) & 1) == 0;
+    if (show != shift_shown) {
+        if (show) lv_obj_remove_flag(s_shift_light, LV_OBJ_FLAG_HIDDEN);
+        else      lv_obj_add_flag(s_shift_light, LV_OBJ_FLAG_HIDDEN);
+        shift_shown = show;
     }
 }
