@@ -52,8 +52,10 @@ int bsp_display_brightness_set(int brightness_percent)
 // No audio on the desktop sim. SDL_audio could be wired here later if the
 // click rhythm itself needs visual tuning, but for now silence is fine —
 // the on-device feedback is the source of truth.
-void sound_init(void) {}
-void sound_play_turn_click(void) {}
+void sound_init(void)                          {}
+void sound_play_turn_click(void)               {}
+void sound_set_enabled(bool enabled)           { (void)enabled; }
+void sound_set_volume (uint8_t pct)            { (void)pct; }
 
 // --- ui_manager shim -------------------------------------------------------
 void ui_manager_show_ride(void)

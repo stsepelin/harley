@@ -16,8 +16,12 @@
 #include "screen_ride.h"
 #include "settings_store.h"
 #include "ui_manager.h"
+#include "gesture.h"
+#include "phone_data.h"
+#include "phone_mock.h"
 
 #include <stdio.h>
+#include <stdlib.h>
 #include <unistd.h>
 
 #define DISPLAY_W   800
@@ -38,7 +42,9 @@ int main(void)
 
     // 2) Vehicle state + sim cycle (starts a pthread via the FreeRTOS shim)
     vehicle_data_init();
+    phone_data_init();
     sim_engine_start();
+    phone_mock_start();        // scripted notification/media timeline
 
     // 3) Init settings (desktop shim — defaults only) and build the ride
     //    screen against the running sim. The ui_manager shim caches both
@@ -51,34 +57,31 @@ int main(void)
     //    vehicle_data_get gives us a snapshot under the mutex so we never
     //    see a torn struct.
     //
-    //    Long-press detection runs inline here because on the desktop
-    //    there's no FreeRTOS to pin a separate task to — the firmware
-    //    side does it in event_watcher_task.
-    uint32_t press_start_tick = 0;
-    bool     pressing         = false;
-    bool     long_fired       = false;
+    //    Long-press + swipe detection uses the same gesture FSM as the
+    //    firmware (main/display/gesture.c). On desktop there's no
+    //    FreeRTOS task to pin it to, so we run it inline.
+    gesture_state_t gesture;
+    gesture_init(&gesture);
 
     while (1) {
         vehicle_data_t snapshot;
         vehicle_data_get(&snapshot);
         screen_ride_update(&snapshot, settings_store_current());
 
-        lv_indev_t *indev = lv_indev_get_next(NULL);
+        lv_indev_t *indev   = lv_indev_get_next(NULL);
+        bool        pressed = false;
+        lv_point_t  pt      = { 0, 0 };
         if (indev) {
-            bool pressed = (lv_indev_get_state(indev) == LV_INDEV_STATE_PRESSED);
-            if (!pressed) {
-                pressing   = false;
-                long_fired = false;
-            } else {
-                if (!pressing) {
-                    pressing         = true;
-                    press_start_tick = lv_tick_get();
-                }
-                if (!long_fired && lv_tick_elaps(press_start_tick) >= 600) {
-                    long_fired = true;
-                    ui_manager_show_settings();
-                }
-            }
+            pressed = (lv_indev_get_state(indev) == LV_INDEV_STATE_PRESSED);
+            lv_indev_get_point(indev, &pt);
+        }
+        switch (gesture_update(&gesture, pressed, pt.x, pt.y, lv_tick_get())) {
+        case GESTURE_LONG_PRESS:  ui_manager_show_settings();              break;
+        case GESTURE_SWIPE_LEFT:  phone_data_handle_swipe(PHONE_SWIPE_LEFT);  break;
+        case GESTURE_SWIPE_RIGHT: phone_data_handle_swipe(PHONE_SWIPE_RIGHT); break;
+        case GESTURE_SWIPE_UP:    phone_data_handle_swipe(PHONE_SWIPE_UP);    break;
+        case GESTURE_SWIPE_DOWN:  phone_data_handle_swipe(PHONE_SWIPE_DOWN);  break;
+        case GESTURE_NONE:        default:                                    break;
         }
 
         lv_timer_handler();

@@ -1,4 +1,6 @@
 #include "ui_manager.h"
+#include "gesture.h"
+#include "phone_data.h"
 #include "screen_ride.h"
 #include "screen_settings.h"
 #include "settings_store.h"
@@ -20,7 +22,6 @@ static lv_obj_t *s_settings    = NULL;
 static bool      s_ui_started   = false;
 static bool      s_event_started = false;
 
-#define LONG_PRESS_MS   600
 #define EVENT_POLL_MS   10        // 100 Hz event polling
 
 static void ui_update_task(void *arg)
@@ -44,20 +45,39 @@ static void ui_update_task(void *arg)
 //
 //   - turn-signal edges → audio click
 //   - long-press on the ride screen → switch to settings
+//   - horizontal swipe → dismiss an active SMS/app notification
 //
 // Previously these lived inside the UI task which gates on the LVGL
 // lock; under heavy frames (tach + shift-light + arrows all redrawing)
 // the UI task would wait, starving both checks and producing a visible
 // lag on every input. This task does the detection out-of-band at 100 Hz
 // and only takes the LVGL lock for the brief screen swap.
+// Map a classified swipe back to phone_data's enum. Centralised so both
+// the firmware watcher and the desktop sim stay in lockstep.
+static void dispatch_gesture(gesture_event_t e)
+{
+    switch (e) {
+    case GESTURE_LONG_PRESS:
+        bsp_display_lock(-1);
+        ui_manager_show_settings();
+        bsp_display_unlock();
+        break;
+    case GESTURE_SWIPE_LEFT:  phone_data_handle_swipe(PHONE_SWIPE_LEFT);  break;
+    case GESTURE_SWIPE_RIGHT: phone_data_handle_swipe(PHONE_SWIPE_RIGHT); break;
+    case GESTURE_SWIPE_UP:    phone_data_handle_swipe(PHONE_SWIPE_UP);    break;
+    case GESTURE_SWIPE_DOWN:  phone_data_handle_swipe(PHONE_SWIPE_DOWN);  break;
+    case GESTURE_NONE:
+    default:                  break;
+    }
+}
+
 static void event_watcher_task(void *arg)
 {
     (void)arg;
-    bool     prev_left        = false;
-    bool     prev_right       = false;
-    uint32_t press_start_tick = 0;
-    bool     pressing         = false;
-    bool     long_fired       = false;
+    bool            prev_left  = false;
+    bool            prev_right = false;
+    gesture_state_t gesture;
+    gesture_init(&gesture);
 
     while (1) {
         // --- Turn-signal edge → click ---
@@ -69,30 +89,19 @@ static void event_watcher_task(void *arg)
             sound_play_turn_click();
         }
 
-        // --- Long-press → settings (only while ride screen is active) ---
-        lv_indev_t *indev = lv_indev_get_next(NULL);
+        // --- Touch input → long-press / swipe ---
+        // Only consume input while the ride screen is up; settings has
+        // its own back-button and ignoring stale presses keeps a long
+        // press in settings from bouncing right back here.
+        lv_indev_t *indev   = lv_indev_get_next(NULL);
         bool        on_ride = (lv_screen_active() == s_ride);
         bool        pressed = false;
+        lv_point_t  pt = { 0, 0 };
         if (indev && on_ride) {
             pressed = (lv_indev_get_state(indev) == LV_INDEV_STATE_PRESSED);
+            if (pressed) lv_indev_get_point(indev, &pt);
         }
-        if (!pressed) {
-            pressing   = false;
-            long_fired = false;
-        } else {
-            if (!pressing) {
-                pressing         = true;
-                press_start_tick = lv_tick_get();
-            }
-            if (!long_fired && lv_tick_elaps(press_start_tick) >= LONG_PRESS_MS) {
-                long_fired = true;
-                // The only LVGL-mutating call here. Brief lock — usually
-                // contended only with the next refresh cycle.
-                bsp_display_lock(-1);
-                ui_manager_show_settings();
-                bsp_display_unlock();
-            }
-        }
+        dispatch_gesture(gesture_update(&gesture, pressed, pt.x, pt.y, lv_tick_get()));
 
         vTaskDelay(pdMS_TO_TICKS(EVENT_POLL_MS));
     }

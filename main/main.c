@@ -6,6 +6,7 @@
 #include "freertos/task.h"
 
 #include "boot_screen.h"
+#include "phone_data.h"
 #include "vehicle_data.h"
 #include "sim_engine.h"
 #include "settings_store.h"
@@ -35,6 +36,7 @@ void app_main(void)
     sound_set_enabled(settings_store_current()->sound_enabled);
 
     vehicle_data_init();
+    phone_data_init();
     sim_engine_start();
 
     // boot_screen_show() plays the embedded GIF splash, then hands off

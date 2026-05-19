@@ -1,6 +1,8 @@
 idf_component_register(
     SRCS
         main.c
+        phone/phone_data.c
+        phone/phone_protocol.c
         settings/settings.c
         settings/settings_store.c
         sound/sound.c
@@ -13,6 +15,7 @@ idf_component_register(
         display/screen_settings.c
         display/ui_manager.c
         display/format.c
+        display/gesture.c
         display/units.c
         display/widget_util.c
         display/widgets/tach_arc.c
@@ -26,6 +29,9 @@ idf_component_register(
         display/widgets/clock_display.c
         display/widgets/odometer_display.c
         display/widgets/trip_display.c
+        display/widgets/notification_banner.c
+        display/widgets/now_playing_display.c
+        display/widgets/media_banner.c
         display/fonts/jbm_bold_26.c
         display/fonts/jbm_bold_33.c
         display/fonts/jbm_bold_45.c
@@ -37,6 +43,7 @@ idf_component_register(
         display/fonts/mdi_96.c
     INCLUDE_DIRS
         .
+        phone
         settings
         sound
         vehicle

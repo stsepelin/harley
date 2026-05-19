@@ -37,8 +37,11 @@ jobs:
                '*/main/simulator/gear_table.c' \
                '*/main/simulator/sim_math.c' \
                '*/main/display/format.c' \
+               '*/main/display/gesture.c' \
                '*/main/display/units.c' \
                '*/main/display/widgets/smooth.c' \
+               '*/main/phone/phone_data.c' \
+               '*/main/phone/phone_protocol.c' \
                '*/main/settings/settings.c' \
                '*/main/vehicle/vehicle_data.c' \
                --output-file coverage.tested.info \

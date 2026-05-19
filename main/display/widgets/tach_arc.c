@@ -151,9 +151,12 @@ static bool glow_image_init(void)
 }
 
 // --- Cursor sprite --------------------------------------------------------
+// uint8_t arrays default to 1-byte alignment, but LVGL's draw-buf init
+// checks the pointer against LV_DRAW_BUF_ALIGN (4 by default) and warns
+// "Data is not aligned, ignored" if it isn't. Force 4-byte alignment.
 
-static uint8_t        s_cursor_normal_data[CURSOR_IMG_W * CURSOR_IMG_H * 4];
-static uint8_t        s_cursor_red_data[CURSOR_IMG_W * CURSOR_IMG_H * 4];
+static uint8_t        s_cursor_normal_data[CURSOR_IMG_W * CURSOR_IMG_H * 4] __attribute__((aligned(4)));
+static uint8_t        s_cursor_red_data   [CURSOR_IMG_W * CURSOR_IMG_H * 4] __attribute__((aligned(4)));
 static lv_image_dsc_t s_cursor_normal_dsc;
 static lv_image_dsc_t s_cursor_red_dsc;
 static bool           s_cursor_images_built = false;

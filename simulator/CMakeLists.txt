@@ -49,10 +49,12 @@ add_executable(vrod_sim
     ${MAIN_DIR}/display/screen_ride.c
     ${MAIN_DIR}/display/screen_settings.c
     ${MAIN_DIR}/display/format.c
+    ${MAIN_DIR}/display/gesture.c
     ${MAIN_DIR}/display/units.c
     ${MAIN_DIR}/display/widget_util.c
     ${MAIN_DIR}/settings/settings.c
     ui_manager_shim.c
+    phone_mock.c
     ${MAIN_DIR}/display/widgets/tach_arc.c
     ${MAIN_DIR}/display/widgets/speed_display.c
     ${MAIN_DIR}/display/widgets/gear_indicator.c
@@ -63,7 +65,13 @@ add_executable(vrod_sim
     ${MAIN_DIR}/display/widgets/clock_display.c
     ${MAIN_DIR}/display/widgets/odometer_display.c
     ${MAIN_DIR}/display/widgets/trip_display.c
+    ${MAIN_DIR}/display/widgets/notification_banner.c
+    ${MAIN_DIR}/display/widgets/now_playing_display.c
+    ${MAIN_DIR}/display/widgets/media_banner.c
     ${MAIN_DIR}/display/widgets/smooth.c
+
+    ${MAIN_DIR}/phone/phone_data.c
+    ${MAIN_DIR}/phone/phone_protocol.c
 
     ${MAIN_DIR}/simulator/sim_engine.c
     ${MAIN_DIR}/simulator/gear_table.c
@@ -79,6 +87,7 @@ target_include_directories(vrod_sim PRIVATE
     ${MAIN_DIR}/display
     ${MAIN_DIR}/display/widgets
     ${MAIN_DIR}/display/fonts
+    ${MAIN_DIR}/phone
     ${MAIN_DIR}/settings
     ${MAIN_DIR}/simulator
     ${MAIN_DIR}/sound

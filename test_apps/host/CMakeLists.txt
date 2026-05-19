@@ -31,19 +31,25 @@ add_library(vrod_pure STATIC
     ${MAIN_DIR}/simulator/gear_table.c
     ${MAIN_DIR}/simulator/sim_math.c
     ${MAIN_DIR}/display/format.c
+    ${MAIN_DIR}/display/gesture.c
     ${MAIN_DIR}/display/units.c
     ${MAIN_DIR}/display/widgets/smooth.c
+    ${MAIN_DIR}/phone/phone_data.c
+    ${MAIN_DIR}/phone/phone_protocol.c
     ${MAIN_DIR}/settings/settings.c
     ${MAIN_DIR}/vehicle/vehicle_data.c
     external/freertos_stub/freertos_stub.c
+    external/lvgl_tick_stub/lv_tick_stub.c
 )
 target_include_directories(vrod_pure PUBLIC
     ${MAIN_DIR}/simulator
     ${MAIN_DIR}/display
     ${MAIN_DIR}/display/widgets
+    ${MAIN_DIR}/phone
     ${MAIN_DIR}/settings
     ${MAIN_DIR}/vehicle
     external/freertos_stub
+    external/lvgl_tick_stub
 )
 
 # --- Widget library --------------------------------------------------------
@@ -87,6 +93,9 @@ add_unit_test(test_smooth)
 add_unit_test(test_vehicle_data)
 add_unit_test(test_units)
 add_unit_test(test_settings)
+add_unit_test(test_phone_protocol)
+add_unit_test(test_phone_data)
+add_unit_test(test_gesture)
 
 # Widget cache-regression tests link against the LVGL stub.
 function(add_widget_test name)

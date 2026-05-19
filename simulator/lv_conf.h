@@ -16,8 +16,11 @@
 #define LV_USE_STDLIB_SPRINTF   LV_STDLIB_CLIB
 
 // --- Logging ---------------------------------------------------------------
+// ERROR (not WARN) so the SDL mouse driver's "Y is N which is greater than
+// ver. res" message during off-window drags doesn't spam the console. That
+// input never happens on the real (physically clamped) GT911 panel.
 #define LV_USE_LOG          1
-#define LV_LOG_LEVEL        LV_LOG_LEVEL_WARN
+#define LV_LOG_LEVEL        LV_LOG_LEVEL_ERROR
 #define LV_LOG_PRINTF       1
 
 // --- SDL2 display + input driver ------------------------------------------
