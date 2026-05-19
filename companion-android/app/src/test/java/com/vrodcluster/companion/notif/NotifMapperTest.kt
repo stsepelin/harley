@@ -23,10 +23,11 @@ class NotifMapperTest {
         flags:       Int     = 0,
         key:         String  = "0|com.example.app|0|tag|0",
         category:    String? = null,
+        template:    String? = null,
         title:       String  = "Title",
         text:        String  = "Body",
     ): ByteArray? = NotifMapper.encodePost(
-        ownPackage, packageName, isOngoing, flags, key, category, title, text,
+        ownPackage, packageName, isOngoing, flags, key, category, template, title, text,
     )
 
     // --- classification ----------------------------------------------------
@@ -68,6 +69,25 @@ class NotifMapperTest {
         // FLAG_GROUP_SUMMARY = 0x200. Messaging apps (Telegram, Gmail)
         // post a summary alongside each child; we want the child only.
         assertNull(encode(flags = 0x200))
+    }
+
+    @Test fun `transport-category notifications are dropped`() {
+        // Spotify / YouTube Music post their now-playing notification
+        // with CATEGORY_TRANSPORT. MediaWatcher already pushes that
+        // data via the proper MEDIA channel.
+        assertNull(encode(category = "transport"))
+    }
+
+    @Test fun `MediaStyle template notifications are dropped`() {
+        // Same idea as transport, but matched via the template extra
+        // since not every media app sets CATEGORY_TRANSPORT.
+        assertNull(encode(template = "android.app.Notification\$MediaStyle"))
+    }
+
+    @Test fun `non-media template does not interfere with normal flow`() {
+        // BigTextStyle and similar should not get dropped.
+        val out = encode(template = "android.app.Notification\$BigTextStyle")
+        assertEquals(0x01.toByte(), out!![0])
     }
 
     @Test fun `ordinary notification is encoded`() {

@@ -31,6 +31,19 @@ internal object NotifMapper {
     private const val CAT_CALL        = "call"
     private const val CAT_MISSED_CALL = "missed_call"
     private const val CAT_MESSAGE     = "msg"
+    private const val CAT_TRANSPORT   = "transport"
+
+    // Notification.EXTRA_TEMPLATE value for the MediaStyle (now-playing)
+    // notification. Spotify / YouTube Music / etc. post these alongside
+    // their actual MediaSession; we already push that channel via
+    // MediaWatcher, so the notification copy is redundant and the
+    // sender/text fields are awkwardly inverted (title goes in
+    // EXTRA_TITLE, artist in EXTRA_TEXT). Drop on sight.
+    //
+    // Note the literal `$`: the Java class name embeds it, so when this
+    // string round-trips through the platform we have to match it
+    // verbatim — escape it for the Kotlin compiler only.
+    private const val TEMPLATE_MEDIA_STYLE = "android.app.Notification\$MediaStyle"
 
     /**
      * Stable 32-bit id for a notification. The cluster uses ids to scope
@@ -64,6 +77,7 @@ internal object NotifMapper {
         flags:       Int,
         key:         String,
         category:    String?,
+        template:    String?,
         title:       String,
         text:        String,
     ): ByteArray? {
@@ -71,6 +85,8 @@ internal object NotifMapper {
         if (isOngoing) return null
         if (flags and FLAG_FOREGROUND_SERVICE != 0) return null
         if (flags and FLAG_GROUP_SUMMARY      != 0) return null
+        if (category == CAT_TRANSPORT)          return null
+        if (template == TEMPLATE_MEDIA_STYLE)   return null
         return Protocol.encodeNotif(stableId(key), kindFor(category), title, text)
     }
 }

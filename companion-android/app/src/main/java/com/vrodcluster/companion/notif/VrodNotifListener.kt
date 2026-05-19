@@ -1,13 +1,18 @@
 package com.vrodcluster.companion.notif
 
 import android.app.Notification
+import android.content.ComponentName
 import android.service.notification.NotificationListenerService
 import android.service.notification.StatusBarNotification
 import com.vrodcluster.companion.ble.OutboundSink
 import com.vrodcluster.companion.ble.Protocol
+import com.vrodcluster.companion.media.MediaWatcher
 
 /**
  * Bridges Android notification posts/cancels to the cluster wire format.
+ * Also hosts [MediaWatcher] because MediaSessionManager auth piggybacks
+ * on the notification-listener grant — one user-facing permission, two
+ * data streams.
  *
  * The system binds this service after the user grants notification
  * access (Settings → Apps → Special access → Notification access).
@@ -15,6 +20,19 @@ import com.vrodcluster.companion.ble.Protocol
  * extracts platform fields and forwards via [OutboundSink].
  */
 class VrodNotifListener : NotificationListenerService() {
+
+    private val mediaWatcher = MediaWatcher()
+
+    override fun onListenerConnected() {
+        super.onListenerConnected()
+        mediaWatcher.start(this, ComponentName(this, VrodNotifListener::class.java))
+    }
+
+    override fun onListenerDisconnected() {
+        mediaWatcher.stop()
+        super.onListenerDisconnected()
+    }
+
 
     override fun onNotificationPosted(sbn: StatusBarNotification) {
         if (!AllowList.isAllowed(this, sbn.packageName)) return
@@ -28,6 +46,7 @@ class VrodNotifListener : NotificationListenerService() {
             flags       = sbn.notification.flags,
             key         = sbn.key,
             category    = sbn.notification.category,
+            template    = extras.getString(Notification.EXTRA_TEMPLATE),
             title       = title,
             text        = text,
         ) ?: return
