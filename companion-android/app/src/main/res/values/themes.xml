@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Compose-only app: Material3 themes live in the AppCompat XML library
+         which we don't pull in. Inherit from the platform Material theme so
+         the splash/window background is sensible, and let enableEdgeToEdge()
+         + Compose's MaterialTheme handle everything else. -->
+    <style name="Theme.VRodCompanion" parent="android:Theme.Material.NoActionBar" />
+</resources>

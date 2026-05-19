@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">V-Rod Companion</string>
+    <string name="status_idle">Idle — looking for cluster</string>
+    <string name="notif_listener_label">V-Rod notification bridge</string>
+    <string name="notif_access_granted">Notification access granted</string>
+    <string name="notif_access_missing">Notification access needed</string>
+    <string name="grant_notif_access">Grant notification access</string>
+    <string name="configure_apps">Configure apps</string>
+    <string name="app_list_title">Apps forwarding to cluster</string>
+    <string name="forwarding_all">All apps forwarding</string>
+    <string name="forwarding_some_muted">%1$d apps muted</string>
+    <string name="back">Back</string>
+</resources>

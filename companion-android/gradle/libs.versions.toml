@@ -1,0 +1,40 @@
+[versions]
+# Targets Android 16 (API 36). AGP 9.x is the Gradle 9-aligned line
+# and is the first one that ships a D8 build supporting API 36 fully
+# (no "API level 36 not supported" nags at dex time). Kotlin 2.1+
+# ships the Compose compiler plugin so we don't need a separate
+# compose-compiler artifact.
+agp                = "9.2.1"
+kotlin             = "2.3.21"
+compose-bom        = "2024.12.01"
+activity-compose   = "1.9.3"
+core-ktx           = "1.15.0"
+lifecycle          = "2.8.7"
+junit              = "4.13.2"
+androidx-junit     = "1.2.1"
+androidx-test-core = "1.6.1"
+robolectric        = "4.16.1"
+
+[plugins]
+# AGP 9.x bundles Kotlin via `com.android.application` itself, so we no
+# longer declare org.jetbrains.kotlin.android. The Compose compiler
+# plugin is still separate and pins to the Kotlin version that AGP
+# brings in (which is what the `kotlin = ...` line above tracks).
+android-application = { id = "com.android.application", version.ref = "agp" }
+kotlin-compose      = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "kotlin" }
+
+[libraries]
+androidx-core-ktx          = { group = "androidx.core",                  name = "core-ktx",          version.ref = "core-ktx" }
+androidx-lifecycle-runtime = { group = "androidx.lifecycle",             name = "lifecycle-runtime-ktx", version.ref = "lifecycle" }
+androidx-lifecycle-runtime-compose = { group = "androidx.lifecycle",     name = "lifecycle-runtime-compose", version.ref = "lifecycle" }
+androidx-activity-compose  = { group = "androidx.activity",              name = "activity-compose",  version.ref = "activity-compose" }
+androidx-compose-bom       = { group = "androidx.compose",               name = "compose-bom",       version.ref = "compose-bom" }
+androidx-compose-ui        = { group = "androidx.compose.ui",            name = "ui" }
+androidx-compose-ui-graphics = { group = "androidx.compose.ui",          name = "ui-graphics" }
+androidx-compose-material3 = { group = "androidx.compose.material3",     name = "material3" }
+androidx-compose-material-icons = { group = "androidx.compose.material", name = "material-icons-extended" }
+androidx-compose-ui-tooling-preview = { group = "androidx.compose.ui",   name = "ui-tooling-preview" }
+junit                      = { group = "junit",                          name = "junit",             version.ref = "junit" }
+androidx-junit             = { group = "androidx.test.ext",              name = "junit",             version.ref = "androidx-junit" }
+androidx-test-core         = { group = "androidx.test",                   name = "core",              version.ref = "androidx-test-core" }
+robolectric                = { group = "org.robolectric",                 name = "robolectric",       version.ref = "robolectric" }
