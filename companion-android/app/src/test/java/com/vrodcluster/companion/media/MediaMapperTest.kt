@@ -3,8 +3,6 @@ package com.vrodcluster.companion.media
 import com.vrodcluster.companion.ble.Protocol
 import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertNotNull
-import org.junit.Assert.assertNull
 import org.junit.Test
 
 /**
@@ -70,32 +68,5 @@ class MediaMapperTest {
         val out  = MediaMapper.encode(MediaMapper.STATE_BUFFERING, "X", "Y")
         val want = Protocol.encodeMedia(Protocol.MediaState.PLAYING, "X", "Y")
         assertArrayEquals(want, out)
-    }
-
-    // --- transient suppression -------------------------------------------
-
-    @Test fun `PAUSED with empty metadata is suppressed`() {
-        // Spotify track-skip transient — we'd briefly show "(unknown
-        // artist) / (unknown title)" on the cluster.
-        assertNull(MediaMapper.encode(MediaMapper.STATE_PAUSED, "", ""))
-    }
-
-    @Test fun `PLAYING with empty metadata is suppressed`() {
-        // Same shape: some apps go straight to PLAYING but haven't
-        // populated the metadata yet — wait for the next event.
-        assertNull(MediaMapper.encode(MediaMapper.STATE_PLAYING, "", ""))
-    }
-
-    @Test fun `STOPPED with empty metadata is NOT suppressed`() {
-        // Definitive "media is gone" — the cluster needs this to clear
-        // its banner. Must come through even with no artist/title.
-        assertNotNull(MediaMapper.encode(MediaMapper.STATE_STOPPED, "", ""))
-    }
-
-    @Test fun `PAUSED with partial metadata still publishes`() {
-        // Either field non-empty is enough — only the all-empty case
-        // is treated as a transient.
-        assertNotNull(MediaMapper.encode(MediaMapper.STATE_PAUSED, "Hiko", ""))
-        assertNotNull(MediaMapper.encode(MediaMapper.STATE_PAUSED, "", "Ghost"))
     }
 }

@@ -33,6 +33,12 @@ class MediaWatcher {
     private var lastBytes:         ByteArray? = null
 
     fun start(context: Context, listenerComponent: ComponentName) {
+        // Defensive: Android's contract pairs onListenerConnected /
+        // onListenerDisconnected, but a re-bind glitch (or test harness
+        // that calls start twice) would leak a sessions listener
+        // otherwise. Re-entrant start is a no-op.
+        if (sessionsListener != null) return
+
         this.context = context
         val mgr = context.getSystemService(Context.MEDIA_SESSION_SERVICE) as MediaSessionManager
         msm = mgr

@@ -89,15 +89,58 @@ class ProtocolTest {
 
     @Test fun `multibyte utf8 sender truncates on codepoint boundary`() {
         // 16 × "テ" (3 bytes each in UTF-8) = 48 bytes — exactly the cap.
-        // We must not split a continuation byte off the last codepoint.
-        // 47 bytes can't fit a whole "テ" boundary unless we walk back: we
-        // should end up with 15 × 3 = 45 bytes, not 47.
+        // MAX-1 = 47 bytes is the budget; the continuation walk must
+        // back up past the half-encoded "テ" landing us at 15 × 3 = 45.
+        // Pinned exact (not just `% 3 == 0`) so a regression in the
+        // back-walk surfaces precisely instead of producing some other
+        // multiple of three.
         val s = "テ".repeat(16)
         val out = Protocol.encodeNotif(1u, Protocol.NotifKind.APP, s, "")
         val senderLen = out[8].toInt() and 0xFF
-        // Whatever we cut to, it must be a multiple of 3 (since every char
-        // is 3 bytes) and ≤ MAX-1.
-        assertEquals(0, senderLen % 3)
-        assertTrue(senderLen <= Protocol.Limits.NOTIF_SENDER_MAX - 1)
+        assertEquals(45, senderLen)
+    }
+
+    @Test fun `ascii sender exactly at MAX-1 bytes is not truncated further`() {
+        // 47 ASCII chars = 47 bytes — the budget exactly. No back-walk
+        // should fire because byte 48 (the cut point) would be a fresh
+        // codepoint start, not a continuation.
+        val s = "A".repeat(Protocol.Limits.NOTIF_SENDER_MAX - 1)
+        val out = Protocol.encodeNotif(1u, Protocol.NotifKind.APP, s, "")
+        val senderLen = out[8].toInt() and 0xFF
+        assertEquals(Protocol.Limits.NOTIF_SENDER_MAX - 1, senderLen)
+    }
+
+    // --- u32 id round-trip --------------------------------------------------
+
+    @Test fun `dismiss id 0 round-trips as four zero bytes`() {
+        val out = Protocol.encodeDismiss(0u)
+        val expected = byteArrayOf(0x02, 0x04, 0x00, 0x00, 0x00, 0x00, 0x00)
+        assertArrayEquals(expected, out)
+    }
+
+    @Test fun `dismiss id at u32 max round-trips correctly`() {
+        // 0xFFFFFFFF would be -1 as a signed Int; Kotlin's UInt → Int
+        // bit reinterpretation needs to put 0xFF in all four bytes,
+        // not sign-extend or wrap.
+        val out = Protocol.encodeDismiss(UInt.MAX_VALUE)
+        val expected = byteArrayOf(
+            0x02, 0x04, 0x00,
+            0xFF.toByte(), 0xFF.toByte(), 0xFF.toByte(), 0xFF.toByte(),
+        )
+        assertArrayEquals(expected, out)
+    }
+
+    @Test fun `notif id with sign bit set round-trips correctly`() {
+        // 0x80000000 — first bit set. A naive Int.toByteArray would
+        // include a sign-extended leading byte; our LE u32 must stay
+        // exactly four bytes.
+        val out = Protocol.encodeNotif(0x80000000u, Protocol.NotifKind.APP, "", "")
+        // Header: type(1) + payload_len(2). payload: u32 id + u8 kind +
+        // u8 slen + 0 sender + u16 mlen + 0 msg = 8 bytes.
+        // Bytes 3..6 are the id LE.
+        assertEquals(0x00.toByte(), out[3])
+        assertEquals(0x00.toByte(), out[4])
+        assertEquals(0x00.toByte(), out[5])
+        assertEquals(0x80.toByte(), out[6])
     }
 }

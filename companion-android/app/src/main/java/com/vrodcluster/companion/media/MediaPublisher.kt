@@ -39,10 +39,14 @@ internal object MediaPublisher {
     /**
      * The next payload to push, or null if nothing should go on the
      * wire. Drops on:
-     *   - identical bytes to the last push (debounce — PlaybackState
-     *     position updates fire frequently and aren't user-visible),
-     *   - a track-transition transient (state != STOPPED, empty
-     *     artist + title — see [MediaMapper.encode]).
+     *   - **track-transition transient** — picked source has non-STOPPED
+     *     mapped state with empty artist+title. Spotify/YouTube Music
+     *     flicker through this for ~1 s between tracks; forwarding it
+     *     would briefly show "(unknown artist) / (unknown title)" on
+     *     the cluster banner. STOPPED with empty fields is *not*
+     *     suppressed — that's a real "media gone" signal.
+     *   - **debounce** — identical bytes to the last push. PlaybackState
+     *     position updates fire often and aren't user-visible.
      *
      * When the picked source's package is muted by the user we push
      * STOPPED so the cluster banner clears, *not* null — the rider has
@@ -58,8 +62,12 @@ internal object MediaPublisher {
         val bytes  = if (picked == null || !isAllowed(picked.packageName)) {
             Protocol.encodeMedia(Protocol.MediaState.STOPPED, "", "")
         } else {
+            val mapped = MediaMapper.toClusterState(picked.stateCode)
+            if (mapped != Protocol.MediaState.STOPPED
+             && picked.artist.isEmpty()
+             && picked.title.isEmpty()
+            ) return null
             MediaMapper.encode(picked.stateCode, picked.artist, picked.title)
-                ?: return null
         }
         if (lastBytes != null && bytes.contentEquals(lastBytes)) return null
         return bytes

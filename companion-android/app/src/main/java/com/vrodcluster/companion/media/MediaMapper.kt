@@ -36,22 +36,10 @@ internal object MediaMapper {
         else /* NONE / STOPPED / ERROR / CONNECTING */                  -> Protocol.MediaState.STOPPED
     }
 
-    /**
-     * Convenience for callers that have the raw triple. Returns null
-     * when the snapshot looks like a track-transition transient:
-     * Spotify (and others) flicker through PAUSED/PLAYING with empty
-     * metadata for ~1s between tracks. Forwarding those would briefly
-     * show "(unknown artist) / (unknown title)" on the cluster.
-     *
-     * STOPPED with empty fields is *not* suppressed — that's a real
-     * "media gone" signal and the cluster needs it to clear its banner.
-     */
-    fun encode(stateCode: Int, artist: String, title: String): ByteArray? {
-        val clusterState = toClusterState(stateCode)
-        if (clusterState != Protocol.MediaState.STOPPED
-         && artist.isEmpty()
-         && title.isEmpty()
-        ) return null
-        return Protocol.encodeMedia(clusterState, artist, title)
-    }
+    /** Pure state-bucket → wire-bytes mapping. The "should this go on
+     *  the wire at all?" question (transients, debounce, mute fallback)
+     *  belongs to [MediaPublisher] — keeping it out of here is what lets
+     *  this module be a one-line equivalence with [Protocol.encodeMedia]. */
+    fun encode(stateCode: Int, artist: String, title: String): ByteArray =
+        Protocol.encodeMedia(toClusterState(stateCode), artist, title)
 }
