@@ -87,4 +87,4 @@ companion/
 
 ## License
 
-MIT — see [`../LICENSE`](../LICENSE) at the repo root.
+Apache 2.0 — see [`../LICENSE`](../LICENSE) at the repo root.

@@ -76,6 +76,6 @@ workaround).
 
 ## License
 
-MIT — see [`../LICENSE`](../LICENSE) at the repo root. Vendor BSP and
-managed components keep their own licenses (Apache 2.0 / MIT) in their
-respective subdirectories.
+Apache 2.0 — see [`../LICENSE`](../LICENSE) at the repo root. Vendor BSP
+and managed components keep their own licenses (Apache 2.0 / MIT) in
+their respective subdirectories.

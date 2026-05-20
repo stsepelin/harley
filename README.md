@@ -1,8 +1,8 @@
 # harley
 
-[![firmware build](https://github.com/your-username/harley/actions/workflows/firmware-build.yml/badge.svg)](https://github.com/your-username/harley/actions/workflows/firmware-build.yml)
-[![host tests](https://github.com/your-username/harley/actions/workflows/host-tests.yml/badge.svg)](https://github.com/your-username/harley/actions/workflows/host-tests.yml)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![firmware build](https://github.com/stsepelin/harley/actions/workflows/firmware-build.yml/badge.svg)](https://github.com/stsepelin/harley/actions/workflows/firmware-build.yml)
+[![host tests](https://github.com/stsepelin/harley/actions/workflows/host-tests.yml/badge.svg)](https://github.com/stsepelin/harley/actions/workflows/host-tests.yml)
+[![License: Apache 2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
 
 > DIY digital instrument cluster for a 2009 Harley-Davidson VRSCF Muscle —
 > an 800×800 round IPS gauge that drops into the stock dash, reads the
@@ -107,6 +107,6 @@ If you're filing a bug, please include:
 
 ## License
 
-[MIT](LICENSE). Vendor BSP components under `firmware/components/` and
-`firmware/managed_components/` retain their own licenses (Apache 2.0,
+[Apache 2.0](LICENSE). Vendor BSP components under `firmware/components/`
+and `firmware/managed_components/` retain their own licenses (Apache 2.0,
 MIT, etc.); see the LICENSE file inside each.
