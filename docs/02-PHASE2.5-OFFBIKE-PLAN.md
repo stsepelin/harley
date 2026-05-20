@@ -105,6 +105,16 @@ and the units toggle is the first prefs entry that needs both.
 **Independent workstream**, biggest scope of the four. Can run in
 parallel with stages 1–2 by another contributor (or in sequence).
 
+> **Status update**: the cluster-side BLE peripheral skeleton is now
+> in the build and runs on hardware. Advertises as `V-Rod Cluster`
+> with a Nordic-UART-shaped GATT layout (RX write / TX notify), via
+> ESP-HOSTED's SDIO link to the onboard ESP32-C6 controller. Getting
+> here required working around a binutils 2.45 / IDF P4-rev<3 link
+> trap — see `ble-bringup-bisect.md` for the resolution notes and
+> the `default_registered_chips[]` + LVGL-fast-mem-to-flash workaround
+> that's now baked into `main/`. What remains in Stage 3 is the
+> *protocol* work below; the bring-up blocker is gone.
+
 ### Scope
 
 - ESP-HOSTED to the onboard ESP32-C6 (acts as the BLE radio for the

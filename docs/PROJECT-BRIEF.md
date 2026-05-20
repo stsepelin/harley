@@ -68,7 +68,8 @@ at >9000 RPM), speed display, gear indicator, fuel bar, temperature,
 turn signals + hazard, 7 warning lamps in two chevrons (oil, engine,
 ABS, battery, immobiliser, low + high beam — beam slot rotates),
 clock + odometer + dual trip counters cycling in a shared slot, and
-an embedded GIF boot animation rendered via PPA hardware accelerator.
+an embedded GIF boot animation (LVGL's AnimatedGIF decoder; PPA HW
+accel was tried and dropped — caused banding on this BSP).
 Same widget code drives a desktop SDL2 simulator under `simulator/`
 for iteration without flashing.
 
@@ -114,7 +115,7 @@ won't touch the UI.
 - **Phase 4**: BLE phone integration (iOS ANCS/AMS + Android companion app)
 - **Phase 5**: Speed camera database from SCDB.info / OpenStreetMap
 - **Phase 6**: Full cluster replacement + 3D-printed mounting bracket + conformal coating
-- **Phase 7**: Polish — auto-brightness, themes, handlebar button, ride logging
+- **Phase 7**: Polish — auto-brightness, themes, handlebar button, ride logging, OTA updates with on-screen progress (USB flashing impractical once the cluster is housed)
 
 ## Key References
 
