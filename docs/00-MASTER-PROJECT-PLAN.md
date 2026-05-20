@@ -385,6 +385,26 @@ See `02-PHASE2.5-OFFBIKE-PLAN.md` for the full plan + ordering.
 - Handlebar button for media/screen control
 - WiFi config portal for settings
 - SD card ride logging
+- **OTA firmware update with on-screen progress** — once the cluster is
+  installed on the bike, USB flashing requires opening the housing. OTA
+  lets a new image be delivered over BLE (from the Android companion) or
+  Wi-Fi (during dev). Because the app stays running through the download,
+  the screen can render an "Updating xx %" splash + "do not power off",
+  unlike USB flashing where the app isn't running and the panel shows the
+  last framebuffer state. Implementation outline:
+    - Custom partition table with `ota_0` / `ota_1` + `otadata` (currently
+      a single `factory` partition; can't OTA without splitting).
+    - `esp_https_ota` or `esp_ota_*` raw API to write the inactive slot
+      from a streaming source (BLE GATT chunks or HTTPS).
+    - Companion-side: chunk + ACK protocol over a dedicated OTA GATT
+      characteristic, with a CRC of the full image checked before
+      `esp_ota_set_boot_partition()`.
+    - UI: a dedicated screen (or a banner overlay on the ride screen)
+      that renders progress, ETA, and a graceful failure path if the
+      update is interrupted.
+    - Out of scope for the link-bring-up bisect; flagged here so it
+      isn't forgotten once BLE is fully wired in. See
+      `docs/ble-bringup-bisect.md` for the build-blocker history.
 - Vector map rendering (future)
 - Voice commands via P4's onboard mics (future)
 

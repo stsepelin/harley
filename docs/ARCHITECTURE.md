@@ -102,17 +102,34 @@ nobody re-tries an approach we already discarded.
 ## Boot sequence
 
 ```
-bsp_display_start_with_config   // panel + LVGL up
+bsp_display_start_with_config   // panel + LVGL up, backlight at LEDC duty 0
 settings_store_init             // NVS open, defaults if first boot
-bsp_display_brightness_set      // BEFORE backlight_on, avoids 100% flash
-bsp_display_backlight_on
-sound_init                      // codec, queue, click sample baked
-sound_set_volume/_enabled       // apply persisted prefs
-vehicle_data_init
-sim_engine_start                // sim task spawns on core 0
-boot_screen_show                // GIF starts; hands off to ride screen
-                                // on LV_EVENT_READY (or 15 s safety)
+vehicle_data_init               // data sources must be live before
+phone_data_init                 //   boot_screen_show's safety-timer
+sim_engine_start                //   fast-path into the ride screen
+bsp_display_lock                // hold the LVGL lock for the paint sequence
+  loop 3×:                      //   triple-partial has 3 PSRAM framebuffers
+    invalidate(scr) + lv_refr_now + unlock + 20ms + lock
+                                //   cycles all three buffers to black so
+                                //   none of them shows PSRAM init garbage
+                                //   (~0xFFFF / white) when the panel lights
+  boot_screen_show              //   GIF widget paints on top of black
+  lv_refr_now
+bsp_display_unlock + 20ms       // last DMA flush reaches the panel
+bsp_display_brightness_set      // LIGHTS THE PANEL at saved brightness — this
+                                //   is the moment the user sees the screen
+sound_init / sound_set_*        // codec, queue, click sample baked
+ble_peripheral_init             // NimBLE host, esp_hosted VHCI brings up
+                                //   the BLE controller on the C6
+                                // GIF eventually hands off to ride screen
+                                //   on LV_EVENT_READY (or 15 s safety)
 ```
+
+The `bsp_display_brightness_set()` is the only call that actually turns
+the backlight on. `bsp_display_backlight_on()` is just
+`bsp_display_brightness_set(100)`; any duty change lights the panel.
+Painting black-then-GIF before that call is what prevents the boot
+white flash.
 
 ## Out-of-band timing notes
 

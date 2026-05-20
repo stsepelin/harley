@@ -83,11 +83,12 @@ One-liners — see `docs/ARCHITECTURE.md` for the why.
 
 ## Patches & gotchas (operational)
 
-- **`AnimatedGIF.h` MAX_WIDTH 480 → 1024.** LVGL's bundled GIF decoder
-  hard-caps width at 480; our boot GIF used to be 800. Patched at CMake
-  configure time in `main/CMakeLists.txt` — idempotent, re-applies after
-  a fresh `managed_components/` fetch. Don't manually edit the patched
-  file.
+- **`AnimatedGIF.h` MAX_WIDTH 480 → 800.** LVGL's bundled GIF decoder
+  hard-caps width at 480; our boot GIF is 800. Patched at CMake configure
+  time in `main/CMakeLists.txt` — idempotent, re-applies after a fresh
+  `managed_components/` fetch. Don't manually edit the patched file. The
+  path in the CMake patch must match the current LVGL layout
+  (`src/libs/gif/AnimatedGIF.h` — *not* the older `gif/AnimatedGIF/src/`).
 - **PPA is off** (`CONFIG_LV_USE_PPA` unset, `CONFIG_LV_DRAW_BUF_ALIGN=4`).
   Caused horizontal banding on this BSP. Re-enable only with a
   known-good alignment story.
@@ -96,9 +97,14 @@ One-liners — see `docs/ARCHITECTURE.md` for the why.
 - **LVGL press events don't reach the ride screen** on this BSP — hover
   does but `LV_EVENT_PRESSED` / `_LONG_PRESSED` never fire. We poll
   `lv_indev_get_state()` from `event_watcher_task` instead.
-- **`bsp_display_brightness_set()` before `_backlight_on()`** at boot
-  to avoid a 100 % flash. Below ~25 % duty the LCD goes fully black,
-  so `SETTINGS_BRIGHTNESS_MIN = 30` in `settings.h` clamps loads.
+- **Backlight stays at duty 0 through init**, then `_brightness_set()`
+  fires once after the boot screen is painted. `_backlight_on()` is
+  literally `_brightness_set(100)` — every brightness call lights the
+  panel. Lighting it before LVGL has painted shows whatever PSRAM came
+  up with (≈ white in RGB565), as a flash. See `main/main.c`'s
+  `app_main()` boot sequence and `docs/ble-bringup-bisect.md`. Below
+  ~25 % duty the LCD goes fully black, so `SETTINGS_BRIGHTNESS_MIN = 30`
+  in `settings.h` clamps loads.
 - **Don't try Lottie again** for the boot screen unless ThorVG's
   rasteriser gets much faster.
 
