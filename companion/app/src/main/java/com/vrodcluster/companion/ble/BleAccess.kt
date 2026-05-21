@@ -20,6 +20,11 @@ object BleAccess {
         Manifest.permission.BLUETOOTH_SCAN,
         Manifest.permission.BLUETOOTH_CONNECT,
         Manifest.permission.POST_NOTIFICATIONS,
+        // Cluster → phone command channel: accept/reject/end-call buttons
+        // call TelecomManager which requires ANSWER_PHONE_CALLS. Grouped
+        // with the BLE perms because a cluster without call control isn't
+        // really delivering on the companion's purpose.
+        Manifest.permission.ANSWER_PHONE_CALLS,
     )
 
     fun allGranted(context: Context): Boolean =

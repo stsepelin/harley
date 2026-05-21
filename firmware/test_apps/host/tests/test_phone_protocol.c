@@ -330,6 +330,44 @@ static void test_media_stopped_clears_track(void)
     TEST_ASSERT_EQUAL_STRING("", evt.media.title);
 }
 
+// --- TX encoders (cluster → phone) ---------------------------------------
+
+static void test_encode_cmd_no_payload(void)
+{
+    // CMD_MEDIA_NEXT (0x22) — type + u16 0 = three bytes total.
+    uint8_t buf[8] = {0};
+    size_t  n = phone_protocol_encode_cmd(PHONE_CMD_MEDIA_NEXT, buf, sizeof(buf));
+    TEST_ASSERT_EQUAL_size_t(3, n);
+    TEST_ASSERT_EQUAL_UINT8(0x22, buf[0]);
+    TEST_ASSERT_EQUAL_UINT8(0x00, buf[1]);
+    TEST_ASSERT_EQUAL_UINT8(0x00, buf[2]);
+}
+
+static void test_encode_cmd_undersized_buffer(void)
+{
+    // Encoder must refuse to write past the caller's buffer end.
+    uint8_t buf[2] = {0xAA, 0xBB};
+    size_t  n = phone_protocol_encode_cmd(PHONE_CMD_CALL_ACCEPT, buf, sizeof(buf));
+    TEST_ASSERT_EQUAL_size_t(0, n);
+    TEST_ASSERT_EQUAL_UINT8(0xAA, buf[0]);
+    TEST_ASSERT_EQUAL_UINT8(0xBB, buf[1]);
+}
+
+static void test_encode_dismiss_little_endian_id(void)
+{
+    // payload = u32 id, LE.
+    uint8_t buf[8] = {0};
+    size_t  n = phone_protocol_encode_dismiss(0xDEADBEEFu, buf, sizeof(buf));
+    TEST_ASSERT_EQUAL_size_t(7, n);
+    TEST_ASSERT_EQUAL_UINT8(PHONE_CMD_NOTIF_DISMISS, buf[0]);
+    TEST_ASSERT_EQUAL_UINT8(0x04, buf[1]);
+    TEST_ASSERT_EQUAL_UINT8(0x00, buf[2]);
+    TEST_ASSERT_EQUAL_UINT8(0xEF, buf[3]);
+    TEST_ASSERT_EQUAL_UINT8(0xBE, buf[4]);
+    TEST_ASSERT_EQUAL_UINT8(0xAD, buf[5]);
+    TEST_ASSERT_EQUAL_UINT8(0xDE, buf[6]);
+}
+
 void RunTests(void)
 {
     RUN_TEST(test_parse_notif);
@@ -350,4 +388,7 @@ void RunTests(void)
     RUN_TEST(test_unknown_notif_kind_falls_back_to_app);
     RUN_TEST(test_empty_message_is_valid);
     RUN_TEST(test_media_stopped_clears_track);
+    RUN_TEST(test_encode_cmd_no_payload);
+    RUN_TEST(test_encode_cmd_undersized_buffer);
+    RUN_TEST(test_encode_dismiss_little_endian_id);
 }

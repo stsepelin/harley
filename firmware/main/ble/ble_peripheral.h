@@ -31,3 +31,9 @@ void ble_peripheral_get_state(ble_peripheral_state_t *out);
 // Gracefully drop the active central. No-op if nothing's connected.
 // Safe to call from any task.
 void ble_peripheral_disconnect_active(void);
+
+// Push bytes out on the TX notify characteristic. No-op if no central
+// is connected, or if the central hasn't subscribed (the CCCD descriptor
+// isn't written yet). Caller owns `buf` — we copy into a NimBLE mbuf
+// before returning. Returns true if the notify was queued, false otherwise.
+bool ble_peripheral_notify(const uint8_t *buf, uint16_t len);

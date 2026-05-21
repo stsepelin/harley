@@ -32,6 +32,16 @@ class MediaWatcher {
     private val controllerCbs    = mutableMapOf<MediaController, MediaController.Callback>()
     private var lastBytes:         ByteArray? = null
 
+    companion object {
+        // Picked controller for the most recent publish() — the one whose
+        // play/pause/skip we want to drive when the cluster sends a media
+        // command. @Volatile so cross-thread reads from the BLE binder
+        // thread see the latest write from the listener's main thread.
+        // Null when nothing is playing or paused.
+        @Volatile var currentController: MediaController? = null
+            private set
+    }
+
     fun start(context: Context, listenerComponent: ComponentName) {
         // Defensive: Android's contract pairs onListenerConnected /
         // onListenerDisconnected, but a re-bind glitch (or test harness
@@ -60,6 +70,7 @@ class MediaWatcher {
         msm        = null
         lastBytes  = null
         context    = null
+        currentController = null
     }
 
     // --- internals -------------------------------------------------------
@@ -92,7 +103,8 @@ class MediaWatcher {
 
     private fun publish() {
         val ctx     = context ?: return
-        val sources = controllerCbs.keys.map { c ->
+        val controllers = controllerCbs.keys.toList()
+        val sources = controllers.map { c ->
             MediaPublisher.Source(
                 packageName = c.packageName,
                 stateCode   = c.playbackState?.state ?: MediaMapper.STATE_NONE,
@@ -100,6 +112,17 @@ class MediaWatcher {
                 title       = c.metadata?.getString(MediaMetadata.METADATA_KEY_TITLE)  ?: "",
             )
         }
+
+        // Refresh the global pick used by BLE-driven dispatch
+        // (cluster's media buttons → MediaController.dispatchMediaButtonEvent).
+        // Track this independently of the wire-push decision below — we
+        // want the buttons to keep working even when the wire push is
+        // suppressed (debounce, transient empty metadata, muted package).
+        val pickedSource = MediaPublisher.pickActive(sources)
+        currentController = pickedSource?.let { src ->
+            controllers.firstOrNull { it.packageName == src.packageName }
+        }
+
         val bytes = MediaPublisher.nextPayload(
             sources   = sources,
             isAllowed = { AllowList.isAllowed(ctx, it) },

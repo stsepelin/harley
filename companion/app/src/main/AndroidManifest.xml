@@ -25,6 +25,11 @@
          READ_PHONE_STATE at runtime. -->
     <uses-permission android:name="android.permission.READ_PHONE_STATE" />
 
+    <!-- ANSWER_PHONE_CALLS gates TelecomManager.acceptRingingCall() and
+         endCall() — the actions the cluster's REJECT / ACCEPT / END CALL
+         buttons drive over the TX command channel. Runtime grant on A8+. -->
+    <uses-permission android:name="android.permission.ANSWER_PHONE_CALLS" />
+
     <!-- Filter out devices without BLE. -->
     <uses-feature android:name="android.hardware.bluetooth_le" android:required="true" />
 

@@ -72,9 +72,12 @@ static void state_set_powered(bool on)
 
 static const ble_uuid128_t SVC_UUID = BLE_UUID128_INIT(NUS_UUID_BYTES(0x01, 0x00));
 static const ble_uuid128_t RX_UUID  = BLE_UUID128_INIT(NUS_UUID_BYTES(0x02, 0x00));
+static const ble_uuid128_t TX_UUID  = BLE_UUID128_INIT(NUS_UUID_BYTES(0x03, 0x00));
 
 static uint8_t  s_own_addr_type;
 static uint16_t s_conn_handle = BLE_HS_CONN_HANDLE_NONE;
+static uint16_t s_tx_attr_handle;
+static bool     s_tx_subscribed;       // set when the central writes CCCD
 
 static int gap_event_cb(struct ble_gap_event *event, void *arg);
 static void start_advertising(void);
@@ -111,6 +114,18 @@ static int access_rx_cb(uint16_t conn_handle, uint16_t attr_handle,
     return 0;
 }
 
+// NimBLE's ble_gatts_chr_is_sane() rejects entries with access_cb == NULL
+// (table validation, not runtime gate), so even notify-only TX needs a
+// non-NULL stub. The central can't actually read or write TX — the flag
+// set has neither READ nor WRITE — so this is never invoked in practice;
+// notifications go out via ble_gatts_notify_custom() instead.
+static int access_tx_cb(uint16_t conn_handle, uint16_t attr_handle,
+                        struct ble_gatt_access_ctxt *ctxt, void *arg)
+{
+    (void)conn_handle; (void)attr_handle; (void)ctxt; (void)arg;
+    return BLE_ATT_ERR_READ_NOT_PERMITTED;
+}
+
 // --- GATT service table ---------------------------------------------------
 
 static const struct ble_gatt_chr_def chrs[] = {
@@ -118,6 +133,15 @@ static const struct ble_gatt_chr_def chrs[] = {
         .uuid      = &RX_UUID.u,
         .access_cb = access_rx_cb,
         .flags     = BLE_GATT_CHR_F_WRITE | BLE_GATT_CHR_F_WRITE_NO_RSP,
+    },
+    {
+        // TX (cluster → phone). Notify-only — the central reads via
+        // BluetoothGattCallback.onCharacteristicChanged after enabling
+        // notifications on the CCCD.
+        .uuid       = &TX_UUID.u,
+        .access_cb  = access_tx_cb,
+        .flags      = BLE_GATT_CHR_F_NOTIFY,
+        .val_handle = &s_tx_attr_handle,
     },
     { 0 },
 };
@@ -192,9 +216,21 @@ static int gap_event_cb(struct ble_gap_event *event, void *arg)
         return 0;
     case BLE_GAP_EVENT_DISCONNECT:
         ESP_LOGI(TAG, "disconnect; reason=%d", event->disconnect.reason);
-        s_conn_handle = BLE_HS_CONN_HANDLE_NONE;
+        s_conn_handle   = BLE_HS_CONN_HANDLE_NONE;
+        s_tx_subscribed = false;
         state_set_connected(NULL);
         start_advertising();
+        return 0;
+    case BLE_GAP_EVENT_SUBSCRIBE:
+        // Track the TX-characteristic subscribe state — without it
+        // ble_peripheral_notify() would queue mbufs the host then drops
+        // (and we'd see ble_gatts_notify_custom rc=14, NOTIFY_DISABLED).
+        ESP_LOGI(TAG, "subscribe attr=%u notify=%d indicate=%d",
+                 event->subscribe.attr_handle,
+                 event->subscribe.cur_notify, event->subscribe.cur_indicate);
+        if (event->subscribe.attr_handle == s_tx_attr_handle) {
+            s_tx_subscribed = event->subscribe.cur_notify;
+        }
         return 0;
     default:
         return 0;
@@ -258,6 +294,27 @@ void ble_peripheral_get_state(ble_peripheral_state_t *out)
     portENTER_CRITICAL(&s_state_mux);
     *out = s_state;
     portEXIT_CRITICAL(&s_state_mux);
+}
+
+bool ble_peripheral_notify(const uint8_t *buf, uint16_t len)
+{
+    if (!buf || len == 0) return false;
+    if (s_conn_handle == BLE_HS_CONN_HANDLE_NONE) return false;
+    if (!s_tx_subscribed) return false;
+    // ble_hs_mbuf_from_flat allocates an mbuf chain and copies; NimBLE
+    // takes ownership when ble_gatts_notify_custom succeeds, frees the
+    // chain when it fails — we don't need to release on either path.
+    struct os_mbuf *om = ble_hs_mbuf_from_flat(buf, len);
+    if (!om) {
+        ESP_LOGW(TAG, "notify: mbuf alloc failed (len=%u)", len);
+        return false;
+    }
+    int rc = ble_gatts_notify_custom(s_conn_handle, s_tx_attr_handle, om);
+    if (rc != 0) {
+        ESP_LOGW(TAG, "ble_gatts_notify_custom rc=%d", rc);
+        return false;
+    }
+    return true;
 }
 
 void ble_peripheral_disconnect_active(void)

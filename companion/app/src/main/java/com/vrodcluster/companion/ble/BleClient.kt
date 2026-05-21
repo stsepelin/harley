@@ -5,6 +5,7 @@ import android.bluetooth.BluetoothDevice
 import android.bluetooth.BluetoothGatt
 import android.bluetooth.BluetoothGattCallback
 import android.bluetooth.BluetoothGattCharacteristic
+import android.bluetooth.BluetoothGattDescriptor
 import android.bluetooth.BluetoothManager
 import android.bluetooth.BluetoothProfile
 import android.bluetooth.le.ScanCallback
@@ -14,6 +15,7 @@ import android.bluetooth.le.ScanSettings
 import android.content.Context
 import android.os.ParcelUuid
 import android.util.Log
+import java.util.UUID
 
 /**
  * Scans for a peripheral advertising [Protocol.SERVICE_UUID], connects
@@ -29,7 +31,17 @@ import android.util.Log
  * are runtime; [BleAccess.allGranted] guards entry points before
  * this class is touched.
  */
-class BleClient(private val appContext: Context) {
+class BleClient(
+    private val appContext: Context,
+    /**
+     * Invoked on the binder thread (Android's default for GATT callbacks)
+     * when a decoded cluster→phone command arrives. The caller is
+     * responsible for switching threads if its dispatch needs the main
+     * looper — TelecomManager/MediaController are safe to call from
+     * the binder thread, so most consumers don't need to.
+     */
+    private val onCommand: (ClientCommand) -> Unit = {},
+) {
 
     private val adapter   = appContext.getSystemService(BluetoothManager::class.java).adapter
     private var gatt:      BluetoothGatt?               = null
@@ -81,17 +93,59 @@ class BleClient(private val appContext: Context) {
             g.discoverServices()
         }
 
+        @SuppressLint("MissingPermission")
         override fun onServicesDiscovered(g: BluetoothGatt, status: Int) {
             val svc = g.getService(Protocol.SERVICE_UUID)
-            val chr = svc?.getCharacteristic(Protocol.RX_UUID)
-            if (chr == null) {
+            val rxChr = svc?.getCharacteristic(Protocol.RX_UUID)
+            val txChr = svc?.getCharacteristic(Protocol.TX_UUID)
+            if (rxChr == null) {
                 Log.w(TAG, "RX characteristic not found on device")
                 BleState.conn = BleConnState.DISCONNECTED
                 return
             }
-            writeChar = chr
+            writeChar = rxChr
+
+            // Subscribe to the TX (cluster → phone) notify channel. Two
+            // steps: tell Android to deliver notifications for this
+            // characteristic locally, then write the CCCD on the peer
+            // so the cluster will actually start sending them. Missing
+            // either half is a silent failure — the other side notifies
+            // into the void or our local pipe drops the bytes.
+            if (txChr != null) {
+                if (!g.setCharacteristicNotification(txChr, true)) {
+                    Log.w(TAG, "setCharacteristicNotification(TX) returned false")
+                }
+                val cccd = txChr.getDescriptor(CCCD_UUID)
+                if (cccd != null) {
+                    val rc = g.writeDescriptor(
+                        cccd, BluetoothGattDescriptor.ENABLE_NOTIFICATION_VALUE
+                    )
+                    if (rc != android.bluetooth.BluetoothStatusCodes.SUCCESS) {
+                        Log.w(TAG, "writeDescriptor(CCCD) rc=$rc")
+                    }
+                } else {
+                    Log.w(TAG, "TX characteristic has no CCCD — cluster won't notify")
+                }
+            } else {
+                Log.w(TAG, "TX characteristic not found — call/media commands won't work")
+            }
+
             BleState.conn = BleConnState.CONNECTED
-            Log.i(TAG, "ready; RX handle resolved")
+            Log.i(TAG, "ready; RX handle resolved, TX subscribed")
+        }
+
+        override fun onCharacteristicChanged(
+            g: BluetoothGatt,
+            characteristic: BluetoothGattCharacteristic,
+            value: ByteArray,
+        ) {
+            if (characteristic.uuid != Protocol.TX_UUID) return
+            val cmd = ClientProtocol.decode(value)
+            if (cmd == null) {
+                Log.w(TAG, "dropping unparseable TX notify, ${value.size} bytes")
+                return
+            }
+            onCommand(cmd)
         }
     }
 
@@ -155,5 +209,9 @@ class BleClient(private val appContext: Context) {
 
     private companion object {
         const val TAG = "BleClient"
+        // Client Characteristic Configuration Descriptor — the standard
+        // 0x2902 UUID. Writing ENABLE_NOTIFICATION_VALUE here tells the
+        // peripheral to start pushing notifications on the parent char.
+        val CCCD_UUID: UUID = UUID.fromString("00002902-0000-1000-8000-00805f9b34fb")
     }
 }

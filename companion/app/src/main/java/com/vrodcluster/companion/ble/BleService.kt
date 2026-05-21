@@ -56,7 +56,8 @@ class BleService : Service() {
                 .collect { refreshNotification() }
         }
 
-        client = BleClient(applicationContext).also { c ->
+        val handler = CommandHandler(applicationContext)
+        client = BleClient(applicationContext, onCommand = handler::dispatch).also { c ->
             // Swap the global sink so any future notif / media event
             // goes straight to GATT instead of the default logcat path.
             // Remember the prior lambda so we can restore it in

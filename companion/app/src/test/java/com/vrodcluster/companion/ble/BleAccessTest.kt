@@ -28,35 +28,41 @@ class BleAccessTest {
         assertFalse(BleAccess.allGranted(context))
     }
 
-    @Test fun `allGranted true after the three required perms are granted`() {
+    @Test fun `allGranted true after the four required perms are granted`() {
         shadowApp.grantPermissions(
             Manifest.permission.BLUETOOTH_SCAN,
             Manifest.permission.BLUETOOTH_CONNECT,
             Manifest.permission.POST_NOTIFICATIONS,
+            Manifest.permission.ANSWER_PHONE_CALLS,
         )
         assertTrue(BleAccess.allGranted(context))
     }
 
     @Test fun `allGranted false if any single one is missing`() {
-        // Grant two of three. Each missing-one case should evaluate
+        // Grant three of four. Each missing-one case should evaluate
         // false — otherwise the UI would let the user try to connect
         // and crash on the first scan call.
         shadowApp.grantPermissions(
             Manifest.permission.BLUETOOTH_SCAN,
             Manifest.permission.BLUETOOTH_CONNECT,
+            Manifest.permission.POST_NOTIFICATIONS,
         )
-        assertFalse("missing POST_NOTIFICATIONS", BleAccess.allGranted(context))
+        assertFalse("missing ANSWER_PHONE_CALLS", BleAccess.allGranted(context))
 
         shadowApp.denyPermissions(Manifest.permission.BLUETOOTH_SCAN)
-        shadowApp.grantPermissions(Manifest.permission.POST_NOTIFICATIONS)
+        shadowApp.grantPermissions(Manifest.permission.ANSWER_PHONE_CALLS)
         assertFalse("missing BLUETOOTH_SCAN", BleAccess.allGranted(context))
 
         shadowApp.grantPermissions(Manifest.permission.BLUETOOTH_SCAN)
         shadowApp.denyPermissions(Manifest.permission.BLUETOOTH_CONNECT)
         assertFalse("missing BLUETOOTH_CONNECT", BleAccess.allGranted(context))
+
+        shadowApp.grantPermissions(Manifest.permission.BLUETOOTH_CONNECT)
+        shadowApp.denyPermissions(Manifest.permission.POST_NOTIFICATIONS)
+        assertFalse("missing POST_NOTIFICATIONS", BleAccess.allGranted(context))
     }
 
-    @Test fun `REQUIRED contains the exact three permissions we declare`() {
+    @Test fun `REQUIRED contains the exact four permissions we declare`() {
         // Lock the contract: a future change that silently adds a perm
         // here would surprise the UI flow (the request dialog wouldn't
         // match what the manifest claims).
@@ -64,6 +70,7 @@ class BleAccessTest {
             Manifest.permission.BLUETOOTH_SCAN,
             Manifest.permission.BLUETOOTH_CONNECT,
             Manifest.permission.POST_NOTIFICATIONS,
+            Manifest.permission.ANSWER_PHONE_CALLS,
         )
         assertTrue(BleAccess.REQUIRED.toSet() == expected)
     }

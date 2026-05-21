@@ -39,3 +39,35 @@ phone_parse_result_t phone_protocol_parse(const uint8_t   *buf,
                                           size_t           len,
                                           size_t          *consumed,
                                           phone_event_t   *out);
+
+// Cluster → phone command stream. Same TLV framing as the RX side, just
+// running the other way over the TX notify characteristic. Types are
+// in a separate range so a future single-channel design could share the
+// parser without ambiguity.
+//
+//   header:                u8  type
+//                          u16 payload_len    (little-endian)
+//   CMD_CALL_ACCEPT (0x10):   payload_len=0
+//   CMD_CALL_REJECT (0x11):   payload_len=0
+//   CMD_CALL_END    (0x12):   payload_len=0
+//   CMD_MEDIA_PREV       (0x20): payload_len=0
+//   CMD_MEDIA_PLAY_PAUSE (0x21): payload_len=0
+//   CMD_MEDIA_NEXT       (0x22): payload_len=0
+//   CMD_NOTIF_DISMISS    (0x30): payload_len=4, u32 id (matches RX NOTIF.id)
+typedef enum {
+    PHONE_CMD_CALL_ACCEPT     = 0x10,
+    PHONE_CMD_CALL_REJECT     = 0x11,
+    PHONE_CMD_CALL_END        = 0x12,
+    PHONE_CMD_MEDIA_PREV      = 0x20,
+    PHONE_CMD_MEDIA_PLAY_PAUSE = 0x21,
+    PHONE_CMD_MEDIA_NEXT      = 0x22,
+    PHONE_CMD_NOTIF_DISMISS   = 0x30,
+} phone_cmd_t;
+
+// Encode a no-payload command into out[]. Returns the number of bytes
+// written (always 3) or 0 if out_sz < 3.
+size_t phone_protocol_encode_cmd(phone_cmd_t cmd, uint8_t *out, size_t out_sz);
+
+// Encode a NOTIF_DISMISS command carrying an id. Returns the number of
+// bytes written (always 7) or 0 if out_sz < 7.
+size_t phone_protocol_encode_dismiss(uint32_t id, uint8_t *out, size_t out_sz);

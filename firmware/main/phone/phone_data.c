@@ -1,8 +1,35 @@
 #include "phone_data.h"
+#include "phone_protocol.h"
 #include <string.h>
 #include "freertos/FreeRTOS.h"
 #include "freertos/semphr.h"
 #include "lvgl.h"   /* lv_tick_get for call duration timer */
+
+// Cluster→phone notify path. Declared weak so the desktop simulator can
+// link the same phone_data.c without pulling in NimBLE — the sim and
+// host tests build a no-op stub via the regular symbol resolution path
+// (firmware/simulator/ble_peripheral_shim.c, firmware/test_apps/host
+// stubs). The weak attribute lets phone_data.c stay producer-agnostic
+// in its sources list without a build-system fork.
+__attribute__((weak)) bool ble_peripheral_notify(const uint8_t *buf, uint16_t len)
+{
+    (void)buf; (void)len;
+    return false;
+}
+
+static void send_cmd(phone_cmd_t cmd)
+{
+    uint8_t buf[3];
+    size_t  n = phone_protocol_encode_cmd(cmd, buf, sizeof(buf));
+    if (n) (void)ble_peripheral_notify(buf, (uint16_t)n);
+}
+
+static void send_dismiss(uint32_t id)
+{
+    uint8_t buf[7];
+    size_t  n = phone_protocol_encode_dismiss(id, buf, sizeof(buf));
+    if (n) (void)ble_peripheral_notify(buf, (uint16_t)n);
+}
 
 // Pending notifications wait behind whatever is currently in s_state.notif.
 // FIFO of fixed depth so a flood of pushes can't grow unboundedly. When
@@ -126,10 +153,19 @@ void phone_data_handle_swipe(phone_swipe_dir_t dir)
 {
     if (xSemaphoreTake(s_mutex, pdMS_TO_TICKS(10)) != pdTRUE) return;
 
+    uint32_t dismiss_id = 0;
+    bool     want_dismiss = false;
     if (s_state.notif.active) {
         // CALL requires an explicit button press — swipes are ignored.
-        // SMS / app pushes dismiss on any swipe direction.
-        if (s_state.notif.kind != NOTIF_KIND_CALL) dismiss_active_locked();
+        // SMS / app pushes dismiss on any swipe direction. Capture the
+        // id under the lock; send the wire-side DISMISS after we
+        // release it so we never hold the cluster mutex across a
+        // potentially-blocking NimBLE notify call.
+        if (s_state.notif.kind != NOTIF_KIND_CALL) {
+            dismiss_id   = s_state.notif.id;
+            want_dismiss = true;
+            dismiss_active_locked();
+        }
     } else if (dir == PHONE_SWIPE_UP) {
         // Pull up the media banner if there's a track loaded.
         if (s_state.media.state == MEDIA_STATE_PLAYING
@@ -141,47 +177,58 @@ void phone_data_handle_swipe(phone_swipe_dir_t dir)
     }
 
     xSemaphoreGive(s_mutex);
+
+    if (want_dismiss) send_dismiss(dismiss_id);
 }
 
 void phone_data_call_accept(void)
 {
+    bool send = false;
     if (xSemaphoreTake(s_mutex, pdMS_TO_TICKS(10)) != pdTRUE) return;
     if (s_state.notif.active
      && s_state.notif.kind == NOTIF_KIND_CALL
      && !s_state.notif.call_in_progress) {
-        // TODO: phone_bridge_send(PHONE_CMD_CALL_ACCEPT) once BLE is wired.
         s_state.notif.call_in_progress = true;
         s_state.notif.call_start_ms    = lv_tick_get();
+        send = true;
     }
     xSemaphoreGive(s_mutex);
+    if (send) send_cmd(PHONE_CMD_CALL_ACCEPT);
 }
 
 void phone_data_call_reject(void)
 {
+    bool send = false;
     if (xSemaphoreTake(s_mutex, pdMS_TO_TICKS(10)) != pdTRUE) return;
     if (s_state.notif.active && s_state.notif.kind == NOTIF_KIND_CALL) {
-        // TODO: phone_bridge_send(PHONE_CMD_CALL_REJECT) once BLE is wired.
         dismiss_active_locked();
+        send = true;
     }
     xSemaphoreGive(s_mutex);
+    if (send) send_cmd(PHONE_CMD_CALL_REJECT);
 }
 
 void phone_data_call_end(void)
 {
+    bool send = false;
     if (xSemaphoreTake(s_mutex, pdMS_TO_TICKS(10)) != pdTRUE) return;
     if (s_state.notif.active
      && s_state.notif.kind == NOTIF_KIND_CALL
      && s_state.notif.call_in_progress) {
-        // TODO: phone_bridge_send(PHONE_CMD_CALL_END) once BLE is wired.
         dismiss_active_locked();
+        send = true;
     }
     xSemaphoreGive(s_mutex);
+    if (send) send_cmd(PHONE_CMD_CALL_END);
 }
 
 void phone_data_media_action(phone_media_action_t action)
 {
-    // No local state to mutate — the companion app is the source of
-    // truth for playback state. When BLE is wired this will forward the
-    // command; for now it's a hook so the buttons have somewhere to go.
-    (void)action;
+    // Companion app is the source of truth for playback state, so we
+    // don't synthesise anything locally — just forward the intent.
+    switch (action) {
+    case PHONE_MEDIA_ACTION_PREV:       send_cmd(PHONE_CMD_MEDIA_PREV);       break;
+    case PHONE_MEDIA_ACTION_PLAY_PAUSE: send_cmd(PHONE_CMD_MEDIA_PLAY_PAUSE); break;
+    case PHONE_MEDIA_ACTION_NEXT:       send_cmd(PHONE_CMD_MEDIA_NEXT);       break;
+    }
 }

@@ -104,3 +104,32 @@ phone_parse_result_t phone_protocol_parse(const uint8_t  *buf,
         return PHONE_PARSE_BAD_TYPE;
     }
 }
+
+// Little-endian writers, mirror the rd_* helpers above.
+static inline void wr_u16(uint8_t *p, uint16_t v) {
+    p[0] = (uint8_t)(v       & 0xFF);
+    p[1] = (uint8_t)((v >> 8) & 0xFF);
+}
+static inline void wr_u32(uint8_t *p, uint32_t v) {
+    p[0] = (uint8_t)(v        & 0xFF);
+    p[1] = (uint8_t)((v >> 8)  & 0xFF);
+    p[2] = (uint8_t)((v >> 16) & 0xFF);
+    p[3] = (uint8_t)((v >> 24) & 0xFF);
+}
+
+size_t phone_protocol_encode_cmd(phone_cmd_t cmd, uint8_t *out, size_t out_sz)
+{
+    if (out_sz < 3) return 0;
+    out[0] = (uint8_t)cmd;
+    wr_u16(out + 1, 0);
+    return 3;
+}
+
+size_t phone_protocol_encode_dismiss(uint32_t id, uint8_t *out, size_t out_sz)
+{
+    if (out_sz < 7) return 0;
+    out[0] = (uint8_t)PHONE_CMD_NOTIF_DISMISS;
+    wr_u16(out + 1, 4);
+    wr_u32(out + 3, id);
+    return 7;
+}
