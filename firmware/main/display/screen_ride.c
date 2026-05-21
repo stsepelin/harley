@@ -11,6 +11,7 @@
 #include "trip_display.h"
 #include "notification_banner.h"
 #include "media_banner.h"
+#include "ble_peripheral.h"
 #include "phone_data.h"
 #include "theme.h"
 #include "ui_manager.h"
@@ -37,6 +38,7 @@ static lv_obj_t *s_trip2;
 static lv_obj_t *s_banner;
 static lv_obj_t *s_media_banner;
 static lv_obj_t *s_media_hint;
+static lv_obj_t *s_ble_dot;
 
 // Long-press, turn-signal-edge detection, and now swipe-to-dismiss all
 // live in the 100 Hz event-watcher task (ui_manager.c). The UI side
@@ -139,6 +141,20 @@ lv_obj_t *screen_ride_create(void)
     lv_obj_remove_flag(s_media_hint, LV_OBJ_FLAG_SCROLLABLE);
     lv_obj_add_flag(s_media_hint, LV_OBJ_FLAG_HIDDEN);
 
+    // BLE connection dot: small blue pip at the top of the round face,
+    // shown only while a central is connected. y=60 sits clear of the
+    // gear digit (LV_ALIGN_CENTER -150 → centred around y=250) and well
+    // inside the visible circle (half-chord at y=60 is ~213 px).
+    s_ble_dot = lv_obj_create(s_screen);
+    lv_obj_set_size(s_ble_dot, 16, 16);
+    lv_obj_align(s_ble_dot, LV_ALIGN_TOP_MID, 0, 60);
+    lv_obj_set_style_bg_color(s_ble_dot, lv_color_hex(VROD_BLUE_HIGH_BEAM), 0);
+    lv_obj_set_style_bg_opa(s_ble_dot, LV_OPA_COVER, 0);
+    lv_obj_set_style_border_width(s_ble_dot, 0, 0);
+    lv_obj_set_style_radius(s_ble_dot, LV_RADIUS_CIRCLE, 0);
+    lv_obj_remove_flag(s_ble_dot, LV_OBJ_FLAG_SCROLLABLE);
+    lv_obj_add_flag(s_ble_dot, LV_OBJ_FLAG_HIDDEN);
+
     return s_screen;
 }
 
@@ -182,6 +198,17 @@ void screen_ride_update(const vehicle_data_t *data, const settings_t *settings)
         if (hint_visible) lv_obj_remove_flag(s_media_hint, LV_OBJ_FLAG_HIDDEN);
         else              lv_obj_add_flag   (s_media_hint, LV_OBJ_FLAG_HIDDEN);
         prev_hint = (int)hint_visible;
+    }
+
+    // BLE connection dot: same toggle-on-change pattern. ble_peripheral_get_state
+    // is a short critical section so polling at 30 Hz is fine.
+    ble_peripheral_state_t ble;
+    ble_peripheral_get_state(&ble);
+    static int prev_ble = -1;
+    if ((int)ble.connected != prev_ble) {
+        if (ble.connected) lv_obj_remove_flag(s_ble_dot, LV_OBJ_FLAG_HIDDEN);
+        else               lv_obj_add_flag   (s_ble_dot, LV_OBJ_FLAG_HIDDEN);
+        prev_ble = (int)ble.connected;
     }
 
     // Rotating info slot: clock → odo → trip1 → trip2. Toggle HIDDEN

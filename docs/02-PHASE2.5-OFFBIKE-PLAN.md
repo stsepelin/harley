@@ -114,6 +114,14 @@ parallel with stages 1–2 by another contributor (or in sequence).
 > the `default_registered_chips[]` + LVGL-fast-mem-to-flash workaround
 > that's now baked into `firmware/main/`. What remains in Stage 3 is the
 > *protocol* work below; the bring-up blocker is gone.
+>
+> **Connection surface (added later)**: the cluster now exposes
+> connection state to the UI — a blue dot at the top of the ride
+> screen when a central is connected, and a PHONE row in settings
+> showing `ADVERTISING` / `TAP TO DISCONNECT` + the peer's address.
+> The companion app (Android) is what writes notifications into the
+> RX characteristic; iOS is **not** covered by this path (see "iOS
+> scope decision" below).
 
 ### Scope
 
@@ -138,9 +146,109 @@ parallel with stages 1–2 by another contributor (or in sequence).
 ### Tests to add
 
 - `test_ancs_parse.c` — feed canned ANCS notification payloads through
-  the parser, assert title / sender / app extraction.
+  the parser, assert title / sender / app extraction (deferred along
+  with the iOS scope decision below).
 - BLE protocol layer is hard to unit-test on host; rely on the
   simulator + on-device exercising.
+
+### End-to-end verification — Android path
+
+Procedure for proving Stage 3 actually works after a fresh flash +
+install. Run through this once on hardware; record outcome in the
+commit message that closes the stage.
+
+1. **Flash + boot cluster** — `cd firmware && idf.py build flash monitor`.
+   Boot animation → ride screen, no blue dot at the top.
+2. **Settings row** — long-press the ride screen. The PHONE row should
+   read `ADVERTISING` in dim text, with no address line.
+3. **Install companion** — `cd companion && ./gradlew installDebug`.
+   Open the app. First-run, you'll see two grant buttons:
+   - **Grant notification access** → opens Android's Notification
+     Access screen; toggle V-Rod Companion on.
+   - **Grant Bluetooth permissions** → grants `BLE_SCAN` +
+     `BLE_CONNECT` + `POST_NOTIFICATIONS`.
+4. **Connect** — tap **Connect cluster**. The status line above the
+   button cycles `Scanning…` → `Connecting to V-Rod Cluster…` →
+   `Connected to V-Rod Cluster` within a few seconds. On success:
+   - Cluster ride screen grows the blue dot at the top.
+   - Cluster settings PHONE row flips to `TAP TO DISCONNECT` and shows
+     the phone's address (matches what Android Bluetooth settings
+     reports).
+5. **Notification** — trigger a notification from any app on the
+   companion's allow-list (SMS test send is the easiest). Cluster
+   should render the notification banner at the bottom; swipe-up on
+   the cluster should reveal the media banner if Spotify (or similar)
+   is playing.
+6. **Media** — start playback on the phone. Cluster's media banner
+   ticker should update with track + artist within a second or two.
+   (Play/pause/skip from cluster → phone is **not** wired yet —
+   `access_tx_cb` flags this as pending — so those buttons currently
+   produce a no-op. Document failure mode for now; fix is its own
+   commit.)
+7. **Disconnect** — tap the PHONE row in cluster settings. The blue
+   dot on ride disappears, the row reverts to `ADVERTISING`. Companion
+   status line flips to `Disconnected`, button reverts to **Connect
+   cluster**. Tap it again to reconnect.
+8. **Power-cycle reconnect** — confirms the link recovers from a
+   cluster reboot (which happens every ignition cycle on the bike).
+   1. Make sure you're connected (status line `Connected to V-Rod
+      Cluster`, blue dot on).
+   2. Unplug the cluster's USB-C cable, wait ~3 s, plug it back in.
+   3. Watch all three: cluster serial shows
+      `advertising as 'V-Rod Cluster'` within ~2 s of boot; cluster
+      ride screen shows the blue dot return; companion status line
+      flips `Disconnected` → `Scanning…` → `Connected` on its own.
+   4. Send a test SMS — banner renders, proving the data path
+      survived the reboot, not just the link.
+
+   - **Success**: companion auto-reconnects, blue dot back within
+     ~10 s, no taps needed.
+   - **Acceptable**: status sticks at `Disconnected`; tapping
+     **Connect cluster** brings it back. Means auto-reconnect-on-
+     advert isn't wired in `BleService` yet — follow-up, not a
+     blocker.
+   - **Bad**: status still says `Connected` but notifications drop
+     silently. Stale state in `BleService` — file an issue.
+
+Known gaps to write up but **not** fix in this commit:
+
+- No bonding / security model — just-works pairing, any nearby Android
+  with the companion can connect. Add `ble_sm_*` config + IRK storage
+  in a follow-up.
+- Cluster → phone TX channel (CALL_ACCEPT, media prev/play/next) is
+  in the GATT table but unused — needs a companion-side handler.
+- No "Forget device" because we don't bond yet. The settings row's
+  tap action drops the link only.
+
+### iOS scope decision — needs your call
+
+The original Stage 3 plan named ANCS + AMS as iOS support — i.e. the
+cluster becomes a GATT *client* of the iPhone's well-known notification
+service. That's meaningfully different work from the current
+Android-companion path:
+
+- Requires NimBLE security manager config (`ble_sm_*`) so iOS will
+  expose ANCS at all.
+- Requires GATT discovery on the connected peer (the iPhone), not just
+  serving a local service.
+- Adds two parsers: ANCS Notification Source/Data Source and AMS
+  Now-Playing — both ~150-300 lines.
+- Doesn't reuse the existing `phone_protocol` TLV layer at all.
+
+Three options, ordered by ambition:
+
+- **A. Defer iOS to Phase 4.** Honest. Phase 4 in the master plan
+  already names "iOS ANCS/AMS via ESP32-C6". Leave Stage 3 at
+  Android-only and call it done.
+- **B. Add iOS as Stage 3b in this phase.** Real chunk of work
+  (~1 weekend) but lands a polished story end-to-end.
+- **C. Skip iOS entirely.** Only viable if Android is the primary
+  phone for the bike.
+
+Recommendation: **A**. Phase 2.5's purpose was to fill bench time
+while parts ship; ANCS is a meaningful protocol implementation that
+deserves its own phase. The decision belongs to the rider — which
+phone do you actually use on the bike?
 
 ## Stage 4 — Speed-camera alert framework
 

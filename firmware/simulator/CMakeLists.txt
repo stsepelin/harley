@@ -55,6 +55,7 @@ add_executable(vrod_sim
     ${MAIN_DIR}/settings/settings.c
     ui_manager_shim.c
     phone_mock.c
+    ble_peripheral_shim.c
     ${MAIN_DIR}/display/widgets/tach_arc.c
     ${MAIN_DIR}/display/widgets/speed_display.c
     ${MAIN_DIR}/display/widgets/gear_indicator.c
@@ -84,6 +85,7 @@ add_executable(vrod_sim
 
 target_include_directories(vrod_sim PRIVATE
     ${MAIN_DIR}
+    ${MAIN_DIR}/ble
     ${MAIN_DIR}/display
     ${MAIN_DIR}/display/widgets
     ${MAIN_DIR}/display/fonts

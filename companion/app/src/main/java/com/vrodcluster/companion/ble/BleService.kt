@@ -1,5 +1,6 @@
 package com.vrodcluster.companion.ble
 
+import android.annotation.SuppressLint
 import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
@@ -9,9 +10,17 @@ import android.content.Intent
 import android.content.pm.ServiceInfo
 import android.os.IBinder
 import android.util.Log
+import androidx.compose.runtime.snapshotFlow
 import androidx.core.app.NotificationCompat
+import androidx.core.app.NotificationManagerCompat
 import com.vrodcluster.companion.MainActivity
 import com.vrodcluster.companion.R
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.launch
 
 /**
  * Foreground service that keeps the BLE link alive while the screen is
@@ -28,11 +37,24 @@ class BleService : Service() {
 
     private var client:           BleClient?     = null
     private var previousSinkSend: ((ByteArray) -> Unit)? = null
+    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
 
     override fun onCreate() {
         super.onCreate()
         ensureChannel()
         startForeground(NOTIF_ID, buildNotification(), FG_TYPE)
+
+        // Keep the foreground notification text in sync with the real
+        // BLE state. Without this, the notification says "Connected"
+        // from the moment the user taps Connect cluster, even while the
+        // scan is still running (or has failed) — which led to a
+        // confusing demo where the system tray claimed connectivity that
+        // didn't actually exist.
+        scope.launch {
+            snapshotFlow { BleState.conn to BleState.deviceName }
+                .distinctUntilChanged()
+                .collect { refreshNotification() }
+        }
 
         client = BleClient(applicationContext).also { c ->
             // Swap the global sink so any future notif / media event
@@ -56,6 +78,7 @@ class BleService : Service() {
 
     override fun onDestroy() {
         Log.i(TAG, "service stopping")
+        scope.cancel()
         client?.stop()
         client = null
         previousSinkSend?.let { OutboundSink.send = it }
@@ -90,11 +113,27 @@ class BleService : Service() {
         )
         return NotificationCompat.Builder(this, CHANNEL_ID)
             .setContentTitle(getString(R.string.app_name))
-            .setContentText(getString(R.string.ble_notif_active))
+            .setContentText(currentStatusText())
             .setSmallIcon(android.R.drawable.stat_sys_data_bluetooth)
             .setContentIntent(tap)
             .setOngoing(true)
             .build()
+    }
+
+    private fun currentStatusText(): String = when (BleState.conn) {
+        BleConnState.IDLE         -> getString(R.string.ble_state_idle)
+        BleConnState.SCANNING     -> getString(R.string.ble_state_scanning)
+        BleConnState.CONNECTING   -> getString(R.string.ble_state_connecting, BleState.deviceName ?: "…")
+        BleConnState.CONNECTED    -> getString(R.string.ble_state_connected,  BleState.deviceName ?: "?")
+        BleConnState.DISCONNECTED -> getString(R.string.ble_state_disconnected)
+    }
+
+    // NotificationManagerCompat handles the POST_NOTIFICATIONS gate
+    // gracefully on Android 13+; the permission is requested as part of
+    // the BLE permission bundle on first run.
+    @SuppressLint("MissingPermission")
+    private fun refreshNotification() {
+        NotificationManagerCompat.from(this).notify(NOTIF_ID, buildNotification())
     }
 
     companion object {

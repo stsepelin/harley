@@ -1,4 +1,5 @@
 #include "screen_settings.h"
+#include "ble_peripheral.h"
 #include "settings_store.h"
 #include "sound.h"
 #include "theme.h"
@@ -6,6 +7,7 @@
 #include "bsp/display.h"
 #include <stdint.h>
 #include <stdio.h>
+#include <string.h>
 
 LV_FONT_DECLARE(jbm_bold_45);
 LV_FONT_DECLARE(jbm_bold_33);
@@ -25,6 +27,10 @@ static lv_obj_t *s_units_value;
 static lv_obj_t *s_sound_badge;
 static lv_obj_t *s_brightness_value;
 static lv_obj_t *s_volume_value;
+static lv_obj_t *s_phone_status;
+static lv_obj_t *s_phone_addr;
+static lv_timer_t *s_phone_timer;
+static ble_peripheral_state_t s_phone_last;
 
 // --- shared row styling --------------------------------------------------
 
@@ -154,6 +160,61 @@ static void brightness_released_cb(lv_event_t *e)
     settings_store_apply(&s_pending);
 }
 
+// --- phone row -----------------------------------------------------------
+
+// Connection state changes asynchronously from the NimBLE host task, so a
+// timer is cheaper than wiring a callback all the way through the BLE
+// subsystem. 1 Hz is plenty — a human reading "CONNECTED" appearing one
+// second after the actual connect is fine. Skip the label rewrite when
+// state hasn't moved so we don't invalidate the row every tick.
+static void refresh_phone_row(void)
+{
+    ble_peripheral_state_t s;
+    ble_peripheral_get_state(&s);
+    if (s.connected   == s_phone_last.connected &&
+        s.advertising == s_phone_last.advertising &&
+        s.powered     == s_phone_last.powered &&
+        strcmp(s.peer_addr_str, s_phone_last.peer_addr_str) == 0) {
+        return;
+    }
+    s_phone_last = s;
+
+    const char *txt;
+    uint32_t color;
+    if (s.connected) {
+        txt = "TAP TO DISCONNECT";
+        color = VROD_ORANGE;
+    } else if (s.advertising) {
+        txt = "ADVERTISING";
+        color = VROD_TEXT_DIM;
+    } else if (s.powered) {
+        txt = "IDLE";
+        color = VROD_TEXT_DIM;
+    } else {
+        txt = "OFF";
+        color = VROD_TEXT_DIM;
+    }
+    lv_label_set_text(s_phone_status, txt);
+    lv_obj_set_style_text_color(s_phone_status, lv_color_hex(color), 0);
+    lv_label_set_text(s_phone_addr, s.connected ? s.peer_addr_str : "");
+}
+
+static void phone_timer_cb(lv_timer_t *t)
+{
+    (void)t;
+    refresh_phone_row();
+}
+
+static void phone_row_clicked_cb(lv_event_t *e)
+{
+    (void)e;
+    ble_peripheral_state_t s;
+    ble_peripheral_get_state(&s);
+    if (!s.connected) return;  // tap is a no-op when nothing's there
+    ble_peripheral_disconnect_active();
+    refresh_phone_row();
+}
+
 // --- back ----------------------------------------------------------------
 
 static void back_cb(lv_event_t *e)
@@ -222,6 +283,33 @@ lv_obj_t *screen_settings_create(void)
             SETTINGS_BRIGHTNESS_MIN, 100, s_pending.brightness,
             brightness_changed_cb, brightness_released_cb);
         s_brightness_value = b.value;
+    }
+
+    // PHONE — connection status + tap-to-disconnect. Sits between the
+    // BRIGHTNESS card (ends y=510) and the BACK button (starts y=640
+    // measured from the top, since LV_ALIGN_BOTTOM_MID with y=-80 puts
+    // an 80-tall button there). Row height 100 at y=525 leaves a 15-px
+    // breather above BACK.
+    lv_obj_t *phone_row = make_row(scr, 100, 525);
+    lv_obj_add_flag(phone_row, LV_OBJ_FLAG_CLICKABLE);
+    lv_obj_add_event_cb(phone_row, phone_row_clicked_cb, LV_EVENT_CLICKED, NULL);
+    make_caption(phone_row, "PHONE", LV_ALIGN_TOP_LEFT, VROD_TEXT);
+
+    s_phone_status = lv_label_create(phone_row);
+    lv_obj_set_style_text_font(s_phone_status, &jbm_bold_33, 0);
+    lv_obj_align(s_phone_status, LV_ALIGN_TOP_RIGHT, 0, 0);
+
+    s_phone_addr = lv_label_create(phone_row);
+    lv_obj_set_style_text_font(s_phone_addr, &jbm_bold_33, 0);
+    lv_obj_set_style_text_color(s_phone_addr, lv_color_hex(VROD_TEXT_DIM), 0);
+    lv_obj_align(s_phone_addr, LV_ALIGN_BOTTOM_RIGHT, 0, 0);
+
+    // Force the first paint with the real state before the timer's first
+    // tick — otherwise the row sits empty for up to a second after open.
+    memset(&s_phone_last, 0xff, sizeof(s_phone_last));   // force diff
+    refresh_phone_row();
+    if (!s_phone_timer) {
+        s_phone_timer = lv_timer_create(phone_timer_cb, 1000, NULL);
     }
 
     // BACK button — glove-friendly tap target.
