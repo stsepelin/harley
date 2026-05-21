@@ -33,6 +33,7 @@ class VrodNotifListener : NotificationListenerService() {
         mediaWatcher.stop()
         instance = null
         idToKey.clear()
+        lastBytesById.clear()
         super.onListenerDisconnected()
     }
 
@@ -53,11 +54,21 @@ class VrodNotifListener : NotificationListenerService() {
             title       = title,
             text        = text,
         ) ?: return
+        val id = NotifMapper.stableId(sbn.key)
+        // Drop identical reposts. Messaging apps repost the same
+        // notification on read receipts / typing indicators / "X is
+        // online" updates — same title, same body, no rider-visible
+        // change. Compare against the last wire bytes per id; identical
+        // → skip the BLE write and the LRU bump. Saves a GATT write per
+        // status-change ping (Telegram can fire one a second).
+        val prev = lastBytesById[id]
+        if (prev != null && prev.contentEquals(bytes)) return
+        lastBytesById[id] = bytes
         // Track id → key so a cluster-side dismiss (swipe on the ride
         // screen → CMD_NOTIF_DISMISS over BLE) can find the SBN to
         // cancel. Only one entry per id is kept; if the upstream poster
         // recycles a key, the latest mapping wins.
-        idToKey[NotifMapper.stableId(sbn.key)] = sbn.key
+        idToKey[id] = sbn.key
         OutboundSink.send(bytes)
     }
 
@@ -70,6 +81,7 @@ class VrodNotifListener : NotificationListenerService() {
         if (!AllowList.isAllowed(this, sbn.packageName)) return
         val id = NotifMapper.stableId(sbn.key)
         idToKey.remove(id)
+        lastBytesById.remove(id)
         OutboundSink.send(Protocol.encodeDismiss(id))
     }
 
@@ -82,11 +94,39 @@ class VrodNotifListener : NotificationListenerService() {
         @Volatile private var instance: VrodNotifListener? = null
 
         // Reverse map of NotifMapper.stableId(sbn.key) → sbn.key, populated
-        // on post and pruned on remove. Lives in the companion object so
-        // it survives the listener being torn down briefly (e.g. process
-        // restart). Bounded only by the rate of unique notifications;
-        // the listener disconnect path clears it.
-        private val idToKey = java.util.concurrent.ConcurrentHashMap<UInt, String>()
+        // on post and pruned on remove. Bounded LRU: a busy messaging app
+        // (Telegram thread updates, mail with hundreds of read receipts)
+        // would otherwise grow this unbounded across the listener's
+        // lifetime. accessOrder=true so a cluster-side dismiss bumps the
+        // entry to the freshest end; eviction starts above 256 entries,
+        // and the eviction loser is the least-recently-touched id — also
+        // the one least likely to still be visible on the phone.
+        //
+        // synchronizedMap because LinkedHashMap's accessOrder reads
+        // mutate internal state, so concurrent .get() callers would
+        // otherwise race during eviction. ConcurrentHashMap can't do
+        // bounded LRU on its own.
+        private const val ID_KEY_MAX = 256
+        private val idToKey: MutableMap<UInt, String> =
+            java.util.Collections.synchronizedMap(
+                object : LinkedHashMap<UInt, String>(64, 0.75f, /*accessOrder=*/true) {
+                    override fun removeEldestEntry(
+                        eldest: MutableMap.MutableEntry<UInt, String>,
+                    ): Boolean = size > ID_KEY_MAX
+                }
+            )
+
+        // Last wire bytes per id — paired with idToKey for the
+        // repost-dedupe at the top of onNotificationPosted. Bounded the
+        // same way so the dedupe state can't outgrow the dismiss map.
+        private val lastBytesById: MutableMap<UInt, ByteArray> =
+            java.util.Collections.synchronizedMap(
+                object : LinkedHashMap<UInt, ByteArray>(64, 0.75f, /*accessOrder=*/true) {
+                    override fun removeEldestEntry(
+                        eldest: MutableMap.MutableEntry<UInt, ByteArray>,
+                    ): Boolean = size > ID_KEY_MAX
+                }
+            )
 
         // Cluster-initiated dismiss. The cluster identifies the notif by
         // the same stableId(sbn.key) hash it received on post, and we

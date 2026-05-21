@@ -10,7 +10,12 @@ LV_FONT_DECLARE(jbm_bold_26);
 
 typedef struct {
     lv_obj_t *label;
-    char      last_text[NP_LINE_BUF];
+    // Cache the raw artist + title fields instead of the formatted line.
+    // Two cheap strcmps (each ≤ MEDIA_FIELD_MAX = 48 bytes) replace the
+    // unconditional snprintf-then-compare pattern, so steady-state
+    // frames where nothing's changed skip the format entirely.
+    char      last_artist[MEDIA_FIELD_MAX];
+    char      last_title [MEDIA_FIELD_MAX];
     bool      has_value;
 } np_data_t;
 
@@ -39,9 +44,10 @@ lv_obj_t *now_playing_display_create(lv_obj_t *parent)
     lv_obj_center(lbl);
 
     np_data_t *nd = lv_malloc(sizeof(np_data_t));
-    nd->label        = lbl;
-    nd->last_text[0] = '\0';
-    nd->has_value    = false;
+    nd->label          = lbl;
+    nd->last_artist[0] = '\0';
+    nd->last_title[0]  = '\0';
+    nd->has_value      = false;
     lv_obj_set_user_data(cont, nd);
     return cont;
 }
@@ -51,13 +57,17 @@ void now_playing_display_set(lv_obj_t *cont, const now_playing_t *np)
     np_data_t *nd = lv_obj_get_user_data(cont);
     if (!nd || !np) return;
 
-    char buf[NP_LINE_BUF];
-    format_line(np, buf, sizeof(buf));
+    if (nd->has_value
+     && strcmp(np->artist, nd->last_artist) == 0
+     && strcmp(np->title,  nd->last_title)  == 0) return;
 
-    if (nd->has_value && strcmp(buf, nd->last_text) == 0) return;
-    strncpy(nd->last_text, buf, sizeof(nd->last_text) - 1);
-    nd->last_text[sizeof(nd->last_text) - 1] = '\0';
+    strncpy(nd->last_artist, np->artist, sizeof(nd->last_artist) - 1);
+    nd->last_artist[sizeof(nd->last_artist) - 1] = '\0';
+    strncpy(nd->last_title, np->title, sizeof(nd->last_title) - 1);
+    nd->last_title[sizeof(nd->last_title) - 1] = '\0';
     nd->has_value = true;
 
+    char buf[NP_LINE_BUF];
+    format_line(np, buf, sizeof(buf));
     lv_label_set_text(nd->label, buf);
 }

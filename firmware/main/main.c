@@ -1,6 +1,5 @@
 #include "bsp/esp-bsp.h"
 #include "bsp/display.h"
-#include "esp_heap_caps.h"
 #include "esp_log.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
@@ -86,17 +85,9 @@ void app_main(void)
     sound_set_enabled(settings_store_current()->sound_enabled);
     ble_peripheral_init();
 
-    ESP_LOGI(TAG, "boot complete, simulator running");
-    while (1) {
-        vTaskDelay(pdMS_TO_TICKS(5000));
-        vehicle_data_t d;
-        vehicle_data_get(&d);
-        size_t psram_total = heap_caps_get_total_size(MALLOC_CAP_SPIRAM);
-        size_t psram_free  = heap_caps_get_free_size(MALLOC_CAP_SPIRAM);
-        ESP_LOGI(TAG, "speed=%u km/h  rpm=%u  gear=%d  L=%d  PSRAM=%u/%uK (%.0f%%)",
-                 d.speed_kmh, d.rpm, d.gear, d.turn_left,
-                 (unsigned)((psram_total - psram_free) / 1024),
-                 (unsigned)(psram_total / 1024),
-                 100.0 * (double)(psram_total - psram_free) / (double)psram_total);
-    }
+    ESP_LOGI(TAG, "boot complete");
+    // app_main can return — all the real work runs in the FreeRTOS tasks
+    // we spawned (ui_update_task, event_watcher_task, sim_engine_task,
+    // NimBLE host, LVGL render). The previous busy-log loop here would
+    // also block any future TWDT IDLE-task feed on core 0.
 }

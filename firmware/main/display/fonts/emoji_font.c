@@ -40,11 +40,13 @@ void emoji_font_init(void)
     lv_fs_make_path_from_buffer(&s_emoji_path, LV_FS_MEMFS_LETTER,
                                 emoji_ttf_start, (uint32_t)ttf_len, "ttf");
 
-    // Cap: 256 cached glyph nodes (LV_FREETYPE_CACHE_FT_GLYPH_CNT default).
-    // The full glyph cache is bounded by that count × the underlying
-    // FreeType FTC_Manager; LRU-evicts above the ceiling. See ARCHITECTURE
-    // for the cache lifecycle write-up.
-    if (lv_freetype_init(256) != LV_RESULT_OK) {
+    // Cache cap kept in sync with CONFIG_LV_FREETYPE_CACHE_FT_GLYPH_CNT
+    // (sdkconfig.defaults). The LVGL FreeType layer enforces both —
+    // passing a larger value here would still get clamped at the lower
+    // Kconfig ceiling. 64 nodes ≈ 170 KB PSRAM with ARGB8888 ~32 px
+    // emoji glyphs, plenty of headroom for the rider's actual working
+    // set (a few smiles + weather + ✅).
+    if (lv_freetype_init(64) != LV_RESULT_OK) {
         ESP_LOGE(TAG, "lv_freetype_init failed");
         return;
     }

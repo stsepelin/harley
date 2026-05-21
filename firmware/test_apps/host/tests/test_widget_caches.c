@@ -103,8 +103,9 @@ static void test_gear_warning_fires_on_edge(void)
 }
 
 // --- temp_display ----------------------------------------------------------
-// temp updates both the value label (snprintf + set_text) and recolours
-// both icon + value (two text_color calls).
+// Two independent caches: the value label updates whenever celsius changes;
+// the colour pair (icon + value) only re-applies when the hot/cold state
+// flips. Bumping by 1 °C below the 110 °C threshold is a text update only.
 
 static void test_temp_cache_skips_unchanged(void)
 {
@@ -116,14 +117,31 @@ static void test_temp_cache_skips_unchanged(void)
     TEST_ASSERT_EQUAL_INT(0, g_lv_obj_set_style_text_color_calls);
 }
 
-static void test_temp_cache_fires_on_change(void)
+static void test_temp_cache_value_change_no_color(void)
 {
+    // Below threshold, ticking up by 1 °C: text re-renders, colour stays.
     lv_obj_t *w = temp_display_create(NULL);
     temp_display_set_value(w, 92);
     lv_stub_reset();
     temp_display_set_value(w, 93);
     TEST_ASSERT_EQUAL_INT(1, g_lv_label_set_text_calls);
-    TEST_ASSERT_EQUAL_INT(2, g_lv_obj_set_style_text_color_calls);  // value + icon
+    TEST_ASSERT_EQUAL_INT(0, g_lv_obj_set_style_text_color_calls);
+}
+
+static void test_temp_cache_hot_transition(void)
+{
+    // Crossing the 110 °C threshold flips both labels' colours plus
+    // re-renders the text. Going back down flips colours again.
+    lv_obj_t *w = temp_display_create(NULL);
+    temp_display_set_value(w, 109);
+    lv_stub_reset();
+    temp_display_set_value(w, 110);
+    TEST_ASSERT_EQUAL_INT(1, g_lv_label_set_text_calls);
+    TEST_ASSERT_EQUAL_INT(2, g_lv_obj_set_style_text_color_calls);  // icon + value
+    lv_stub_reset();
+    temp_display_set_value(w, 109);
+    TEST_ASSERT_EQUAL_INT(1, g_lv_label_set_text_calls);
+    TEST_ASSERT_EQUAL_INT(2, g_lv_obj_set_style_text_color_calls);
 }
 
 // --- turn_signals ----------------------------------------------------------
@@ -300,7 +318,8 @@ void RunTests(void)
     RUN_TEST(test_gear_warning_cache_skips_unchanged);
     RUN_TEST(test_gear_warning_fires_on_edge);
     RUN_TEST(test_temp_cache_skips_unchanged);
-    RUN_TEST(test_temp_cache_fires_on_change);
+    RUN_TEST(test_temp_cache_value_change_no_color);
+    RUN_TEST(test_temp_cache_hot_transition);
     RUN_TEST(test_turn_signals_cache_skips_unchanged);
     RUN_TEST(test_turn_signals_only_changed_side_repaints);
     RUN_TEST(test_fuel_cache_skips_unchanged);

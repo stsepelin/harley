@@ -73,6 +73,11 @@ CONFIG_LV_FS_MEMFS_LETTER=77
 # FreeType's COLR rasterizer is stack-hungry — LVGL refuses to compile
 # unless the draw-thread stack is at least 32 KB.
 CONFIG_LV_DRAW_THREAD_STACK_SIZE=32768
+# Glyph cache ceiling. Default (256) would let the emoji cache balloon to
+# ~700 KB PSRAM with ARGB8888 32×32 glyphs. Realistic working set on the
+# cluster is <30 distinct emoji at a time; cap to 64 so the cache stays
+# under ~170 KB and evicts long-tail glyphs sooner.
+CONFIG_LV_FREETYPE_CACHE_FT_GLYPH_CNT=64
 
 # IDF v6 experimental features (BSP needs DSI etc.)
 CONFIG_IDF_EXPERIMENTAL_FEATURES=y

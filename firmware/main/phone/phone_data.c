@@ -1,5 +1,6 @@
 #include "phone_data.h"
 #include "phone_protocol.h"
+#include <assert.h>
 #include <string.h>
 #include "freertos/FreeRTOS.h"
 #include "freertos/semphr.h"
@@ -48,6 +49,13 @@ void phone_data_init(void)
     memset(s_queue, 0, sizeof(s_queue));
     s_queue_count = 0;
     s_mutex = xSemaphoreCreateMutex();
+    // Boot loudly if heap is exhausted now — every other phone_data_*
+    // entrypoint silently no-ops when the mutex is NULL (xSemaphoreTake
+    // returns pdFALSE on a NULL handle), which would leave the cluster
+    // up but with the phone bridge invisibly dead. C assert() instead of
+    // configASSERT so the same code compiles cleanly under the host
+    // FreeRTOS stub (no configASSERT define there) and the SDL2 sim.
+    assert(s_mutex != NULL);
 }
 
 static void queue_remove_at_locked(int idx)

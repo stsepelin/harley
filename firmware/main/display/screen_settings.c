@@ -202,6 +202,12 @@ static void refresh_phone_row(void)
 static void phone_timer_cb(lv_timer_t *t)
 {
     (void)t;
+    // Skip when settings isn't the active screen — the timer outlives the
+    // visibility of the row it updates (screens are kept alive across
+    // ui_manager_show_*), and mutating an off-screen label still costs a
+    // critical-section read of BLE state for no visual benefit. Lifecycle
+    // hygiene more than perf — at 1 Hz the wasted work is microscopic.
+    if (lv_screen_active() != lv_obj_get_screen(s_phone_status)) return;
     refresh_phone_row();
 }
 

@@ -4,7 +4,6 @@
 #include <string.h>
 #include "esp_log.h"
 #include "freertos/FreeRTOS.h"
-#include "nvs_flash.h"
 
 #include "nimble/nimble_port.h"
 #include "nimble/nimble_port_freertos.h"
@@ -135,9 +134,8 @@ static const struct ble_gatt_chr_def chrs[] = {
         .flags     = BLE_GATT_CHR_F_WRITE | BLE_GATT_CHR_F_WRITE_NO_RSP,
     },
     {
-        // TX (cluster → phone). Notify-only — the central reads via
-        // BluetoothGattCallback.onCharacteristicChanged after enabling
-        // notifications on the CCCD.
+        // TX (cluster → phone). Notify-only; the command channel that
+        // delivers CALL_ACCEPT etc. plugs in here once #33 lands.
         .uuid       = &TX_UUID.u,
         .access_cb  = access_tx_cb,
         .flags      = BLE_GATT_CHR_F_NOTIFY,
@@ -201,14 +199,19 @@ static int gap_event_cb(struct ble_gap_event *event, void *arg)
     switch (event->type) {
     case BLE_GAP_EVENT_CONNECT:
         if (event->connect.status == 0) {
+            // s_conn_handle is read from the UI thread (ble_peripheral_notify,
+            // ble_peripheral_disconnect_active) so the write needs to go
+            // through the same critical section as the rest of s_state.
+            portENTER_CRITICAL(&s_state_mux);
             s_conn_handle = event->connect.conn_handle;
+            portEXIT_CRITICAL(&s_state_mux);
             struct ble_gap_conn_desc desc;
             if (ble_gap_conn_find(event->connect.conn_handle, &desc) == 0) {
                 state_set_connected(desc.peer_id_addr.val);
             } else {
                 state_set_connected((const uint8_t[6]){0});
             }
-            ESP_LOGI(TAG, "central connected; handle=%u", s_conn_handle);
+            ESP_LOGI(TAG, "central connected; handle=%u", event->connect.conn_handle);
         } else {
             ESP_LOGW(TAG, "connect failed; status=%d", event->connect.status);
             start_advertising();
@@ -216,8 +219,10 @@ static int gap_event_cb(struct ble_gap_event *event, void *arg)
         return 0;
     case BLE_GAP_EVENT_DISCONNECT:
         ESP_LOGI(TAG, "disconnect; reason=%d", event->disconnect.reason);
+        portENTER_CRITICAL(&s_state_mux);
         s_conn_handle   = BLE_HS_CONN_HANDLE_NONE;
         s_tx_subscribed = false;
+        portEXIT_CRITICAL(&s_state_mux);
         state_set_connected(NULL);
         start_advertising();
         return 0;
@@ -229,7 +234,9 @@ static int gap_event_cb(struct ble_gap_event *event, void *arg)
                  event->subscribe.attr_handle,
                  event->subscribe.cur_notify, event->subscribe.cur_indicate);
         if (event->subscribe.attr_handle == s_tx_attr_handle) {
+            portENTER_CRITICAL(&s_state_mux);
             s_tx_subscribed = event->subscribe.cur_notify;
+            portEXIT_CRITICAL(&s_state_mux);
         }
         return 0;
     default:
@@ -260,15 +267,9 @@ static void nimble_host_task(void *arg)
 
 void ble_peripheral_init(void)
 {
-    // NimBLE expects NVS available for bond / IRK storage before init.
-    esp_err_t err = nvs_flash_init();
-    if (err == ESP_ERR_NVS_NO_FREE_PAGES || err == ESP_ERR_NVS_NEW_VERSION_FOUND) {
-        ESP_ERROR_CHECK(nvs_flash_erase());
-        ESP_ERROR_CHECK(nvs_flash_init());
-    } else {
-        ESP_ERROR_CHECK(err);
-    }
-
+    // NVS is already initialised by settings_store_init() in app_main —
+    // NimBLE just needs it available before nimble_port_init runs, not a
+    // dedicated init here. Caller is responsible for the ordering.
     int rc = nimble_port_init();
     if (rc != 0) { ESP_LOGE(TAG, "nimble_port_init rc=%d", rc); return; }
 
@@ -299,8 +300,17 @@ void ble_peripheral_get_state(ble_peripheral_state_t *out)
 bool ble_peripheral_notify(const uint8_t *buf, uint16_t len)
 {
     if (!buf || len == 0) return false;
-    if (s_conn_handle == BLE_HS_CONN_HANDLE_NONE) return false;
-    if (!s_tx_subscribed) return false;
+    // Snapshot handle + subscribe state under the mutex — the NimBLE
+    // host task updates them from GAP events on a different core, and
+    // an uint16_t read without a barrier can see stale bytes on RISC-V.
+    uint16_t handle;
+    bool     subscribed;
+    portENTER_CRITICAL(&s_state_mux);
+    handle     = s_conn_handle;
+    subscribed = s_tx_subscribed;
+    portEXIT_CRITICAL(&s_state_mux);
+    if (handle == BLE_HS_CONN_HANDLE_NONE) return false;
+    if (!subscribed) return false;
     // ble_hs_mbuf_from_flat allocates an mbuf chain and copies; NimBLE
     // takes ownership when ble_gatts_notify_custom succeeds, frees the
     // chain when it fails — we don't need to release on either path.
@@ -309,7 +319,7 @@ bool ble_peripheral_notify(const uint8_t *buf, uint16_t len)
         ESP_LOGW(TAG, "notify: mbuf alloc failed (len=%u)", len);
         return false;
     }
-    int rc = ble_gatts_notify_custom(s_conn_handle, s_tx_attr_handle, om);
+    int rc = ble_gatts_notify_custom(handle, s_tx_attr_handle, om);
     if (rc != 0) {
         ESP_LOGW(TAG, "ble_gatts_notify_custom rc=%d", rc);
         return false;
@@ -319,10 +329,13 @@ bool ble_peripheral_notify(const uint8_t *buf, uint16_t len)
 
 void ble_peripheral_disconnect_active(void)
 {
-    // Tolerant of a concurrent disconnect — ble_gap_terminate returns
-    // BLE_HS_ENOTCONN if the handle dies under us, which is the same
-    // outcome we wanted anyway.
-    uint16_t handle = s_conn_handle;
+    // Snapshot under the same critical section the GAP callback writes
+    // under. ble_gap_terminate is itself tolerant of a stale handle —
+    // returns BLE_HS_ENOTCONN if the disconnect raced us.
+    uint16_t handle;
+    portENTER_CRITICAL(&s_state_mux);
+    handle = s_conn_handle;
+    portEXIT_CRITICAL(&s_state_mux);
     if (handle == BLE_HS_CONN_HANDLE_NONE) return;
     int rc = ble_gap_terminate(handle, BLE_ERR_REM_USER_CONN_TERM);
     if (rc != 0 && rc != BLE_HS_ENOTCONN) {
