@@ -82,8 +82,15 @@ internal object NotifMapper {
         text:        String,
     ): ByteArray? {
         if (packageName == ownPackage) return null
-        if (isOngoing) return null
-        if (flags and FLAG_FOREGROUND_SERVICE != 0) return null
+        // Calls are *always* ongoing (the notification persists for the
+        // duration of the call), and modern dialers also tag their
+        // notification as a foreground service. The "drop long-running
+        // state" filters below would silently swallow the incoming call,
+        // which is the one notification we most want to surface — let
+        // calls through both gates.
+        val isCall = category == CAT_CALL || category == CAT_MISSED_CALL
+        if (!isCall && isOngoing) return null
+        if (!isCall && (flags and FLAG_FOREGROUND_SERVICE) != 0) return null
         if (flags and FLAG_GROUP_SUMMARY      != 0) return null
         if (category == CAT_TRANSPORT)          return null
         if (template == TEMPLATE_MEDIA_STYLE)   return null

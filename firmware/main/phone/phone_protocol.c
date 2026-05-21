@@ -55,6 +55,13 @@ phone_parse_result_t phone_protocol_parse(const uint8_t  *buf,
         if (p + mlen > end) { *consumed = total_len; return PHONE_PARSE_BAD_FIELD; }
         const uint8_t *msg = p;
 
+        // Zero the struct first — call_in_progress / call_start_ms aren't on
+        // the wire (they're cluster-side state set by phone_data_call_accept),
+        // and the caller hands us an uninitialised stack-local phone_event_t.
+        // Skipping this leaks whatever garbage was on the stack into those
+        // fields, which made every incoming CALL render in IN-CALL mode
+        // (END CALL button) instead of the incoming REJECT/ACCEPT layout.
+        memset(&out->notif, 0, sizeof(out->notif));
         out->type            = PHONE_EVT_NOTIF;
         out->notif.active    = true;
         out->notif.id        = id;

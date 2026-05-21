@@ -60,9 +60,26 @@ class NotifMapperTest {
         assertNull(encode(isOngoing = true))
     }
 
+    @Test fun `ongoing call notification is kept`() {
+        // Phone calls post an ongoing notification that persists for the
+        // duration of the call. The "ongoing" filter was originally
+        // intended to suppress long-running app state (Spotify, Maps),
+        // but it was also silently swallowing incoming calls — the one
+        // notification we most want to surface on the cluster.
+        val out = encode(category = "call", isOngoing = true)
+        assertEquals(0x01.toByte(), out!![0])
+    }
+
     @Test fun `foreground service notifications are dropped`() {
         // FLAG_FOREGROUND_SERVICE = 0x40
         assertNull(encode(flags = 0x40))
+    }
+
+    @Test fun `foreground service call notification is kept`() {
+        // Some dialers run as a foreground service for the duration of a
+        // call. Same reasoning as the ongoing exemption above.
+        val out = encode(category = "call", flags = 0x40)
+        assertEquals(0x01.toByte(), out!![0])
     }
 
     @Test fun `group summary notifications are dropped`() {

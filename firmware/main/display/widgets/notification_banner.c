@@ -13,12 +13,24 @@ LV_FONT_DECLARE(jbm_bold_33);
 // height we render at. Width is fixed and chosen so that the bottom
 // corners stay inside the round bezel at y≈740 (|dy|≈340 → max half-
 // width ≈ 211, so 400 wide fits).
+//
+// INFO mode is height-dynamic: the container grows to fit the actual
+// wrapped message height (1, 2, or 3 lines) after MSG_MAX_CHARS clamps
+// the input. CALL modes stay fixed because the button row needs a
+// stable place to sit.
 #define BANNER_W           400
 #define BANNER_H_CALL      210   // top row + message + button row
-#define BANNER_H_INFO      120   // top row + message only (SMS / app)
+#define BANNER_H_INFO_MIN  110   // top row + 1-line message + bottom pad
+#define BANNER_H_INFO_MAX  175   // top row + 3-line message + bottom pad
 #define BTN_W              160
 #define BTN_H              60
 #define BANNER_PAD         18
+#define MSG_Y              46    // content-y where the wrapped message starts
+
+// Max codepoints rendered in the message slot before we append "...".
+// 364 px content width / ~15 px per JBM-bold-26 cell ≈ 24 chars/line;
+// 3 lines × 24 = 72, minus a small margin for word-break slop.
+#define MSG_MAX_CHARS      69
 
 // Banner mode — drives which row of buttons / what message format is shown.
 typedef enum {
@@ -44,6 +56,34 @@ typedef struct {
     char                   last_sender [NOTIF_SENDER_MAX];
     char                   last_message[NOTIF_MSG_MAX];
 } banner_data_t;
+
+// Truncate to MSG_MAX_CHARS codepoints (not bytes — Cyrillic and other
+// multi-byte UTF-8 needs to be counted per character so a 60-char
+// Russian message isn't cut to 30 by a naive byte count). Appends "..."
+// when truncation actually happens. out_sz must comfortably hold
+// MSG_MAX_CHARS × 4 bytes + 4 for the ellipsis + NUL.
+static void truncate_message(char *out, size_t out_sz, const char *in)
+{
+    size_t cp = 0;       // codepoints emitted
+    size_t op = 0;       // output write cursor (bytes)
+    const char *p = in;
+    while (*p && cp < MSG_MAX_CHARS) {
+        unsigned char c = (unsigned char)*p;
+        size_t seq = 1;
+        if      ((c & 0xE0) == 0xC0) seq = 2;
+        else if ((c & 0xF0) == 0xE0) seq = 3;
+        else if ((c & 0xF8) == 0xF0) seq = 4;
+        if (op + seq >= out_sz) break;
+        for (size_t i = 0; i < seq && *p; i++) out[op++] = *p++;
+        cp++;
+    }
+    if (*p && op + 4 < out_sz) {
+        out[op++] = '.';
+        out[op++] = '.';
+        out[op++] = '.';
+    }
+    out[op] = '\0';
+}
 
 static const char *kind_text(banner_mode_t mode, notif_kind_t k)
 {
@@ -79,7 +119,7 @@ static void on_btn_clicked(lv_event_t *e)
 
 lv_obj_t *notification_banner_create(lv_obj_t *parent, notif_call_action_cb_t on_call_action)
 {
-    lv_obj_t *cont = widget_container_create(parent, BANNER_W, BANNER_H_INFO);
+    lv_obj_t *cont = widget_container_create(parent, BANNER_W, BANNER_H_INFO_MIN);
     lv_obj_set_style_bg_color    (cont, lv_color_hex(0x1A1A1A), 0);
     lv_obj_set_style_bg_opa      (cont, LV_OPA_COVER, 0);
     lv_obj_set_style_border_color(cont, lv_color_hex(VROD_TEXT_DIM), 0);
@@ -193,7 +233,9 @@ static banner_mode_t mode_for(const notification_t *notif)
 static void apply_mode(lv_obj_t *cont, banner_data_t *bd, banner_mode_t mode)
 {
     // Resize + toggle the right button row. Edge-triggered so we don't
-    // re-invalidate the layout every frame.
+    // re-invalidate the layout every frame. INFO mode starts at MIN
+    // height; the actual height is recomputed in fit_info_height_locked
+    // each time the message changes.
     switch (mode) {
     case BANNER_MODE_INCOMING_CALL:
         lv_obj_set_height(cont, BANNER_H_CALL);
@@ -209,11 +251,28 @@ static void apply_mode(lv_obj_t *cont, banner_data_t *bd, banner_mode_t mode)
         break;
     case BANNER_MODE_INFO:
     default:
-        lv_obj_set_height(cont, BANNER_H_INFO);
+        lv_obj_set_height(cont, BANNER_H_INFO_MIN);
         lv_obj_add_flag   (bd->btn_accept,   LV_OBJ_FLAG_HIDDEN);
         lv_obj_add_flag   (bd->btn_reject,   LV_OBJ_FLAG_HIDDEN);
         lv_obj_add_flag   (bd->btn_end_call, LV_OBJ_FLAG_HIDDEN);
         break;
+    }
+}
+
+// Recompute the container height to fit the message label exactly. Read
+// the wrapped label height after a forced layout, then size the
+// container so there's a symmetric pad above and below. Bottom-anchored
+// banner means the top edge moves up as the height grows — the
+// alignment in screen_ride doesn't need to change.
+static void fit_info_height(lv_obj_t *cont, banner_data_t *bd)
+{
+    lv_obj_update_layout(bd->message_label);
+    int32_t msg_h = lv_obj_get_height(bd->message_label);
+    int32_t want  = BANNER_PAD + MSG_Y + msg_h + BANNER_PAD;
+    if (want < BANNER_H_INFO_MIN) want = BANNER_H_INFO_MIN;
+    if (want > BANNER_H_INFO_MAX) want = BANNER_H_INFO_MAX;
+    if (lv_obj_get_height(cont) != want) {
+        lv_obj_set_height(cont, want);
     }
 }
 
@@ -274,8 +333,16 @@ void notification_banner_update(lv_obj_t *cont, const notification_t *notif)
             bd->last_call_sec = elapsed_sec;
         }
     } else if (strcmp(notif->message, bd->last_message) != 0) {
-        lv_label_set_text(bd->message_label, notif->message);
+        // Truncate to MSG_MAX_CHARS so the rendered text never exceeds
+        // 3 lines and overflows the container. Cache the raw input (not
+        // the truncated form) so two raw messages that happen to share
+        // the same prefix still each invalidate when one replaces the
+        // other — the truncation is purely a display concern.
+        char shown[NOTIF_MSG_MAX + 4];
+        truncate_message(shown, sizeof(shown), notif->message);
+        lv_label_set_text(bd->message_label, shown);
         memcpy(bd->last_message, notif->message, sizeof(bd->last_message));
+        if (mode == BANNER_MODE_INFO) fit_info_height(cont, bd);
     }
 
     bd->last_id = notif->id;
