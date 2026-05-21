@@ -9,14 +9,18 @@ set(REPO_ROOT  ${CMAKE_CURRENT_LIST_DIR}/..)
 set(MAIN_DIR   ${REPO_ROOT}/main)
 set(SIM_DIR    ${CMAKE_CURRENT_LIST_DIR})
 
-# --- SDL2 ------------------------------------------------------------------
+# --- SDL2 + FreeType ------------------------------------------------------
 # pkg-config first (cleanest on Linux + Homebrew); fall back to find_package.
 find_package(PkgConfig QUIET)
 if(PKG_CONFIG_FOUND)
     pkg_check_modules(SDL2 sdl2)
+    pkg_check_modules(FREETYPE freetype2)
 endif()
 if(NOT SDL2_FOUND)
     find_package(SDL2 REQUIRED)
+endif()
+if(NOT FREETYPE_FOUND)
+    find_package(Freetype REQUIRED)
 endif()
 
 # --- LVGL ------------------------------------------------------------------
@@ -25,11 +29,14 @@ endif()
 add_compile_definitions(LV_CONF_INCLUDE_SIMPLE LV_LVGL_H_INCLUDE_SIMPLE)
 include_directories(BEFORE ${SIM_DIR})  # so lv_conf.h is found before LVGL's
 
-# LVGL's SDL driver `#include`s the SDL header — add SDL2's include dirs
-# *globally* before LVGL builds, otherwise lv_sdl_window.c can't find SDL.h.
+# LVGL's SDL + FreeType bindings #include the SDL / ft2build.h headers
+# directly. Both have to be visible globally *before* the lvgl
+# add_subdirectory below, otherwise lv_sdl_window.c / lv_freetype_*.c
+# can't find the headers during their own compile.
 if(SDL2_INCLUDE_DIRS)
     include_directories(${SDL2_INCLUDE_DIRS})
 endif()
+include_directories(${FREETYPE_INCLUDE_DIRS})
 
 # LVGL's CMake (non-ESP path) builds a `lvgl` target. Reuse the same source
 # tree the firmware uses so the simulator can never drift out of sync.
@@ -54,7 +61,6 @@ add_executable(vrod_sim
     ${MAIN_DIR}/display/widget_util.c
     ${MAIN_DIR}/settings/settings.c
     ui_manager_shim.c
-    phone_mock.c
     ble_peripheral_shim.c
     test_bridge.c
     ${MAIN_DIR}/display/widgets/tach_arc.c
@@ -104,10 +110,25 @@ target_link_libraries(vrod_sim PRIVATE
     pthread
 )
 
+# emoji_font.c reads firmware/main/assets/emoji.ttf via an absolute path on
+# the host because EMBED_FILES is ESP-IDF-only. The firmware build path
+# keeps embedding the same TTF via the cluster's main/CMakeLists.txt.
+target_compile_definitions(vrod_sim PRIVATE
+    EMOJI_TTF_PATH=\"${MAIN_DIR}/assets/emoji.ttf\"
+)
+
 if(SDL2_LIBRARIES)
     target_link_libraries(vrod_sim PRIVATE ${SDL2_LIBRARIES})
     target_include_directories(vrod_sim PRIVATE ${SDL2_INCLUDE_DIRS})
     target_link_directories(vrod_sim PRIVATE ${SDL2_LIBRARY_DIRS})
 else()
     target_link_libraries(vrod_sim PRIVATE SDL2::SDL2)
+endif()
+
+# FreeType for the runtime color-emoji fallback chain. Headers were
+# added globally above (before LVGL's add_subdirectory) so lv_freetype.c
+# can build; here we just link the actual library into vrod_sim.
+target_link_libraries(vrod_sim PRIVATE ${FREETYPE_LIBRARIES})
+if(FREETYPE_LIBRARY_DIRS)
+    target_link_directories(vrod_sim PRIVATE ${FREETYPE_LIBRARY_DIRS})
 endif()

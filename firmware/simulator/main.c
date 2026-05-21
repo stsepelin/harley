@@ -18,8 +18,8 @@
 #include "ui_manager.h"
 #include "gesture.h"
 #include "phone_data.h"
-#include "phone_mock.h"
 #include "test_bridge.h"
+#include "emoji_font.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -39,14 +39,18 @@ int main(void)
     phone_data_init();
     test_bridge_start();       // localhost:7700 listener for ad-hoc payloads
 
-    // 2) LVGL core + SDL2 backend
+    // 2) LVGL core + color-emoji fallback chain. emoji_font_init only
+    //    depends on lv_init, not on the SDL window, so it runs ahead of
+    //    the window check — that way headless smoke tests still exercise
+    //    the FreeType linkage (good CI canary).
     lv_init();
+    emoji_font_init();
+
+    // 3) SDL2 backend. No display → keep the process alive so the
+    //    bridge thread (already on localhost:7700) can still service
+    //    notify.py round-trips for protocol-level smoke testing.
     lv_display_t *display = lv_sdl_window_create(DISPLAY_W, DISPLAY_H);
     if (!display) {
-        // No display attached — common in CI or when SDL_VIDEODRIVER=dummy.
-        // Keep the process alive so the bridge thread (already listening
-        // on localhost:7700) can still service notify.py round-trips for
-        // protocol-level smoke testing without a window.
         fprintf(stderr, "no SDL display — staying alive for bridge-only mode\n");
         pause();
         return 0;
@@ -54,11 +58,12 @@ int main(void)
     lv_sdl_window_set_title(display, "V-Rod cluster simulator");
     lv_sdl_mouse_create();
 
-    // 3) Producers that drive vehicle_data + phone_data behind the UI.
+    // 4) Producer for the driving cycle. phone_data has no built-in
+    //    producer here — push events from the test bridge (tools/notify.py)
+    //    instead.
     sim_engine_start();
-    phone_mock_start();        // scripted notification/media timeline
 
-    // 3) Init settings (desktop shim — defaults only) and build the ride
+    // 5) Init settings (desktop shim — defaults only) and build the ride
     //    screen against the running sim. The ui_manager shim caches both
     //    screens so the settings → back path rejoins the original instead
     //    of rebuilding the ride each time.
