@@ -555,6 +555,10 @@ static void test_media_action_does_not_crash(void)
     phone_data_media_action(PHONE_MEDIA_ACTION_PREV);
     phone_data_media_action(PHONE_MEDIA_ACTION_PLAY_PAUSE);
     phone_data_media_action(PHONE_MEDIA_ACTION_NEXT);
+    // Out-of-range cast exercises the switch's no-match exit so the
+    // function stays a tested no-op for garbage input instead of dead
+    // code in branch-coverage reports.
+    phone_data_media_action((phone_media_action_t)0xFF);
 }
 
 // Dismiss for an id that isn't active and isn't queued must iterate the

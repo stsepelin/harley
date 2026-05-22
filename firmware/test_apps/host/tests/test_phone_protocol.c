@@ -353,6 +353,15 @@ static void test_encode_cmd_undersized_buffer(void)
     TEST_ASSERT_EQUAL_UINT8(0xBB, buf[1]);
 }
 
+static void test_encode_dismiss_undersized_buffer(void)
+{
+    // Dismiss needs 7 bytes (cmd + u16 len + u32 id); 6 must fail closed.
+    uint8_t buf[6] = {0xAA, 0xBB, 0xCC, 0xDD, 0xEE, 0xFF};
+    size_t  n      = phone_protocol_encode_dismiss(0xDEADBEEFu, buf, sizeof(buf));
+    TEST_ASSERT_EQUAL_size_t(0, n);
+    TEST_ASSERT_EQUAL_UINT8(0xAA, buf[0]);
+}
+
 static void test_encode_dismiss_little_endian_id(void)
 {
     // payload = u32 id, LE.
@@ -390,5 +399,6 @@ void RunTests(void)
     RUN_TEST(test_media_stopped_clears_track);
     RUN_TEST(test_encode_cmd_no_payload);
     RUN_TEST(test_encode_cmd_undersized_buffer);
+    RUN_TEST(test_encode_dismiss_undersized_buffer);
     RUN_TEST(test_encode_dismiss_little_endian_id);
 }

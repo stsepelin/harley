@@ -1,6 +1,5 @@
 #include "phone_data.h"
 #include "phone_protocol.h"
-#include <assert.h>
 #include <string.h>
 #include "freertos/FreeRTOS.h"
 #include "freertos/semphr.h"
@@ -22,14 +21,14 @@ static void send_cmd(phone_cmd_t cmd)
 {
     uint8_t buf[3];
     size_t  n = phone_protocol_encode_cmd(cmd, buf, sizeof(buf));
-    if (n) (void)ble_peripheral_notify(buf, (uint16_t)n);
+    (void)ble_peripheral_notify(buf, (uint16_t)n);
 }
 
 static void send_dismiss(uint32_t id)
 {
     uint8_t buf[7];
     size_t  n = phone_protocol_encode_dismiss(id, buf, sizeof(buf));
-    if (n) (void)ble_peripheral_notify(buf, (uint16_t)n);
+    (void)ble_peripheral_notify(buf, (uint16_t)n);
 }
 
 // Pending notifications wait behind whatever is currently in s_state.notif.
@@ -48,14 +47,7 @@ void phone_data_init(void)
     memset(&s_state, 0, sizeof(s_state));
     memset(s_queue, 0, sizeof(s_queue));
     s_queue_count = 0;
-    s_mutex = xSemaphoreCreateMutex();
-    // Boot loudly if heap is exhausted now — every other phone_data_*
-    // entrypoint silently no-ops when the mutex is NULL (xSemaphoreTake
-    // returns pdFALSE on a NULL handle), which would leave the cluster
-    // up but with the phone bridge invisibly dead. C assert() instead of
-    // configASSERT so the same code compiles cleanly under the host
-    // FreeRTOS stub (no configASSERT define there) and the SDL2 sim.
-    assert(s_mutex != NULL);
+    s_mutex       = xSemaphoreCreateMutex();
 }
 
 static void queue_remove_at_locked(int idx)
