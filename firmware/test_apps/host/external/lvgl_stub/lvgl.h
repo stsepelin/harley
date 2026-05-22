@@ -78,6 +78,7 @@ void  lv_obj_center(lv_obj_t *obj);
 void  lv_obj_set_user_data(lv_obj_t *obj, void *data);
 void *lv_obj_get_user_data(lv_obj_t *obj);
 
+void  lv_obj_add_flag(lv_obj_t *obj, lv_obj_flag_t flag);
 void  lv_obj_remove_flag(lv_obj_t *obj, lv_obj_flag_t flag);
 void  lv_obj_remove_style_all(lv_obj_t *obj);
 
@@ -88,7 +89,8 @@ void  lv_obj_set_flex_align(lv_obj_t *obj, lv_flex_align_t main,
 void  lv_obj_set_style_text_color(lv_obj_t *obj, lv_color_t c,    lv_part_t part);
 void  lv_obj_set_style_text_font (lv_obj_t *obj, const lv_font_t *f, lv_part_t part);
 void  lv_obj_set_style_text_align(lv_obj_t *obj, lv_text_align_t a, lv_part_t part);
-void  lv_obj_set_style_bg_color  (lv_obj_t *obj, lv_color_t c,    lv_part_t part);
+void  lv_obj_set_style_bg_color    (lv_obj_t *obj, lv_color_t c,    lv_part_t part);
+void  lv_obj_set_style_border_color(lv_obj_t *obj, lv_color_t c,    lv_part_t part);
 void  lv_obj_set_style_bg_opa    (lv_obj_t *obj, lv_opa_t opa,    lv_part_t part);
 void  lv_obj_set_style_border_width(lv_obj_t *obj, int w,         lv_part_t part);
 void  lv_obj_set_style_pad_all   (lv_obj_t *obj, int v,           lv_part_t part);

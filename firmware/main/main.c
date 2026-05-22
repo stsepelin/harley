@@ -10,10 +10,14 @@
 #include "ble_peripheral.h"
 #include "boot_screen.h"
 #include "emoji_font.h"
+#include "gps_source.h"
 #include "phone_data.h"
+#include "poi_alert.h"
+#include "poi_db.h"
 #include "screen_pairing.h"
 #include "vehicle_data.h"
 #if CONFIG_VROD_INCLUDE_SIM_ENGINE
+#include "gps_sim.h"
 #include "sim_engine.h"
 #endif
 #include "settings_store.h"
@@ -30,6 +34,19 @@ const spi_flash_chip_t *default_registered_chips[] = {
 };
 
 static const char *TAG = "vrod_gauge";
+
+#if CONFIG_VROD_DEMO_POI
+// Bench-only demo POI DB. Placed on the gps_sim canned route so the
+// alert engine has at least one record to chew on; replaced in Phase 5
+// by a real DB loaded from microSD. Coordinates picked off the orbit
+// path: one omnidirectional speed camera at the boot position (north
+// of the sim centre), reached again once per orbit. Off by default —
+// see Kconfig.projbuild for why.
+static const poi_record_t s_demo_poi[] = {
+    { 594388000, 247536000, POI_KIND_SPEED, 50, 0xFFFF },
+};
+static poi_db_t s_demo_db;
+#endif
 
 void app_main(void)
 {
@@ -52,8 +69,14 @@ void app_main(void)
     // against an uninitialised vehicle_data store.
     vehicle_data_init();
     phone_data_init();
+    gps_source_init();
 #if CONFIG_VROD_INCLUDE_SIM_ENGINE
     sim_engine_start();
+    gps_sim_start();
+#endif
+#if CONFIG_VROD_DEMO_POI
+    poi_db_open(&s_demo_db, (const uint8_t *)s_demo_poi, sizeof(s_demo_poi));
+    poi_alert_init(&s_demo_db);
 #endif
 
     // Backlight strategy. bsp_display_brightness_init() leaves the LEDC

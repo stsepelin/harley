@@ -18,6 +18,8 @@
 #include "odometer_display.h"
 #include "trip_display.h"
 #include "warning_lights.h"
+#include "poi_alert_popup.h"
+#include "poi_db.h"
 
 #include <string.h>
 
@@ -308,6 +310,56 @@ static void test_warning_lights_only_changed_lamp_repaints(void)
     TEST_ASSERT_EQUAL_INT(1, g_lv_obj_set_style_text_color_calls);
 }
 
+// --- poi_alert_popup ------------------------------------------------------
+
+static void test_poi_popup_inactive_skips_label(void)
+{
+    lv_obj_t *w = poi_alert_popup_create(NULL);
+    poi_alert_t a = { .active = false };
+    poi_alert_popup_update(w, &a);
+    lv_stub_reset();
+    for (int i = 0; i < REPEAT; i++) poi_alert_popup_update(w, &a);
+    TEST_ASSERT_EQUAL_INT(0, g_lv_label_set_text_calls);
+}
+
+static void test_poi_popup_cache_skips_unchanged(void)
+{
+    static const poi_record_t cam = { 0, 0, POI_KIND_SPEED, 50, 0xFFFF };
+    lv_obj_t *w = poi_alert_popup_create(NULL);
+    poi_alert_t a = { .active = true, .cam = &cam, .distance_m = 100 };
+    poi_alert_popup_update(w, &a);
+    lv_stub_reset();
+    for (int i = 0; i < REPEAT; i++) poi_alert_popup_update(w, &a);
+    TEST_ASSERT_EQUAL_INT(0, g_lv_label_set_text_calls);
+}
+
+// Distances rounding into the same 10 m bucket render to the same text,
+// so the label must not be re-set. Burns a UI tick checking the rounding
+// only, no LVGL work.
+static void test_poi_popup_cache_skips_within_bucket(void)
+{
+    static const poi_record_t cam = { 0, 0, POI_KIND_SPEED, 50, 0xFFFF };
+    lv_obj_t *w = poi_alert_popup_create(NULL);
+    poi_alert_t a = { .active = true, .cam = &cam, .distance_m = 100 };
+    poi_alert_popup_update(w, &a);
+    lv_stub_reset();
+    a.distance_m = 104;
+    poi_alert_popup_update(w, &a);
+    TEST_ASSERT_EQUAL_INT(0, g_lv_label_set_text_calls);
+}
+
+static void test_poi_popup_cache_fires_on_bucket_change(void)
+{
+    static const poi_record_t cam = { 0, 0, POI_KIND_SPEED, 50, 0xFFFF };
+    lv_obj_t *w = poi_alert_popup_create(NULL);
+    poi_alert_t a = { .active = true, .cam = &cam, .distance_m = 100 };
+    poi_alert_popup_update(w, &a);
+    lv_stub_reset();
+    a.distance_m = 110;
+    poi_alert_popup_update(w, &a);
+    TEST_ASSERT_EQUAL_INT(1, g_lv_label_set_text_calls);
+}
+
 void RunTests(void)
 {
     RUN_TEST(test_speed_cache_skips_unchanged);
@@ -334,4 +386,8 @@ void RunTests(void)
     RUN_TEST(test_trip_cache_fires_on_units_change);
     RUN_TEST(test_warning_lights_cache_idle);
     RUN_TEST(test_warning_lights_only_changed_lamp_repaints);
+    RUN_TEST(test_poi_popup_inactive_skips_label);
+    RUN_TEST(test_poi_popup_cache_skips_unchanged);
+    RUN_TEST(test_poi_popup_cache_skips_within_bucket);
+    RUN_TEST(test_poi_popup_cache_fires_on_bucket_change);
 }

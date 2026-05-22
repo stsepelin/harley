@@ -38,6 +38,9 @@ add_library(vrod_pure STATIC
     ${MAIN_DIR}/phone/phone_protocol.c
     ${MAIN_DIR}/settings/settings.c
     ${MAIN_DIR}/vehicle/vehicle_data.c
+    ${MAIN_DIR}/poi/poi_math.c
+    ${MAIN_DIR}/poi/poi_db.c
+    ${MAIN_DIR}/poi/poi_alert.c
     external/freertos_stub/freertos_stub.c
     external/lvgl_tick_stub/lv_tick_stub.c
 )
@@ -48,9 +51,13 @@ target_include_directories(vrod_pure PUBLIC
     ${MAIN_DIR}/phone
     ${MAIN_DIR}/settings
     ${MAIN_DIR}/vehicle
+    ${MAIN_DIR}/poi
+    ${MAIN_DIR}/gps
     external/freertos_stub
     external/lvgl_tick_stub
 )
+# poi_math uses libm (cos / sin / sqrt / atan2).
+target_link_libraries(vrod_pure PUBLIC m)
 
 # --- Widget library --------------------------------------------------------
 # Label-based widgets + the LVGL stub. tach_arc is intentionally excluded —
@@ -66,6 +73,7 @@ add_library(vrod_widgets STATIC
     ${MAIN_DIR}/display/widgets/odometer_display.c
     ${MAIN_DIR}/display/widgets/trip_display.c
     ${MAIN_DIR}/display/widgets/warning_lights.c
+    ${MAIN_DIR}/display/widgets/poi_alert_popup.c
     ${MAIN_DIR}/display/widget_util.c
     external/lvgl_stub/lvgl_stub.c
 )
@@ -96,6 +104,9 @@ add_unit_test(test_settings)
 add_unit_test(test_phone_protocol)
 add_unit_test(test_phone_data)
 add_unit_test(test_gesture)
+add_unit_test(test_gps_format)
+add_unit_test(test_poi_index)
+add_unit_test(test_alert_engine)
 
 # Widget cache-regression tests link against the LVGL stub.
 function(add_widget_test name)

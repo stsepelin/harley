@@ -58,6 +58,7 @@ void lv_obj_set_size(lv_obj_t *o, int w, int h)                       { (void)o;
 void lv_obj_set_pos (lv_obj_t *o, int x, int y)                       { (void)o; (void)x; (void)y; }
 void lv_obj_align   (lv_obj_t *o, lv_align_t a, int x, int y)         { (void)o; (void)a; (void)x; (void)y; }
 void lv_obj_center  (lv_obj_t *o)                                     { (void)o; }
+void lv_obj_add_flag   (lv_obj_t *o, lv_obj_flag_t f)                 { (void)o; (void)f; }
 void lv_obj_remove_flag(lv_obj_t *o, lv_obj_flag_t f)                 { (void)o; (void)f; }
 void lv_obj_remove_style_all(lv_obj_t *o)                             { (void)o; }
 void lv_obj_set_flex_flow(lv_obj_t *o, lv_flex_flow_t f)              { (void)o; (void)f; }
@@ -68,6 +69,7 @@ void lv_obj_set_style_text_font (lv_obj_t *o, const lv_font_t *f, lv_part_t p) {
 void lv_obj_set_style_text_align(lv_obj_t *o, lv_text_align_t a, lv_part_t p)  { (void)o; (void)a; (void)p; }
 void lv_obj_set_style_bg_opa    (lv_obj_t *o, lv_opa_t v, lv_part_t p)         { (void)o; (void)v; (void)p; }
 void lv_obj_set_style_border_width(lv_obj_t *o, int w, lv_part_t p)            { (void)o; (void)w; (void)p; }
+void lv_obj_set_style_border_color(lv_obj_t *o, lv_color_t c, lv_part_t p)     { (void)o; (void)c; (void)p; }
 void lv_obj_set_style_pad_all   (lv_obj_t *o, int v, lv_part_t p)              { (void)o; (void)v; (void)p; }
 void lv_obj_set_style_pad_column(lv_obj_t *o, int v, lv_part_t p)              { (void)o; (void)v; (void)p; }
 void lv_obj_set_style_pad_row   (lv_obj_t *o, int v, lv_part_t p)              { (void)o; (void)v; (void)p; }
