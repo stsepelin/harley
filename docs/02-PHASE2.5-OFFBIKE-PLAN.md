@@ -250,25 +250,147 @@ while parts ship; ANCS is a meaningful protocol implementation that
 deserves its own phase. The decision belongs to the rider — which
 phone do you actually use on the bike?
 
-## Stage 4 — Speed-camera alert framework
+## Stage 4 — Host-side notification emulator
 
-**Last in the phase** because it benefits most from real GPS arriving
-mid-stage so end-to-end validation lands naturally.
+**Why now**: every render-side tweak (banner geometry, sanitize rules,
+font subset, emoji fallback chain) currently requires building + flashing
+the cluster *and* re-installing the companion APK + sending a real
+notification. That's a >2-minute cycle for a 1-line UI change. A
+host-side bridge collapses it to <5 seconds: edit, rebuild the SDL2 sim
+on macOS, fire a payload via CLI, see the rendered banner.
 
 ### Scope
 
+- `firmware/simulator/test_bridge.c` — TCP listener on `localhost:7700`,
+  reads raw bytes off the socket → `phone_protocol_parse` →
+  `phone_data_apply`. Same pipeline the cluster's BLE RX uses, so the
+  wire format is the single source of truth. (7700 chosen so we don't
+  collide with PHP-FPM on 9000.)
+- `tools/notify.py` — small CLI that encodes payloads using the same
+  TLV layout (mirrors `companion/.../Protocol.kt` byte-for-byte):
+  - `--call "Alice"` → CALL notification, banner shows REJECT/ACCEPT
+  - `--sms "Mom" "running late 🚗"` → SMS, banner with body
+  - `--app pkg "title" "body"` → app notification
+  - `--media playing "Foo Fighters" "Everlong"`
+  - `--dismiss <id>` → NOTIF_DISMISS
+- The existing `phone_mock.c` scripted timeline stays for the boot
+  demo; the socket bridge sits alongside it for ad-hoc poking.
+- Same socket can drive the cluster→phone TX channel — bridge prints
+  decoded command bytes to stdout so we can verify e.g. that tapping
+  ACCEPT on the sim fires CALL_ACCEPT bytes.
+
+### Tests to add
+
+- `test_test_bridge.c` (host-only) — feed canned TLV bytes through the
+  bridge entrypoint, assert that `phone_data_get()` reflects the
+  applied state.
+- The notify.py encoder is cross-checked against `phone_protocol`'s
+  existing parser tests — same fixtures, two languages.
+
+## Stage 5 — BLE pairing + bonding
+
+**Why now**: replace the current just-works "any nearby central can
+connect and write" model with proper bonding. Once the cluster is on
+the bike, an unbonded central writing garbage to the RX characteristic
+shouldn't be possible.
+
+### Scope
+
+- NimBLE security-manager config: `BT_NIMBLE_SM_SC=y` (LE Secure
+  Connections), set `ble_hs_cfg.sm_bonding=1`, `sm_mitm=1`, `sm_sc=1`,
+  reasonable `sm_our_key_dist` / `sm_their_key_dist`.
+- IO capability: `BLE_HS_IO_DISPLAY_ONLY` — cluster has a screen but
+  no keyboard. That selects numeric-comparison passkeys (6 digits
+  shown on cluster + phone; rider eyeballs that they match before
+  confirming on the touchscreen).
+- New `screen_pairing.c` (or extend `screen_settings`): when
+  `BLE_GAP_EVENT_PASSKEY_ACTION` fires, render the passkey + ACCEPT /
+  CANCEL buttons. Tap → `ble_sm_inject_io`.
+- Bonds persist in NVS (`CONFIG_BT_NIMBLE_NVS_PERSIST=y` already on).
+  Settings PHONE row grows a "Forget all devices" entry →
+  `ble_store_clear()`.
+- Settings PHONE row shows the bonded peer name with a visible
+  "trusted" cue (e.g. lock glyph in front of the address).
+- Companion side: nothing protocol-wise changes — Android's pairing
+  flow handles SC numeric comparison natively.
+
+### Developer escape hatch
+
+Once enabled, the cluster won't talk to an unbonded phone. If the NVS
+bond storage gets wiped (fresh flash, NVS partition resize), re-pairing
+from the phone side recovers. For bench work where we want to skip
+pairing entirely, add a build-time flag `CONFIG_VROD_BLE_INSECURE`
+(default `n`) that compiles the SM config out and reverts to the
+just-works model. CI doesn't set the flag; bench flashes do if needed.
+
+### Tests to add
+
+- `test_pairing_state.c` — unit-test the pure state-machine glue that
+  routes GAP passkey-action events into the screen.
+- Round-trip pairing flow is hard to host-test (Android security stack
+  + NimBLE host both involved); rely on the device + companion.
+
+## Stage 6 — No-sim build flag
+
+**Why now**: small but useful. The synthetic 32-second driving cycle is
+fine on the bench, but adds noise to the gauge dial when we're trying
+to demo notification rendering, eats a few KB of flash, and won't be
+the data source once Phase 3 lands.
+
+### Scope
+
+- `CONFIG_VROD_INCLUDE_SIM_ENGINE` Kconfig knob, default `y`.
+- `firmware/main/CMakeLists.txt`: `simulator/sim_engine.c` +
+  `simulator/sim_math.c` move under an `if(CONFIG_VROD_INCLUDE_SIM_ENGINE)`
+  guard. `simulator/gear_table.c` stays unconditional — the gear
+  indicator widget consumes it independently.
+- `main.c`: `#if CONFIG_VROD_INCLUDE_SIM_ENGINE … sim_engine_start();
+  #endif`.
+- Desktop SDL2 sim's `CMakeLists.txt` is separate and always includes
+  the sim sources — it has no other data source on the desktop.
+
+When the flag is off and no other producer is plugged in, the gauge
+sits at zeros. That's fine — it's what makes notification-rendering
+bench work cleaner. Once Phase 3 lands, the J1850 driver becomes the
+producer in the off-sim build.
+
+### Tests to add
+
+- No new tests — the existing host tests use the sim_math /
+  sim_engine pure-logic modules directly via their own includes,
+  unaffected by the firmware-side Kconfig.
+
+## Stage 7 — Speed-camera alert framework (off-bike portion)
+
+**Last in the phase** — the framework is fully off-bike testable via
+the SDL2 sim + a fake GPS producer + a hand-authored test camera DB.
+The on-bike pieces (real NEO-6M wiring + real SCDB import + ride
+validation) live in Phase 5.
+
+### Scope (here)
+
 - `gps_source_t` abstraction — a struct of `{lat, lon, speed_kmh,
   heading_deg, fix_ok, time_utc}` published the same way as
-  `vehicle_data_t`. Stub producer for now: a `gps_sim.c` that walks a
-  canned route.
-- Camera DB format: tightly packed binary on the microSD card.
+  `vehicle_data_t`. Stub producer: `gps_sim.c` that walks a canned
+  route at variable speed.
+- Camera DB binary format:
   `[lat_int32, lon_int32, kind:8, limit_kmh:8, heading_deg:16]` per
-  record. Load + spatial-index on boot.
+  record. Spatial-index on boot, look up by bounding box on each tick.
 - Alert engine: every GPS tick, check whether any camera is within
   alert radius along our current heading. Fire alert events.
-- UI: a transient warning popup near the top of the ride screen,
-  showing camera kind + distance + posted limit. Auto-dismiss after
-  the camera is passed or N seconds.
+- UI: transient warning popup near the top of the ride screen, showing
+  camera kind + distance + posted limit. Auto-dismiss after the
+  camera is passed or N seconds.
+- Audio hook into the existing `sound` module — one short tone on
+  alert fire.
+
+### Out of scope here — see Phase 5
+
+- Real NEO-6M / M8N module wiring + NMEA parser → `gps_source_t`
+- SCDB.info / OSM data export + import into the binary format
+- microSD mount + DB loaded from a real file on the card
+- On-bike validation: real fix → real camera detected → alert fires
+  while riding
 
 ### Tests to add
 
@@ -291,9 +413,18 @@ These came up during discussion but belong elsewhere:
 
 ## Suggested order
 
-1. Stage 1 — touch + screen switching (foundation, ~half day)
-2. Stage 2 — NVS + settings + units (one weekend)
-3. Decision point: hardware arrived?
-   - **Yes** → jump to Phase 3 (J1850 driver replaces sim, real bike
-     data lands), then BLE, then camera framework
-   - **No** → continue with Stage 3 (BLE), Stage 4 (camera framework)
+The phase is now entirely off-bike, so every stage is independently
+shippable without waiting on parts.
+
+1. **Stage 1** — touch + screen switching ✅
+2. **Stage 2** — NVS + settings + units ✅
+3. **Stage 3** — BLE phone integration ✅
+4. **Stage 6** — no-sim build flag (~30 min, smallest scope, unlocks
+   cleaner bench testing for the next stages immediately).
+5. **Stage 4** — host-side notif emulator (~2–3 h, biggest dev-velocity
+   payoff — every later UI tweak gets a sub-second test loop).
+6. **Stage 5** — BLE pairing + bonding (~1 weekend, safety-relevant
+   before real riding).
+7. **Stage 7** — speed-camera framework off-bike portion (medium —
+   pure logic + UI, fully exercised by the new test bridge from
+   Stage 4 and the fake GPS producer).

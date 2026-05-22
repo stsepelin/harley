@@ -9,7 +9,10 @@
 #include <string.h>
 
 // JetBrains Mono Bold — monospaced, OFL. Used for tabular gauge labels.
+// Two sizes: 45 for normal labels, 72 for the "zoomed" overlay shown
+// over the label currently nearest the cursor.
 LV_FONT_DECLARE(jbm_bold_45);
+LV_FONT_DECLARE(jbm_bold_72);
 
 // RPM range + redline threshold are the source of truth; all angles, colours
 // and sub-arc ranges below are derived from them.
@@ -73,21 +76,89 @@ typedef struct {
     lv_obj_t *line_arc_normal;      // orange line over 0..REDLINE_RPM
     lv_obj_t *line_arc_redline;     // red line over REDLINE_RPM..RPM_MAX
     lv_obj_t *cursor_img;
-    lv_obj_t *labels[MAJOR_LABEL_COUNT];
+    lv_obj_t *labels[MAJOR_LABEL_COUNT];      // jbm_bold_45 — always visible
+    lv_obj_t *labels_big[MAJOR_LABEL_COUNT];  // jbm_bold_72 — shown only when nearest cursor
     int32_t  displayed_rpm;
     int32_t  last_applied_rpm;      // last value pushed through to LVGL
-    int32_t  last_label_scale[MAJOR_LABEL_COUNT];  // per-label cache: skip unchanged transform_scale sets
+    int32_t  last_arc_bucket;       // last RPM bucket pushed to the 3 arcs
+    int32_t  last_label_scale[MAJOR_LABEL_COUNT];  // unused now — kept for header binary compat
+    int32_t  last_zoom_idx;         // which label index is currently zoomed in (-1 = none)
     bool     last_redline;          // last cursor red-state we applied
     bool     has_applied;
+    bool     has_arc_value;
 } tach_data_t;
 
 static const int32_t k_label_values[MAJOR_LABEL_COUNT] = {0, 2000, 4000, 6000, 8000, 10000};
 static const char   *k_label_strs[MAJOR_LABEL_COUNT]   = {"0", "2", "4", "6", "8", "10"};
 
+// Pre-baked label sprites — each label string rendered once into an
+// ARGB8888 PSRAM buffer at boot using jbm_bold_72 (the largest font we
+// have). At runtime they're shown via lv_image and scaled down with
+// lv_image_set_scale → bitmap bilinear, cheap, continuous. Old path
+// (lv_label + transform_scale) re-rasterized the glyph at every
+// fractional scale, which thrashed LVGL's glyph cache and burned ~25 ms
+// of render thread per frame during cursor sweep.
+// Bake at jbm_bold_72. "10" at 72-pt needs ~88 px wide → W=120 prevents
+// lv_draw_label from wrapping it onto a second line. At runtime we
+// scale DOWN to 0.625× (= 45-pt visual) when "normal" and UP slightly
+// to 1.25× (= original 2× of 45-pt) at full zoom — downscale is sharp,
+// upscale is mild.
+#define LABEL_SPRITE_W   120
+#define LABEL_SPRITE_H   96
+static uint8_t       *s_label_buf[MAJOR_LABEL_COUNT];
+static lv_image_dsc_t s_label_dsc[MAJOR_LABEL_COUNT];
+
+static bool bake_label_sprite(int i)
+{
+    if (s_label_buf[i]) return true;
+    const size_t bytes = (size_t)LABEL_SPRITE_W * LABEL_SPRITE_H * 4;
+    uint8_t *buf = heap_caps_calloc(1, bytes, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
+    if (!buf) {
+        ESP_LOGE("tach", "label sprite alloc failed (%u bytes)", (unsigned)bytes);
+        return false;
+    }
+
+    lv_obj_t *canvas = lv_canvas_create(NULL);
+    lv_canvas_set_buffer(canvas, buf, LABEL_SPRITE_W, LABEL_SPRITE_H,
+                         LV_COLOR_FORMAT_ARGB8888);
+
+    lv_layer_t layer;
+    lv_canvas_init_layer(canvas, &layer);
+
+    lv_draw_label_dsc_t dsc;
+    lv_draw_label_dsc_init(&dsc);
+    dsc.text  = k_label_strs[i];
+    dsc.text_local = true;
+    dsc.font  = &jbm_bold_72;
+    uint32_t color = (k_label_values[i] >= REDLINE_RPM) ? VROD_RED_TICK : VROD_TEXT;
+    dsc.color = lv_color_hex(color);
+    dsc.align = LV_TEXT_ALIGN_CENTER;
+
+    lv_area_t area = { 0, 0, LABEL_SPRITE_W - 1, LABEL_SPRITE_H - 1 };
+    lv_draw_label(&layer, &dsc, &area);
+    lv_canvas_finish_layer(canvas, &layer);
+    lv_obj_delete(canvas);
+
+    s_label_buf[i] = buf;
+    s_label_dsc[i].header.magic  = LV_IMAGE_HEADER_MAGIC;
+    s_label_dsc[i].header.cf     = LV_COLOR_FORMAT_ARGB8888;
+    s_label_dsc[i].header.w      = LABEL_SPRITE_W;
+    s_label_dsc[i].header.h      = LABEL_SPRITE_H;
+    s_label_dsc[i].header.stride = LABEL_SPRITE_W * 4;
+    s_label_dsc[i].data_size     = bytes;
+    s_label_dsc[i].data          = buf;
+    return true;
+}
+
 // --- Tail glow ring image --------------------------------------------------
 
 static uint8_t       *s_glow_img_data = NULL;
 static lv_image_dsc_t s_glow_img_dsc;
+
+// Forward decls used in the combined sprite pass.
+static void draw_track_ring(uint8_t *buf, uint32_t color);
+static void draw_tick(uint8_t *buf, float angle_deg, int width, int length, uint32_t color);
+static inline uint32_t hex_to_argb(uint32_t hex_rgb);
 
 static bool glow_image_init(void)
 {
@@ -99,6 +170,12 @@ static bool glow_image_init(void)
         ESP_LOGE("tach", "glow image alloc failed (%u bytes)", (unsigned)bytes);
         return false;
     }
+    memset(s_glow_img_data, 0, bytes);
+
+    // Pass 1: gray track ring underneath everything else (covers the full
+    // 270° sweep). The lit-arc pass below overwrites it inside the sweep
+    // range with the orange/red colored line and glow.
+    draw_track_ring(s_glow_img_data, hex_to_argb(VROD_RAIL));
 
     const float c = (GLOW_IMG_SIZE - 1) / 2.0f;
     const float two_sigma_sq = 2.0f * GLOW_SIGMA * GLOW_SIGMA;
@@ -118,26 +195,71 @@ static bool glow_image_init(void)
             uint8_t a = 0;
             uint8_t r = 0xFF, g = 0x66, b = 0x00;
             if (d <= (float)TAIL_OUTER_R) {
-                float d_in = (float)TAIL_OUTER_R - d;
-                float a_f  = 210.0f * expf(-d_in * d_in / two_sigma_sq);
-                a = (a_f >= 255.0f) ? 255 : (uint8_t)(a_f + 0.5f);
-
                 float angle_rad = atan2f(dy, dx);
                 float angle_deg = angle_rad * 180.0f / (float)M_PI;
                 if (angle_deg < 0.0f) angle_deg += 360.0f;
-                bool is_redline = (angle_deg >= redline_start_deg)
-                               || (angle_deg <= redline_end_wrapped);
+                // LVGL angle convention: 135° = bottom-left, 405° = bottom-right.
+                // The gauge has an open "gap" at the bottom from 45° to 135°
+                // — leave those pixels transparent so the gauge has the V-Rod
+                // "U-shape" silhouette instead of a closed ring.
+                bool in_sweep = !(angle_deg > 45.0f && angle_deg < 135.0f);
+                if (in_sweep) {
+                    bool is_redline = (angle_deg >= redline_start_deg)
+                                   || (angle_deg <= redline_end_wrapped);
 
-                g = is_redline ? 0x00 : 0x66;
-                b = 0x00;
+                    // Outer glow halo (Gaussian falloff from the bezel inward).
+                    float d_in = (float)TAIL_OUTER_R - d;
+                    float a_f  = 210.0f * expf(-d_in * d_in / two_sigma_sq);
+                    a = (a_f >= 255.0f) ? 255 : (uint8_t)(a_f + 0.5f);
+                    r = 0xFF;
+                    g = is_redline ? 0x00 : 0x66;
+                    b = 0x00;
+
+                    // Solid colored line over the glow, on the bezel edge —
+                    // replaces the old lv_arc line widgets, baked-in once so
+                    // the LVGL render thread doesn't re-rasterize them every
+                    // time the cursor's dirty rect overlaps the arc area.
+                    if (d_in <= (float)LINE_ARC_WIDTH) {
+                        uint32_t hex = is_redline ? VROD_RED : VROD_ORANGE;
+                        r = (hex >> 16) & 0xFF;
+                        g = (hex >>  8) & 0xFF;
+                        b =  hex        & 0xFF;
+                        a = 255;
+                    }
+                }
             }
 
-            int idx = (y * GLOW_IMG_SIZE + x) * 4;
-            s_glow_img_data[idx + 0] = b;
-            s_glow_img_data[idx + 1] = g;
-            s_glow_img_data[idx + 2] = r;
-            s_glow_img_data[idx + 3] = a;
+            // Only overwrite if we have content here. Pass-1 track ring
+            // sits in the buffer underneath; leaving the cell untouched
+            // when a == 0 preserves it (in the bottom-of-gauge gap and
+            // anywhere inside the bezel that the lit arc didn't paint).
+            if (a > 0) {
+                int idx = (y * GLOW_IMG_SIZE + x) * 4;
+                s_glow_img_data[idx + 0] = b;
+                s_glow_img_data[idx + 1] = g;
+                s_glow_img_data[idx + 2] = r;
+                s_glow_img_data[idx + 3] = a;
+            }
         }
+    }
+
+    // Pass 3: ticks on top of the lit arc. 21 ticks across the sweep,
+    // major every 4 (matches the labels) — redline-zone ticks in red,
+    // others in white. Drawn last so the full tick length is visible
+    // through the lit/glow band underneath.
+    for (int i = 0; i < TICK_COUNT; i++) {
+        float angle = (float)START_DEG
+                    + ((float)i / (float)(TICK_COUNT - 1)) * (float)SWEEP_DEG;
+        bool major   = (i % TICK_MAJOR_EVERY) == 0;
+        int  rpm     = i * RPM_MAX / (TICK_COUNT - 1);
+        bool redline = rpm >= REDLINE_RPM;
+        uint32_t hex = major
+            ? (redline ? VROD_RED_TICK     : VROD_TEXT)
+            : (redline ? VROD_RED_TICK_DIM : VROD_TICK_MINOR);
+        draw_tick(s_glow_img_data, angle,
+                  major ? TICK_MAJOR_W : TICK_MINOR_W,
+                  major ? TICK_MAJOR_L : TICK_MINOR_L,
+                  hex_to_argb(hex));
     }
 
     s_glow_img_dsc.header.magic  = LV_IMAGE_HEADER_MAGIC;
@@ -404,7 +526,24 @@ static void cursor_set_state(tach_data_t *td, int32_t value, bool redline)
                      redline ? &s_cursor_red_dsc : &s_cursor_normal_dsc);
 }
 
-// --- Manual labels with smooth zoom near the cursor -----------------------
+// --- Labels: continuous proximity zoom, quantized to 5 discrete steps ----
+//
+// Quantizing scale_int to 5 levels (1.0×, 1.25×, 1.5×, 1.75×, 2.0×)
+// keeps the smooth-looking "label grows as cursor approaches" effect
+// while triggering glyph re-rasterization only at level boundaries.
+// LVGL's per-frame transform_scale was the second-biggest render-budget
+// cost (after the live arc widgets) — every fractional scale value
+// re-rastered the font glyph at the new size. With 5 steps, each label
+// re-rasters ~8 times per cursor sweep through its proximity zone
+// instead of continuously, total ~3-4 re-rasters/sec across all labels.
+// Sprite baked at jbm_bold_72 → 1.6× of jbm_bold_45 (the original
+// label size). Map UX zoom 1.0×..2.0× to sprite scale 0.625×..1.25×.
+// Downscale is sharp; mild 1.25× upscale at max zoom is acceptable.
+// Quantize to 16 steps (≈4 % per step) to skip per-frame invalidation
+// when the scale would only nudge a hair.
+#define LABEL_SCALE_MIN_X256  160
+#define LABEL_SCALE_MAX_X256  320
+#define LABEL_SCALE_LEVELS    16
 
 static void labels_update(tach_data_t *td, int32_t value)
 {
@@ -415,26 +554,22 @@ static void labels_update(tach_data_t *td, int32_t value)
             + (float)SWEEP_DEG * k_label_values[i] / (float)RPM_MAX;
         float dist = fabsf(cursor_angle - label_angle);
 
-        // Smoothstep curve: full 2x scale at cursor angle, fading back to 1x
-        // by four tick spans away (~54 deg) so the zoom starts earlier and
-        // feels less abrupt.
         const float falloff_deg = 54.0f;
         float t = dist / falloff_deg;
         if (t > 1.0f) t = 1.0f;
         float smooth_t = t * t * (3.0f - 2.0f * t);
         float scale = 2.0f - 1.0f * smooth_t;
 
-        int scale_int = (int)(scale * 256.0f + 0.5f);
-        // Skip set_style on labels whose scale didn't change since last
-        // frame. During a hard RPM transient (e.g. WOT → cruise) only 1-2
-        // labels are near the cursor and actually change scale; the other
-        // four stay locked at 1.0× but were re-invalidated every frame.
-        // 6 labels × 2 styles × ~15 transient frames = 180 redundant
-        // invalidations per WOT exit — the user could feel them.
+        int idx = (int)((scale - 1.0f) * (LABEL_SCALE_LEVELS - 1) + 0.5f);
+        if (idx < 0)                      idx = 0;
+        if (idx > LABEL_SCALE_LEVELS - 1) idx = LABEL_SCALE_LEVELS - 1;
+        int32_t scale_int = LABEL_SCALE_MIN_X256
+                          + (idx * (LABEL_SCALE_MAX_X256 - LABEL_SCALE_MIN_X256))
+                            / (LABEL_SCALE_LEVELS - 1);
+
         if (scale_int == td->last_label_scale[i]) continue;
         td->last_label_scale[i] = scale_int;
-        lv_obj_set_style_transform_scale_x(td->labels[i], scale_int, 0);
-        lv_obj_set_style_transform_scale_y(td->labels[i], scale_int, 0);
+        lv_image_set_scale(td->labels[i], scale_int);
     }
 }
 
@@ -470,21 +605,23 @@ static void build_track_image(lv_obj_t *cont)
     lv_obj_center(img);
 }
 
-// Glow tail — a pre-baked Gaussian ARGB image painted as the arc's
-// indicator brush. Falls back to a flat orange if the image alloc failed.
-static void build_tail_glow(lv_obj_t *cont, tach_data_t *td)
+// Static lit-arc sprite. The glow + the orange/red lines are all baked
+// into one ARGB image at boot (glow_image_init). The widget here is a
+// plain lv_image, so per-frame render cost is one ARGB blit — no arc
+// rasterization. Replaces the original tail_arc + line_arc_normal +
+// line_arc_redline trio, which together burned ~30 ms of render thread
+// time per frame because LVGL re-rasterizes the full arc whenever ANY
+// part of its bbox falls in the cursor's dirty rect.
+//
+// Trade-off: the fill no longer "grows" with RPM. The cursor + the
+// scale-zoom on the nearest label carry the RPM read at a glance.
+static void build_lit_arc_image(lv_obj_t *cont)
 {
-    lv_obj_t *tail = make_arc(cont, TAIL_ARC_DIA, START_DEG, START_DEG + SWEEP_DEG);
-    lv_arc_set_range(tail, 0, RPM_MAX);
-    lv_obj_set_style_arc_opa(tail, LV_OPA_TRANSP, LV_PART_MAIN);
-    lv_obj_set_style_arc_width(tail, TAIL_ARC_WIDTH, LV_PART_INDICATOR);
-    if (s_glow_img_data) {
-        lv_obj_set_style_arc_image_src(tail, &s_glow_img_dsc, LV_PART_INDICATOR);
-    } else {
-        lv_obj_set_style_arc_color(tail, lv_color_hex(VROD_ORANGE), LV_PART_INDICATOR);
-    }
-    lv_obj_set_style_arc_rounded(tail, false, LV_PART_INDICATOR);
-    td->tail_arc = tail;
+    if (!s_glow_img_data) return;   // alloc failed at boot — show nothing
+    lv_obj_t *img = lv_image_create(cont);
+    lv_image_set_src(img, &s_glow_img_dsc);
+    lv_obj_remove_flag(img, LV_OBJ_FLAG_CLICKABLE);
+    lv_obj_center(img);
 }
 
 // Solid orange + red lines at the bezel, value-clipped to current RPM.
@@ -534,27 +671,29 @@ static void build_ticks_image(lv_obj_t *cont)
     lv_obj_center(img);
 }
 
-// Manual labels: 6 lv_label widgets at the major tick positions, scaled
-// per-frame by labels_update() so the one nearest the cursor grows to 2x.
-// Colour is red for redline values (8, 10).
+// 6 lv_image widgets, one per major tick. Each shows a pre-baked ARGB
+// sprite of the label string rendered with jbm_bold_72. At runtime,
+// lv_image_set_scale (set in labels_update) does bilinear scaling on
+// the baked bitmap — much cheaper than the original lv_label +
+// transform_scale path which re-rasterized the glyph outline at every
+// fractional scale.
 static void build_labels(lv_obj_t *cont, tach_data_t *td)
 {
     for (int i = 0; i < MAJOR_LABEL_COUNT; i++) {
-        lv_obj_t *lbl = lv_label_create(cont);
-        lv_label_set_text(lbl, k_label_strs[i]);
-        uint32_t color = (k_label_values[i] >= REDLINE_RPM) ? VROD_RED_TICK : VROD_TEXT;
-        lv_obj_set_style_text_color(lbl, lv_color_hex(color), 0);
-        lv_obj_set_style_text_font(lbl, &jbm_bold_45, 0);
-        lv_obj_set_style_transform_pivot_x(lbl, LV_PCT(50), 0);
-        lv_obj_set_style_transform_pivot_y(lbl, LV_PCT(50), 0);
+        bake_label_sprite(i);
 
         float angle_rad = ((float)START_DEG
             + (float)SWEEP_DEG * k_label_values[i] / (float)RPM_MAX)
             * (float)M_PI / 180.0f;
         int px = CENTER_XY + (int)(LABEL_R * cosf(angle_rad));
         int py = CENTER_XY + (int)(LABEL_R * sinf(angle_rad));
-        lv_obj_align(lbl, LV_ALIGN_CENTER, px - CENTER_XY, py - CENTER_XY);
-        td->labels[i] = lbl;
+
+        lv_obj_t *img = lv_image_create(cont);
+        if (s_label_buf[i]) lv_image_set_src(img, &s_label_dsc[i]);
+        lv_image_set_pivot(img, LABEL_SPRITE_W / 2, LABEL_SPRITE_H / 2);
+        lv_obj_align(img, LV_ALIGN_CENTER, px - CENTER_XY, py - CENTER_XY);
+        td->labels[i] = img;
+        td->labels_big[i] = NULL;
     }
 }
 
@@ -562,27 +701,31 @@ lv_obj_t *tach_arc_create(lv_obj_t *parent)
 {
     glow_image_init();
     cursor_image_init();
-    track_image_init();
-    ticks_image_init();
 
     lv_obj_t *cont = widget_container_create(parent, 800, 800);
 
     tach_data_t *td = lv_malloc(sizeof(tach_data_t));
     td->displayed_rpm    = 0;
     td->last_applied_rpm = 0;
+    td->last_arc_bucket  = 0;
     td->last_redline     = false;
     td->has_applied      = false;
+    td->has_arc_value    = false;
     for (int i = 0; i < MAJOR_LABEL_COUNT; i++) td->last_label_scale[i] = -1;
 
-    // Z-order matters: track at the bottom, then glow, then the dynamic
-    // line arcs + cursor, then the ticks sprite above them (so ticks
-    // stay visible through the lines), then the animated labels on top.
-    build_track_image(cont);
-    build_tail_glow(cont, td);
-    build_line_arcs(cont, td);
+    // Z-order: the combined-background sprite (track + lit arc + ticks
+    // all baked into one ARGB image at boot), then the cursor sprite,
+    // then the animated labels on top. Single static blit + cursor +
+    // labels per frame — was 5 widgets/layers before. Trade-off: ticks
+    // now sit BELOW the cursor (the needle covers the tick it points
+    // at, same as most real tachs).
+    build_lit_arc_image(cont);
     build_cursor(cont, td);
-    build_ticks_image(cont);
     build_labels(cont, td);
+    // Arc widgets are gone — nothing to update at runtime.
+    td->tail_arc         = NULL;
+    td->line_arc_normal  = NULL;
+    td->line_arc_redline = NULL;
 
     lv_obj_set_user_data(cont, td);
     cursor_set_state(td, 0, false);
@@ -612,16 +755,9 @@ void tach_arc_set_value(lv_obj_t *cont, uint16_t target_rpm)
     td->last_redline = redline;
     td->has_applied = true;
 
-    lv_arc_set_value(td->tail_arc, td->displayed_rpm);
-
-    // The normal-zone arc caps at REDLINE_RPM; the redline-zone arc takes
-    // over past it.
-    int32_t normal_v = td->displayed_rpm;
-    if (normal_v > REDLINE_RPM) normal_v = REDLINE_RPM;
-    lv_arc_set_value(td->line_arc_normal, normal_v);
-    int32_t redline_v = td->displayed_rpm;
-    if (redline_v < REDLINE_RPM) redline_v = REDLINE_RPM;
-    lv_arc_set_value(td->line_arc_redline, redline_v);
+    // The lit arc + glow + colored lines are now a single static ARGB
+    // sprite (see glow_image_init). Nothing to set at runtime — the
+    // cursor and labels below carry all the dynamic state.
 
     cursor_set_state(td, td->displayed_rpm, redline);
     labels_update(td, td->displayed_rpm);

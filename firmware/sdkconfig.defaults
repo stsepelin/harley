@@ -26,7 +26,11 @@ CONFIG_FREERTOS_HZ=1000
 CONFIG_LV_USE_CLIB_MALLOC=y
 CONFIG_LV_USE_CLIB_STRING=y
 CONFIG_LV_USE_CLIB_SPRINTF=y
-CONFIG_LV_DEF_REFR_PERIOD=15
+# 33 ms (~30 FPS) targets a render budget the SW renderer reliably fits
+# on this BSP with ESP-Hosted's SDIO traffic active. 15 ms (66 FPS) used
+# to race the budget and end up at ~25 FPS with visible chop during
+# heavy renders. See tach_arc.c for the matching baked-sprite refactor.
+CONFIG_LV_DEF_REFR_PERIOD=33
 CONFIG_LV_OS_FREERTOS=y
 CONFIG_LV_DRAW_SW_DRAW_UNIT_CNT=2
 
@@ -55,11 +59,15 @@ CONFIG_PTHREAD_TASK_CORE_DEFAULT=1
 # which now reuses JBM Bold.
 CONFIG_LV_FONT_MONTSERRAT_14=y
 
-# FreeType runtime font rendering — used for color emoji. The lv_font_conv
-# pipeline can only bake single-color bitmaps, so emoji land here as a
-# runtime fallback (lv_font_t.fallback chain). FT_DISABLE_PNG is on in
-# the espressif freetype port, which rules out NotoColorEmoji's sbix
-# format — we ship Noto-COLRv1 (vector COLR/CPAL) instead.
+# FreeType runtime font rendering — used for the emoji fallback chain.
+# The lv_font_conv pipeline can only bake mono bitmaps for a fixed
+# codepoint range, so emoji land here as a runtime fallback set on
+# jbm_bold_*.fallback. We ship a monochrome emoji font (Noto Emoji
+# wght.ttf) — color emoji formats (COLR v1, Twemoji COLR v0) were both
+# tried and rendered invisibly because LVGL's freetype glyph-dsc step
+# calls FT_LOAD_COMPUTE_METRICS without FT_LOAD_COLOR, which on glyf-
+# empty COLR fonts returns width=0/height=0 and the label allocates a
+# zero-sized slot. Mono fonts have real outlines, so metrics work.
 #
 # LV_USE_FS_MEMFS lets us hand the FreeType create_font path an in-memory
 # buffer wrapped in lv_fs_path_ex_t instead of a real filesystem path —
@@ -70,7 +78,7 @@ CONFIG_LV_FREETYPE_USE_LVGL_PORT=y
 CONFIG_ESP_LVGL_ADAPTER_ENABLE_FREETYPE=y
 CONFIG_LV_USE_FS_MEMFS=y
 CONFIG_LV_FS_MEMFS_LETTER=77
-# FreeType's COLR rasterizer is stack-hungry — LVGL refuses to compile
+# FreeType is stack-hungry on first glyph load — LVGL refuses to compile
 # unless the draw-thread stack is at least 32 KB.
 CONFIG_LV_DRAW_THREAD_STACK_SIZE=32768
 # Glyph cache ceiling. Default (256) would let the emoji cache balloon to
@@ -98,6 +106,14 @@ CONFIG_BT_NIMBLE_NVS_PERSIST=y
 # CONFIG_BT_NIMBLE_TRANSPORT_UART is not set
 CONFIG_ESP_HOSTED_ENABLED=y
 CONFIG_ESP_HOSTED_ENABLE_BT_NIMBLE=y
+
+# Security manager — LE Secure Connections + numeric-comparison passkey.
+# SM_LEGACY off so we can't fall back to the older (weaker) pairing flow.
+# SM_SC needs the C6 controller side to advertise SC support too, which
+# the esp_hosted bundle does by default. Bonds persist in NVS via
+# BT_NIMBLE_NVS_PERSIST above.
+CONFIG_BT_NIMBLE_SM_LEGACY=n
+CONFIG_BT_NIMBLE_SM_SC=y
 
 # Drop the vendor-specific spi_flash chip-driver registration so
 # winbond / mxic / issi / boya / th don't compete with the generic driver

@@ -8,12 +8,15 @@ idf_component_register(
         settings/settings_store.c
         sound/sound.c
         vehicle/vehicle_data.c
-        simulator/sim_engine.c
         simulator/gear_table.c
-        simulator/sim_math.c
+        gps/gps_source.c
+        poi/poi_math.c
+        poi/poi_db.c
+        poi/poi_alert.c
         display/boot_screen.c
         display/screen_ride.c
         display/screen_settings.c
+        display/screen_pairing.c
         display/ui_manager.c
         display/format.c
         display/gesture.c
@@ -33,6 +36,7 @@ idf_component_register(
         display/widgets/notification_banner.c
         display/widgets/now_playing_display.c
         display/widgets/media_banner.c
+        display/widgets/poi_alert_popup.c
         display/fonts/emoji_font.c
         display/fonts/jbm_bold_26.c
         display/fonts/jbm_bold_33.c
@@ -51,6 +55,8 @@ idf_component_register(
         sound
         vehicle
         simulator
+        gps
+        poi
         display
         display/widgets
         display/fonts
@@ -60,6 +66,19 @@ idf_component_register(
     REQUIRES waveshare__esp32_p4_wifi6_touch_lcd_xc lvgl__lvgl nvs_flash
              espressif__esp_codec_dev bt spi_flash
 )
+
+# Synthetic driving-cycle simulator. Pulled in by default for bench
+# builds where the gauge needs to visibly swing; compiled out when
+# CONFIG_VROD_INCLUDE_SIM_ENGINE=n so real-bike builds (Phase 3 J1850
+# driver as the producer) don't carry dead weight. gear_table.c stays
+# unconditional — the gear indicator widget reads from it independently.
+if(CONFIG_VROD_INCLUDE_SIM_ENGINE)
+    target_sources(${COMPONENT_LIB} PRIVATE
+        simulator/sim_engine.c
+        simulator/sim_math.c
+        gps/gps_sim.c
+    )
+endif()
 
 # Generated font files (from lv_font_conv) use `#ifdef LV_LVGL_H_INCLUDE_SIMPLE`
 # to pick between `#include "lvgl.h"` and `#include "lvgl/lvgl.h"`. We want the
@@ -105,7 +124,16 @@ endif()
 #     QIO flash easily covers the LVGL working set. See
 #     docs/ble-bringup-bisect.md for the full investigation.
 idf_component_get_property(LVGL_LIB lvgl__lvgl COMPONENT_LIB)
+# Stable IRAM section name. We *want* LVGL fast-mem in IRAM (the 360 MHz
+# CPU executing the SW renderer hot loop from flash via XIP costs us
+# ~10× on heavy frames — measured: render times 30 ms → 180 ms during
+# tach sweep). The earlier "to flash" workaround was needed only because
+# IRAM was over-full with vendor flash-chip drivers; the
+# default_registered_chips[] override in main.c drops those drivers, so
+# the placer now has room. The stable section name (vs LVGL's bundled
+# IRAM_ATTR which expands to .iram1.<__COUNTER__>) also avoids the
+# binutils mismatch between header decls and .c definitions.
 target_compile_definitions(${LVGL_LIB} PUBLIC
-    "LV_ATTRIBUTE_FAST_MEM=__attribute__((section(\".text.lvgl_fast\")))"
+    "LV_ATTRIBUTE_FAST_MEM=__attribute__((section(\".iram1.lvgl_fast\")))"
 )
 

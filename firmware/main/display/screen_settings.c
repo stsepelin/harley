@@ -221,6 +221,19 @@ static void phone_row_clicked_cb(lv_event_t *e)
     refresh_phone_row();
 }
 
+// Long-press the PHONE row to forget every stored bond. Consistent with
+// the long-press-to-enter-settings gesture pattern — discoverable for
+// anyone who already knows that shortcut. Disconnects the active link
+// first so the central isn't talking to a cluster that no longer
+// remembers it.
+static void phone_row_long_press_cb(lv_event_t *e)
+{
+    (void)e;
+    ble_peripheral_disconnect_active();
+    ble_peripheral_forget_all_bonds();
+    refresh_phone_row();
+}
+
 // --- back ----------------------------------------------------------------
 
 static void back_cb(lv_event_t *e)
@@ -298,7 +311,8 @@ lv_obj_t *screen_settings_create(void)
     // breather above BACK.
     lv_obj_t *phone_row = make_row(scr, 100, 525);
     lv_obj_add_flag(phone_row, LV_OBJ_FLAG_CLICKABLE);
-    lv_obj_add_event_cb(phone_row, phone_row_clicked_cb, LV_EVENT_CLICKED, NULL);
+    lv_obj_add_event_cb(phone_row, phone_row_clicked_cb,    LV_EVENT_CLICKED,     NULL);
+    lv_obj_add_event_cb(phone_row, phone_row_long_press_cb, LV_EVENT_LONG_PRESSED, NULL);
     make_caption(phone_row, "PHONE", LV_ALIGN_TOP_LEFT, VROD_TEXT);
 
     s_phone_status = lv_label_create(phone_row);

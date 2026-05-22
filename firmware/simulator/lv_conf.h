@@ -38,3 +38,17 @@
 // --- Fonts that boot_screen falls back on ---------------------------------
 #define LV_FONT_MONTSERRAT_22   1
 #define LV_FONT_MONTSERRAT_48   1
+
+// --- FreeType for the color-emoji fallback chain --------------------------
+// Mirrors the firmware sdkconfig so jbm_bold_26 / jbm_bold_33 grow a
+// .fallback to a runtime-built FreeType font over firmware/main/assets/emoji.ttf.
+// LV_FREETYPE_USE_LVGL_PORT is off on the host — the LVGL port reaches
+// into FreeType internal headers (ftdebug.h etc.) that homebrew's
+// libfreetype doesn't ship. The default FreeType libc port handles
+// fopen/fread itself, which is fine for the desktop. On firmware we
+// keep the LVGL port + memfs so the TTF stays in flash.
+#define LV_USE_FREETYPE                 1
+#define LV_FREETYPE_USE_LVGL_PORT       0
+#define LV_FREETYPE_CACHE_FT_GLYPH_CNT  64
+// COLR rasterizer is stack-hungry; LVGL's compile-time check fails under 32 KB.
+#define LV_DRAW_THREAD_STACK_SIZE       32768

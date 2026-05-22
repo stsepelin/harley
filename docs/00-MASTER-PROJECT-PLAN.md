@@ -365,11 +365,18 @@ See `02-PHASE2.5-OFFBIKE-PLAN.md` for the full plan + ordering.
 - Incoming call overlay
 - Media play/pause/skip via AMS/AVRCP
 
-### Phase 5: Speed Camera Database (Weekend 10)
+### Phase 5: Speed Camera Database — on-bike validation (Weekend 10)
 - Download SCDB.info / OSM camera data for Estonia/Baltics
-- Store on microSD in compact binary format
-- Alert engine: GPS position vs camera locations
-- Warning popup + audio beep via P4 onboard speaker
+- Import into the binary DB format defined in Phase 2.5 Stage 7
+- Store on microSD; the cluster mounts the card and loads the DB on boot
+- End-to-end validation on a moving bike: real GPS fix → real camera
+  detected by the alert engine (already built in Phase 2.5) → warning
+  popup + audio beep fire on the actual ride
+
+> The alert engine, DB binary format, warning popup widget, fake-GPS
+> producer, and host unit tests were front-loaded into Phase 2.5
+> Stage 7 because all of that is exercise-able off-bike. Phase 5 is
+> now scoped to "plug in real data + validate on the road".
 
 ### Phase 6: Full Cluster Replacement (Weekends 11-12)
 - Read all 12-pin discrete signals (turns, beam, oil, neutral, fuel)

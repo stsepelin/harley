@@ -37,3 +37,23 @@ void ble_peripheral_disconnect_active(void);
 // isn't written yet). Caller owns `buf` — we copy into a NimBLE mbuf
 // before returning. Returns true if the notify was queued, false otherwise.
 bool ble_peripheral_notify(const uint8_t *buf, uint16_t len);
+
+// --- Pairing (LE Secure Connections, numeric comparison) -------------------
+// CONFIG_VROD_BLE_INSECURE disables the whole pairing flow; the rest of
+// this header still compiles so call sites don't need ifdef guards.
+
+// Callback the UI registers to render the 6-digit passkey when the
+// security manager asks the user to confirm a numeric-comparison match.
+// Fires from the NimBLE host task — the UI implementation must take the
+// LVGL lock before touching widgets. After rendering, the UI calls
+// ble_peripheral_pair_respond() with the rider's answer.
+typedef void (*ble_peripheral_pair_request_cb_t)(uint32_t passkey);
+void ble_peripheral_pair_set_callback(ble_peripheral_pair_request_cb_t cb);
+
+// Inject the rider's accept / reject response into the SM flow. Must be
+// called exactly once per pair_request_cb invocation.
+void ble_peripheral_pair_respond(bool accept);
+
+// Clear every stored bond from NVS. The next connect from any phone
+// re-triggers the pairing flow. Safe to call from any task.
+void ble_peripheral_forget_all_bonds(void);

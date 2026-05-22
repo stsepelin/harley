@@ -4,12 +4,15 @@
 #include <string.h>
 #include "esp_log.h"
 #include "freertos/FreeRTOS.h"
+#include "sdkconfig.h"
 
 #include "nimble/nimble_port.h"
 #include "nimble/nimble_port_freertos.h"
 #include "host/ble_hs.h"
 #include "host/ble_uuid.h"
 #include "host/util/util.h"
+#include "host/ble_sm.h"
+#include "host/ble_store.h"
 #include "services/gap/ble_svc_gap.h"
 #include "services/gatt/ble_svc_gatt.h"
 
@@ -78,6 +81,17 @@ static uint16_t s_conn_handle = BLE_HS_CONN_HANDLE_NONE;
 static uint16_t s_tx_attr_handle;
 static bool     s_tx_subscribed;       // set when the central writes CCCD
 
+#if !CONFIG_VROD_BLE_INSECURE
+// Pair-confirm UI hook. The GAP callback runs on the NimBLE host task,
+// the LVGL UI on core 1 — the registered cb is called from the host
+// task and is responsible for taking the LVGL lock if it touches
+// widgets. s_pair_conn_handle pins which connection the rider's reply
+// goes to, since a stale handle from a previous pairing would inject
+// the response into the wrong session.
+static ble_peripheral_pair_request_cb_t s_pair_cb;
+static uint16_t                         s_pair_conn_handle;
+#endif
+
 static int gap_event_cb(struct ble_gap_event *event, void *arg);
 static void start_advertising(void);
 
@@ -131,11 +145,28 @@ static const struct ble_gatt_chr_def chrs[] = {
     {
         .uuid      = &RX_UUID.u,
         .access_cb = access_rx_cb,
+        // WRITE_AUTHEN requires an authenticated encrypted link — i.e.
+        // an SC numeric-comparison pair has completed. Android's
+        // BluetoothGatt sees the insufficient-authentication response
+        // on a cold write and triggers pairing via the SM, then
+        // retries. Without _AUTHEN, any unpaired central could write
+        // here. CONFIG_VROD_BLE_INSECURE drops _AUTHEN back to the
+        // unpaired flags for bench iteration.
+#if CONFIG_VROD_BLE_INSECURE
         .flags     = BLE_GATT_CHR_F_WRITE | BLE_GATT_CHR_F_WRITE_NO_RSP,
+#else
+        .flags     = BLE_GATT_CHR_F_WRITE | BLE_GATT_CHR_F_WRITE_NO_RSP
+                   | BLE_GATT_CHR_F_WRITE_AUTHEN,
+#endif
     },
     {
-        // TX (cluster → phone). Notify-only; the command channel that
-        // delivers CALL_ACCEPT etc. plugs in here once #33 lands.
+        // TX (cluster → phone). Notify-only — the central reads via
+        // BluetoothGattCallback.onCharacteristicChanged after enabling
+        // notifications on the CCCD. Subscribing to TX doesn't carry a
+        // privacy concern (the commands are public — play/pause, call
+        // accept) so we don't gate the CCCD descriptor specifically;
+        // RX being gated is enough to keep an unbonded central from
+        // doing anything useful.
         .uuid       = &TX_UUID.u,
         .access_cb  = access_tx_cb,
         .flags      = BLE_GATT_CHR_F_NOTIFY,
@@ -239,6 +270,51 @@ static int gap_event_cb(struct ble_gap_event *event, void *arg)
             portEXIT_CRITICAL(&s_state_mux);
         }
         return 0;
+#if !CONFIG_VROD_BLE_INSECURE
+    case BLE_GAP_EVENT_PASSKEY_ACTION:
+        // SM wants the rider's input. With sm_io_cap = DISPLAY_ONLY and
+        // sm_sc = 1 + sm_mitm = 1, the only action we should ever see is
+        // NUMCMP (numeric comparison): both sides show a 6-digit number,
+        // user confirms they match. Save the conn_handle so the
+        // ble_peripheral_pair_respond() call from the UI thread targets
+        // the right connection, then hand the passkey to the registered
+        // UI callback. If no callback is set we have to reject (no way
+        // to ask the user) — silently inject reject so the SM doesn't
+        // hang.
+        ESP_LOGI(TAG, "passkey action=%d", event->passkey.params.action);
+        if (event->passkey.params.action == BLE_SM_IOACT_NUMCMP) {
+            s_pair_conn_handle = event->passkey.conn_handle;
+            if (s_pair_cb) {
+                s_pair_cb(event->passkey.params.numcmp);
+            } else {
+                ESP_LOGW(TAG, "no pair UI callback; rejecting");
+                ble_peripheral_pair_respond(false);
+            }
+        } else {
+            // Anything else (passkey display, OOB) is a configuration
+            // mismatch — log loudly and reject.
+            ESP_LOGW(TAG, "unexpected passkey action %d; rejecting",
+                     event->passkey.params.action);
+            struct ble_sm_io io = { .action = event->passkey.params.action };
+            ble_sm_inject_io(event->passkey.conn_handle, &io);
+        }
+        return 0;
+    case BLE_GAP_EVENT_ENC_CHANGE:
+        ESP_LOGI(TAG, "encryption changed; status=%d", event->enc_change.status);
+        return 0;
+    case BLE_GAP_EVENT_REPEAT_PAIRING:
+        // Peer initiated pairing on a connection that already has a
+        // bond. Delete the stale bond and let the new pairing through;
+        // NimBLE expects BLE_GAP_REPEAT_PAIRING_RETRY to proceed.
+        ESP_LOGI(TAG, "repeat pairing — dropping stale bond");
+        {
+            struct ble_gap_conn_desc desc;
+            if (ble_gap_conn_find(event->repeat_pairing.conn_handle, &desc) == 0) {
+                ble_store_util_delete_peer(&desc.peer_id_addr);
+            }
+        }
+        return BLE_GAP_REPEAT_PAIRING_RETRY;
+#endif  /* !CONFIG_VROD_BLE_INSECURE */
     default:
         return 0;
     }
@@ -275,6 +351,23 @@ void ble_peripheral_init(void)
 
     ble_hs_cfg.reset_cb = on_host_reset;
     ble_hs_cfg.sync_cb  = on_host_sync;
+
+#if !CONFIG_VROD_BLE_INSECURE
+    // LE Secure Connections + numeric comparison. DISPLAY_ONLY tells the
+    // peer we can show a passkey but can't accept keyboard input, which
+    // routes the rider's confirmation through the cluster's settings
+    // screen (six digits shown on cluster + phone; rider taps ACCEPT if
+    // they match). store_status_cb defaults to ble_store_util_status_rr
+    // — if NVS fills up, oldest bond gets evicted. Persisting bonds in
+    // NVS comes from CONFIG_BT_NIMBLE_NVS_PERSIST=y in sdkconfig.
+    ble_hs_cfg.sm_io_cap          = BLE_HS_IO_DISPLAY_ONLY;
+    ble_hs_cfg.sm_bonding         = 1;
+    ble_hs_cfg.sm_mitm            = 1;
+    ble_hs_cfg.sm_sc              = 1;
+    ble_hs_cfg.sm_our_key_dist    = BLE_SM_PAIR_KEY_DIST_ENC | BLE_SM_PAIR_KEY_DIST_ID;
+    ble_hs_cfg.sm_their_key_dist  = BLE_SM_PAIR_KEY_DIST_ENC | BLE_SM_PAIR_KEY_DIST_ID;
+    ble_hs_cfg.store_status_cb    = ble_store_util_status_rr;
+#endif
 
     ble_svc_gap_init();
     ble_svc_gatt_init();
@@ -341,4 +434,46 @@ void ble_peripheral_disconnect_active(void)
     if (rc != 0 && rc != BLE_HS_ENOTCONN) {
         ESP_LOGW(TAG, "ble_gap_terminate rc=%d", rc);
     }
+}
+
+// --- Pairing -------------------------------------------------------------
+
+void ble_peripheral_pair_set_callback(ble_peripheral_pair_request_cb_t cb)
+{
+#if CONFIG_VROD_BLE_INSECURE
+    (void)cb;
+#else
+    s_pair_cb = cb;
+#endif
+}
+
+void ble_peripheral_pair_respond(bool accept)
+{
+#if CONFIG_VROD_BLE_INSECURE
+    (void)accept;
+#else
+    if (s_pair_conn_handle == BLE_HS_CONN_HANDLE_NONE) {
+        ESP_LOGW(TAG, "pair_respond with no pending request");
+        return;
+    }
+    struct ble_sm_io io = {
+        .action        = BLE_SM_IOACT_NUMCMP,
+        .numcmp_accept = accept ? 1 : 0,
+    };
+    int rc = ble_sm_inject_io(s_pair_conn_handle, &io);
+    if (rc != 0) ESP_LOGW(TAG, "ble_sm_inject_io rc=%d", rc);
+    // One-shot: clear so a UI bug double-tapping after the SM has
+    // already concluded can't accidentally inject into a future
+    // pairing session.
+    s_pair_conn_handle = BLE_HS_CONN_HANDLE_NONE;
+#endif
+}
+
+void ble_peripheral_forget_all_bonds(void)
+{
+#if !CONFIG_VROD_BLE_INSECURE
+    int rc = ble_store_clear();
+    if (rc != 0) ESP_LOGW(TAG, "ble_store_clear rc=%d", rc);
+    else         ESP_LOGI(TAG, "all bonds cleared");
+#endif
 }

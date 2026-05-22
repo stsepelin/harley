@@ -115,13 +115,23 @@ One-liners — see `docs/ARCHITECTURE.md` for the why.
 - **`jbm_bold_26.c` / `jbm_bold_33.c` have a manually-stripped `const`** on
   the `lv_font_t` struct definition (not on the big bitmap/dsc tables —
   those stay in flash). `emoji_font.c` writes `.fallback` on those two
-  structs at boot to attach the Noto-COLRv1 FreeType font; the P4 maps
-  `.rodata` to flash (XIP), so the struct has to live in `.data`. If you
-  regenerate either font via `lv_font_conv` (see the `Opts:` line in the
-  file header), re-apply the strip on the `lv_font_t jbm_bold_XX = {`
-  line so the assignment doesn't fault at boot. The other JBM sizes (45,
-  72, 144) and the MDI sizes keep their `const` — they're numeric/icon
-  fonts with no emoji to fall back to.
+  structs at boot to attach the monochrome Noto Emoji FreeType font;
+  the P4 maps `.rodata` to flash (XIP), so the struct has to live in
+  `.data`. If you regenerate either font via `lv_font_conv` (see the
+  `Opts:` line in the file header), re-apply the strip on the
+  `lv_font_t jbm_bold_XX = {` line so the assignment doesn't fault at
+  boot. The other JBM sizes (45, 72, 144) and the MDI sizes keep their
+  `const` — they're numeric/icon fonts with no emoji to fall back to.
+- **Emoji are monochrome, not color**, even though FreeType supports
+  COLR/sbix in principle. LVGL's `lv_freetype_glyph.c::freetype_glyph_create_cb`
+  uses `FT_LOAD_COMPUTE_METRICS` without `FT_LOAD_COLOR`, which on
+  Twemoji / Noto-COLRv1 returns metrics.width = 0 / height = 0 (their
+  glyf outlines are empty placeholders, the real visual lives in COLR
+  paint tables). The label then allocates a 0×0 slot and draws
+  nothing. Mono fonts have real outlines, so metrics work and the
+  glyph renders as an alpha mask tinted by `text_color`. Patching
+  LVGL to honour `FT_LOAD_COLOR` during metrics would unlock color
+  emoji — own piece of work, deserves an upstream bug.
 
 ## Testing
 
