@@ -273,12 +273,14 @@ static bool glow_image_init(void)
 }
 
 // --- Cursor sprite --------------------------------------------------------
-// uint8_t arrays default to 1-byte alignment, but LVGL's draw-buf init
-// checks the pointer against LV_DRAW_BUF_ALIGN (4 by default) and warns
-// "Data is not aligned, ignored" if it isn't. Force 4-byte alignment.
+// PSRAM-allocated (~18 KB combined). Static arrays in DRAM ate IRAM
+// placement margin under -Wl,--enable-non-contiguous-regions on P4 < v3
+// (see docs/ble-bringup-bisect.md); PSRAM blit cost is hidden by L2 cache
+// since the sprite is the same one or two frames in a row. heap_caps_malloc
+// returns 16-byte aligned, satisfying LVGL's LV_DRAW_BUF_ALIGN=4 check.
 
-static uint8_t        s_cursor_normal_data[CURSOR_IMG_W * CURSOR_IMG_H * 4] __attribute__((aligned(4)));
-static uint8_t        s_cursor_red_data   [CURSOR_IMG_W * CURSOR_IMG_H * 4] __attribute__((aligned(4)));
+static uint8_t       *s_cursor_normal_data = NULL;
+static uint8_t       *s_cursor_red_data    = NULL;
 static lv_image_dsc_t s_cursor_normal_dsc;
 static lv_image_dsc_t s_cursor_red_dsc;
 static bool           s_cursor_images_built = false;
@@ -486,6 +488,15 @@ static bool ticks_image_init(void)
 static void cursor_image_init(void)
 {
     if (s_cursor_images_built) return;
+
+    const size_t bytes   = (size_t)CURSOR_IMG_W * CURSOR_IMG_H * 4;
+    s_cursor_normal_data = heap_caps_malloc(bytes, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
+    s_cursor_red_data    = heap_caps_malloc(bytes, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
+    if (!s_cursor_normal_data || !s_cursor_red_data) {
+        ESP_LOGE("tach", "cursor sprite alloc failed (%u bytes x2)", (unsigned)bytes);
+        return;
+    }
+
     // Normal: warm near-white core (#FFEECC), orange inner tube, soft sigma.
     bake_cursor_sprite(s_cursor_normal_data, &s_cursor_normal_dsc,
                        CURSOR_SIGMA_NORMAL,
@@ -695,6 +706,12 @@ static void build_labels(lv_obj_t *cont, tach_data_t *td)
         td->labels[i] = img;
         td->labels_big[i] = NULL;
     }
+}
+
+void tach_arc_prebake(void)
+{
+    glow_image_init();
+    cursor_image_init();
 }
 
 lv_obj_t *tach_arc_create(lv_obj_t *parent)

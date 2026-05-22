@@ -400,6 +400,71 @@ validation) live in Phase 5.
 - `test_alert_engine.c` — feed a sequence of `gps_source_t` updates
   and assert which alerts fire and in what order.
 
+## Stage 8 — BLE visibility hardening + directed advertising
+
+**Why now**: Stage 5 closed the *data* path — RX writes require an
+authenticated bond, so a stranger can't push fake SMS or call events
+to the cluster. The *discovery* path is still wide open: any time the
+phone is disconnected (out of range, off, before pairing), the
+cluster advertises in undirected mode and shows up as "V-Rod Cluster"
+in every BLE scanner within range. Stage 8 hides the cluster from
+strangers once it's bonded, and gives the rider explicit control over
+visibility for the "pair a second phone" case.
+
+### Scope
+
+- After a bond is stored in NVS, `start_advertising()` switches from
+  general undirected (`BLE_GAP_CONN_MODE_UND`) to directed
+  (`BLE_GAP_CONN_MODE_DIR`) targeting the bonded peer's identity
+  address. Strangers scanning don't see the device at all — only the
+  bonded phone responds. Bonded phone auto-reconnects when in range.
+- Long-press on the PHONE row in settings (already wired to
+  `ble_peripheral_forget_all_bonds()`) reverts the cluster to
+  undirected so the next pairing can find it from any phone.
+- New "BT VISIBILITY" toggle in the settings card (sits with PHONE).
+  When ON, advertising forces undirected mode even with a bond
+  stored — for adding a second phone without forgetting the first.
+  Auto-reverts to OFF after the new bond completes.
+- Toggle state persists in NVS like brightness/volume. Default OFF
+  (i.e. directed advertising preferred whenever a bond exists).
+- BLE peripheral state grows a `visible_override` flag that the UI
+  thread can set/clear. `start_advertising()` consults
+  `(has_bond, visible_override)` to choose adv mode.
+
+### Out of scope
+
+- Multiple-bond support — sticks with the existing
+  `CONFIG_BT_NIMBLE_MAX_CONNECTIONS=1` and one-bond-at-a-time model.
+  Pairing a different phone wipes the previous bond. Multi-bond is
+  more work than the value it adds for a single-rider use case.
+- Resolvable Private Address rotation. The cluster's BLE identity
+  address stays stable across sessions today, which is a tracking
+  risk a determined passive sniffer could exploit. Worth revisiting
+  if RPA becomes table-stakes for the deployment, but out of phase.
+
+### Tests to add
+
+- `test_ble_visibility_state.c` — pure-logic test for the
+  `(has_bond, visible_override) → adv_mode` decision matrix, plus
+  the auto-revert edge on new-bond-stored.
+- End-to-end "directed adv to bonded peer" is hard to host-test
+  (needs a real Android central); rely on the device + companion.
+
+### End-to-end verification
+
+1. Fresh flash, no bond. Cluster advertises undirected. Phone sees
+   "V-Rod Cluster" in scan list, pairs successfully. Cluster stores
+   the bond and switches to directed.
+2. Power-cycle the cluster. It advertises directed at the bonded
+   MAC. A second phone's scanner does *not* see the cluster. The
+   bonded phone reconnects automatically.
+3. In settings, toggle BT VISIBILITY on. Cluster switches back to
+   undirected. Second phone now sees + pairs. After the new bond
+   commits, BT VISIBILITY auto-toggles off; advertising reverts to
+   directed at the new peer (first bond was overwritten).
+4. Long-press PHONE row → "Forget all devices". Cluster reverts to
+   undirected, accepts pairing from any phone again.
+
 ## Out of phase entirely (still future)
 
 These came up during discussion but belong elsewhere:
@@ -419,12 +484,10 @@ shippable without waiting on parts.
 1. **Stage 1** — touch + screen switching ✅
 2. **Stage 2** — NVS + settings + units ✅
 3. **Stage 3** — BLE phone integration ✅
-4. **Stage 6** — no-sim build flag (~30 min, smallest scope, unlocks
-   cleaner bench testing for the next stages immediately).
-5. **Stage 4** — host-side notif emulator (~2–3 h, biggest dev-velocity
-   payoff — every later UI tweak gets a sub-second test loop).
-6. **Stage 5** — BLE pairing + bonding (~1 weekend, safety-relevant
-   before real riding).
-7. **Stage 7** — speed-camera framework off-bike portion (medium —
-   pure logic + UI, fully exercised by the new test bridge from
-   Stage 4 and the fake GPS producer).
+4. **Stage 6** — no-sim build flag ✅
+5. **Stage 4** — host-side notif emulator ✅
+6. **Stage 5** — BLE pairing + bonding ✅
+7. **Stage 7** — speed-camera framework off-bike portion ✅
+8. **Stage 8** — BLE visibility hardening (~half a day, small —
+   directed advertising + a settings toggle; closes the discovery
+   path Stage 5 left open).

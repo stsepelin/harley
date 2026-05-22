@@ -65,6 +65,7 @@ idf_component_register(
         assets/emoji.ttf
     REQUIRES waveshare__esp32_p4_wifi6_touch_lcd_xc lvgl__lvgl nvs_flash
              espressif__esp_codec_dev bt spi_flash
+    LDFRAGMENTS linker.lf
 )
 
 # Synthetic driving-cycle simulator. Pulled in by default for bench
@@ -110,29 +111,25 @@ endif()
 # lv_font_conv (see the `Opts:` comment in each file's header), re-apply
 # the const strip on the lv_font_t line — see CLAUDE.md note.
 
-# LVGL fast-mem section override. Two concerns served by this one line:
+# LVGL fast-mem section override — two concerns served by this one line:
 #  1) GCC 15 rejects LVGL's bundled LV_ATTRIBUTE_FAST_MEM=IRAM_ATTR because
 #     IRAM_ATTR's __COUNTER__ produces different .iram1.N section names for
 #     the header decl and the .c definition. A stable section name fixes it.
-#  2) Routing the section to .text.lvgl_fast (flash via XIP) keeps ~118 KB
-#     of LVGL fast-path code out of IRAM. On P4 silicon revs < v3,
-#     esp_system unconditionally adds -Wl,--enable-non-contiguous-regions
-#     to the link; with LVGL fast-mem also in IRAM, the placer can't fit
-#     the spi_flash chip-driver sections, and binutils 2.45 hangs at the
-#     final ld step instead of erroring out. Steady-state rendering at
-#     60 FPS / 800×800 is unaffected — the L2 cache (256 KB) plus 80 MHz
-#     QIO flash easily covers the LVGL working set. See
-#     docs/ble-bringup-bisect.md for the full investigation.
+#  2) Route the ~118 KB block to flash (.text.lvgl_fast). Putting the
+#     whole block in IRAM no longer links — stage 5's mbedtls ECC + BLE
+#     SM additions pushed the cumulative IRAM-marked section size past
+#     the placer's budget under -Wl,--enable-non-contiguous-regions on
+#     P4 < v3 silicon (binutils 2.45 segfaults at the final ld step,
+#     discards include _global_interrupt_handler and the spi_flash
+#     generic driver). See docs/ble-bringup-bisect.md.
+#
+# The flash placement DOES cost render time — measured at 110 ms / 7 FPS
+# during a tach sweep, vs the ~30 FPS the perf-bake commit (35c67c2) was
+# measured at with .iram1.lvgl_fast back when it still linked. The fix
+# is in main/linker.lf, which surgically pulls just the inner ARGB->RGB565
+# blender into internal SRAM. Recovers most of the loss without
+# re-triggering the link trap.
 idf_component_get_property(LVGL_LIB lvgl__lvgl COMPONENT_LIB)
-# Stable IRAM section name. We *want* LVGL fast-mem in IRAM (the 360 MHz
-# CPU executing the SW renderer hot loop from flash via XIP costs us
-# ~10× on heavy frames — measured: render times 30 ms → 180 ms during
-# tach sweep). The earlier "to flash" workaround was needed only because
-# IRAM was over-full with vendor flash-chip drivers; the
-# default_registered_chips[] override in main.c drops those drivers, so
-# the placer now has room. The stable section name (vs LVGL's bundled
-# IRAM_ATTR which expands to .iram1.<__COUNTER__>) also avoids the
-# binutils mismatch between header decls and .c definitions.
 target_compile_definitions(${LVGL_LIB} PUBLIC
-    "LV_ATTRIBUTE_FAST_MEM=__attribute__((section(\".iram1.lvgl_fast\")))"
+    "LV_ATTRIBUTE_FAST_MEM=__attribute__((section(\".text.lvgl_fast\")))"
 )

@@ -1,0 +1,48 @@
+# Surgical IRAM/DRAM placement for the LVGL hot blend object.
+#
+# Background: the perf-bake commit (35c67c2) measured 30 FPS / 15-22 ms
+# render with LV_ATTRIBUTE_FAST_MEM pointing at .iram1.lvgl_fast (all
+# ~118 KB of LVGL fast-path code in IRAM). That arrangement no longer
+# links — stage 5 of the same PR (e0e7ee9, BLE LE Secure Connections +
+# mbedtls ECC) grew the IRAM-marked section set past the placer's
+# budget under -Wl,--enable-non-contiguous-regions on P4 < v3. The
+# 4 388-byte original shortfall now sits at ~23 KB; ld either hangs
+# (binutils 2.45) or discards critical sections including
+# _global_interrupt_handler and the spi_flash generic chip driver.
+# See docs/ble-bringup-bisect.md for the underlying bug pair.
+#
+# This fragment recovers most of the lost perf by moving just the
+# inner ARGB8888->RGB565 blender out of PSRAM XIP and into internal
+# SRAM. Combined ~14 KB of .text + .rodata fits comfortably without
+# disturbing the existing IRAM section placement, and the perf win is
+# the bigger lever: bench measurements during the fix (sim engine on,
+# active tach sweep) went from 7 FPS / 110 ms render to 24 FPS / 18 FPS
+# worst-case during a fast gear-down. The render budget at our 30 FPS
+# refresh (~33 ms) is not quite hit, but the gauge is no longer
+# perceptibly laggy.
+#
+# Critical: use the (noflash) scheme — not (noflash_text). With text
+# only, the blender's inner-loop lookup tables stay in PSRAM and the
+# CPU stalls on every cache miss; measured 6-7 FPS, almost no
+# improvement over baseline. Moving .rodata to DRAM alongside the
+# .text is what unlocks the win.
+#
+# Critical: do NOT add more objects to this list without re-measuring.
+# Counter-intuitively, adding lv_draw_sw_blend.c (the dispatcher,
+# 1.3 KB) on top regressed perf back to 7 FPS — likely a cache-locality
+# shift where the dispatcher's rodata in DRAM displaces something
+# previously hot in cache. Adding 4 objects at once additionally fails
+# to boot ("xTaskCreatePinnedToCore for main task" assert in
+# esp_startup_start_app), likely cumulative heap pool fragmentation
+# when too much LVGL .rodata is yanked from PSRAM. Stay at one object
+# unless you have a clear hypothesis and a way to measure.
+#
+# If the upstream binutils 2.45 / IDF non-contig-regions bugs get
+# fixed (see docs/ble-bringup-bisect.md "Upstream issues to file"),
+# the preferred restoration is to move LV_ATTRIBUTE_FAST_MEM back to
+# .iram1.lvgl_fast in main/CMakeLists.txt and delete this fragment.
+
+[mapping:lvgl_perf]
+archive: liblvgl__lvgl.a
+entries:
+    lv_draw_sw_blend_to_rgb565 (noflash)

@@ -115,6 +115,16 @@ CONFIG_ESP_HOSTED_ENABLE_BT_NIMBLE=y
 CONFIG_BT_NIMBLE_SM_LEGACY=n
 CONFIG_BT_NIMBLE_SM_SC=y
 
+# Temporary perf-investigation: sysmon overlay on screen instead of log
+# mode, so render-time / FPS are visible without a serial monitor.
+# BOTTOM_RIGHT (the LVGL default) anchors the label to a corner that
+# lies outside the visible circle on this round 800x800 panel — move it
+# to BOTTOM_MID, which sits on the circle edge and grows upward into
+# the visible area. Remove (or revert) once the lag investigation is closed.
+# CONFIG_LV_USE_PERF_MONITOR_LOG_MODE is not set
+# CONFIG_LV_PERF_MONITOR_ALIGN_BOTTOM_RIGHT is not set
+CONFIG_LV_PERF_MONITOR_ALIGN_BOTTOM_MID=y
+
 # Drop the vendor-specific spi_flash chip-driver registration so
 # winbond / mxic / issi / boya / th don't compete with the generic driver
 # for IRAM placement on P4 < v3 silicon under
