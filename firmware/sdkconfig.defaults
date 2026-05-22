@@ -26,7 +26,11 @@ CONFIG_FREERTOS_HZ=1000
 CONFIG_LV_USE_CLIB_MALLOC=y
 CONFIG_LV_USE_CLIB_STRING=y
 CONFIG_LV_USE_CLIB_SPRINTF=y
-CONFIG_LV_DEF_REFR_PERIOD=15
+# 33 ms (~30 FPS) targets a render budget the SW renderer reliably fits
+# on this BSP with ESP-Hosted's SDIO traffic active. 15 ms (66 FPS) used
+# to race the budget and end up at ~25 FPS with visible chop during
+# heavy renders. See tach_arc.c for the matching baked-sprite refactor.
+CONFIG_LV_DEF_REFR_PERIOD=33
 CONFIG_LV_OS_FREERTOS=y
 CONFIG_LV_DRAW_SW_DRAW_UNIT_CNT=2
 
