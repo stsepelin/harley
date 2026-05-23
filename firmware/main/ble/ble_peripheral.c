@@ -16,9 +16,12 @@
 #include "services/gap/ble_svc_gap.h"
 #include "services/gatt/ble_svc_gatt.h"
 
+#include "ble_visibility.h"
 #include "phone.h"
 #include "phone_data.h"
 #include "phone_protocol.h"
+#include "settings.h"
+#include "settings_store.h"
 
 static const char *TAG = "ble_peripheral";
 
@@ -186,8 +189,54 @@ static const struct ble_gatt_svc_def svcs[] = {
 
 // --- GAP / advertising ----------------------------------------------------
 
+// First bonded peer's identity address, if any. The cluster supports at
+// most one connection at a time, and the most-recently-paired phone is
+// the one we should advertise toward. Returns true and fills *out on a
+// hit; false on no bond stored or on a NimBLE lookup error.
+static bool first_bonded_peer(ble_addr_t *out)
+{
+    ble_addr_t peers[1];
+    int        num = 0;
+    int rc = ble_store_util_bonded_peers(peers, &num, (int)(sizeof(peers) / sizeof(peers[0])));
+    if (rc != 0 || num <= 0)
+        return false;
+    *out = peers[0];
+    return true;
+}
+
 static void start_advertising(void)
 {
+    ble_addr_t     peer        = {0};
+    bool           has_bond    = first_bonded_peer(&peer);
+    bool           override_on = settings_store_current()->ble_visible_override;
+    ble_adv_mode_t mode        = ble_visibility_decide(has_bond, override_on);
+
+    if (mode == BLE_ADV_MODE_DIRECTED) {
+        // Directed advertising — only the bonded peer's connect request
+        // is accepted; strangers scanning don't see "V-Rod Cluster" in
+        // the result list. Low-duty cycle (high_duty_cycle = 0) so the
+        // adv window is the standard ~10s, not the legacy 1.28s high-duty
+        // limit. NimBLE re-arms on its own under BLE_HS_FOREVER for
+        // low-duty directed; the BLE_GAP_EVENT_ADV_COMPLETE path below
+        // covers any controller that does report timeouts.
+        struct ble_gap_adv_params params = {0};
+        params.conn_mode                 = BLE_GAP_CONN_MODE_DIR;
+        params.disc_mode                 = BLE_GAP_DISC_MODE_NON;
+        params.high_duty_cycle           = 0;
+        int rc =
+            ble_gap_adv_start(s_own_addr_type, &peer, BLE_HS_FOREVER, &params, gap_event_cb, NULL);
+        if (rc != 0) {
+            ESP_LOGE(TAG, "ble_gap_adv_start(directed) rc=%d", rc);
+            return;
+        }
+        state_set_advertising(true);
+        ESP_LOGI(TAG, "advertising (directed) to bonded peer");
+        return;
+    }
+
+    // Undirected (general discoverable) — used when no bond exists or
+    // when the rider has toggled BT VISIBILITY on to add another phone.
+    //
     // Split the advert. flags (3) + complete name "V-Rod Cluster" (15) +
     // complete 128-bit service UUID (18) = 36 bytes, which overflows the
     // 31-byte legacy advert limit. NimBLE returns BLE_HS_EMSGSIZE and
@@ -221,7 +270,8 @@ static void start_advertising(void)
     if (rc != 0) { ESP_LOGE(TAG, "ble_gap_adv_start rc=%d", rc); return; }
 
     state_set_advertising(true);
-    ESP_LOGI(TAG, "advertising as 'V-Rod Cluster'");
+    ESP_LOGI(TAG, "advertising as 'V-Rod Cluster' (undirected, %s)",
+             has_bond ? "override-on" : "no bond");
 }
 
 static int gap_event_cb(struct ble_gap_event *event, void *arg)
@@ -301,6 +351,28 @@ static int gap_event_cb(struct ble_gap_event *event, void *arg)
         return 0;
     case BLE_GAP_EVENT_ENC_CHANGE:
         ESP_LOGI(TAG, "encryption changed; status=%d", event->enc_change.status);
+        if (event->enc_change.status == 0) {
+            // Successful encryption upgrade => a bond is now stored (or
+            // a stored bond was used). Auto-revert the visibility override
+            // so the cluster goes back to invisible-to-strangers after
+            // the "add another phone" workflow completes. Idempotent for
+            // the bonded-reconnect case where the override was already
+            // off.
+            const settings_t *cur = settings_store_current();
+            if (cur->ble_visible_override) {
+                settings_t next           = *cur;
+                next.ble_visible_override = ble_visibility_after_new_bond(true);
+                settings_store_apply(&next);
+                ESP_LOGI(TAG, "BT visibility auto-reverted after pairing");
+            }
+        }
+        return 0;
+    case BLE_GAP_EVENT_ADV_COMPLETE:
+        // Directed advertising completed without a connection — the
+        // controller stopped after its window. Re-evaluate (bond may
+        // still be there, override flag may have flipped) and restart.
+        ESP_LOGI(TAG, "adv complete; reason=%d", event->adv_complete.reason);
+        start_advertising();
         return 0;
     case BLE_GAP_EVENT_REPEAT_PAIRING:
         // Peer initiated pairing on a connection that already has a
@@ -475,5 +547,26 @@ void ble_peripheral_forget_all_bonds(void)
     int rc = ble_store_clear();
     if (rc != 0) ESP_LOGW(TAG, "ble_store_clear rc=%d", rc);
     else         ESP_LOGI(TAG, "all bonds cleared");
+    // Bond just disappeared → directed adv has no peer to target.
+    // Restart so undirected adv takes over and the cluster is
+    // pair-able again from any phone without a power-cycle.
+    ble_peripheral_refresh_visibility();
 #endif
+}
+
+void ble_peripheral_refresh_visibility(void)
+{
+    // Don't disrupt an active connection. The new mode applies at the
+    // next disconnect, where the existing BLE_GAP_EVENT_DISCONNECT path
+    // already calls start_advertising() and the fresh override flag is
+    // read from settings then.
+    portENTER_CRITICAL(&s_state_mux);
+    bool connected = (s_conn_handle != BLE_HS_CONN_HANDLE_NONE);
+    portEXIT_CRITICAL(&s_state_mux);
+    if (connected) {
+        ESP_LOGI(TAG, "refresh_visibility: deferred until disconnect");
+        return;
+    }
+    (void)ble_gap_adv_stop();  // OK if not currently advertising
+    start_advertising();
 }

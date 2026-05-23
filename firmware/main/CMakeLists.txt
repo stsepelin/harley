@@ -2,6 +2,7 @@ idf_component_register(
     SRCS
         main.c
         ble/ble_peripheral.c
+        ble/ble_visibility.c
         phone/phone_data.c
         phone/phone_protocol.c
         settings/settings.c
@@ -16,6 +17,7 @@ idf_component_register(
         display/boot_screen.c
         display/screen_ride.c
         display/screen_settings.c
+        display/screen_settings_bluetooth.c
         display/screen_pairing.c
         display/ui_manager.c
         display/format.c

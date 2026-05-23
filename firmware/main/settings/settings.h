@@ -12,10 +12,11 @@
 // settings screen on change. Keep small — anything bigger than a few
 // bytes per field should probably be its own NVS namespace.
 typedef struct {
-    display_units_t units;          // kph or mph
-    uint8_t         brightness;     // 30..100 (mapped to the BSP duty cycle)
-    bool            sound_enabled;  // master mute / unmute
-    uint8_t         volume;         // 0..100 (codec out_vol)
+    display_units_t units;                 // kph or mph
+    uint8_t         brightness;            // 30..100 (mapped to the BSP duty cycle)
+    bool            sound_enabled;         // master mute / unmute
+    uint8_t         volume;                // 0..100 (codec out_vol)
+    bool            ble_visible_override;  // force undirected BLE adv even when bonded
 } settings_t;
 
 // Hardcoded fallback values. Used when NVS is empty or unreadable.

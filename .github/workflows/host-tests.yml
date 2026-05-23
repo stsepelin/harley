@@ -44,6 +44,7 @@ jobs:
                '*/firmware/main/phone/phone_protocol.c' \
                '*/firmware/main/settings/settings.c' \
                '*/firmware/main/vehicle/vehicle_data.c' \
+               '*/firmware/main/ble/ble_visibility.c' \
                --output-file coverage.tested.info \
                --rc branch_coverage=1
           lcov --list coverage.tested.info --rc branch_coverage=1

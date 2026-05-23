@@ -89,6 +89,7 @@ Today that's:
 | `main/phone/phone_protocol.c` | Binary TLV parser for the companion-app BLE wire format |
 | `main/settings/settings.c` | Defaults + validate for the persisted prefs struct |
 | `main/vehicle/vehicle_data.c` | Mutex-guarded latest-value store. Tested with a FreeRTOS stub. |
+| `main/ble/ble_visibility.c` | Pure decision: `(has_bond, override) → adv_mode`. Stage 8. |
 
 ### Behaviour-checked but not coverage-measured
 

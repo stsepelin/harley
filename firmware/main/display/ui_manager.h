@@ -13,3 +13,8 @@ void ui_manager_show_ride(void);
 // Switch to the settings screen. Lazy-creates on first call. Assumes
 // the LVGL lock is already held.
 void ui_manager_show_settings(void);
+
+// Switch to the Bluetooth sub-page of the settings screen. Lazy-creates
+// on first call. BACK on that screen returns to the main settings
+// screen. Assumes the LVGL lock is already held.
+void ui_manager_show_settings_bluetooth(void);

@@ -5,6 +5,7 @@
 #include "poi_alert.h"
 #include "screen_ride.h"
 #include "screen_settings.h"
+#include "screen_settings_bluetooth.h"
 #include "settings_store.h"
 #include "sound.h"
 #include "vehicle_data.h"
@@ -19,9 +20,10 @@
 // widgets stay current because the update task keeps feeding them even
 // when they're not visible (their internal caches mean the work is
 // near-zero in that case).
-static lv_obj_t *s_ride        = NULL;
-static lv_obj_t *s_settings    = NULL;
-static bool      s_ui_started   = false;
+static lv_obj_t *s_ride          = NULL;
+static lv_obj_t *s_settings      = NULL;
+static lv_obj_t *s_settings_bt   = NULL;
+static bool      s_ui_started    = false;
 static bool      s_event_started = false;
 
 #define EVENT_POLL_MS   10        // 100 Hz event polling
@@ -145,6 +147,13 @@ void ui_manager_show_settings(void)
 {
     if (!s_settings) s_settings = screen_settings_create();
     lv_screen_load(s_settings);
+}
+
+void ui_manager_show_settings_bluetooth(void)
+{
+    if (!s_settings_bt)
+        s_settings_bt = screen_settings_bluetooth_create();
+    lv_screen_load(s_settings_bt);
 }
 
 void ui_manager_init(void)

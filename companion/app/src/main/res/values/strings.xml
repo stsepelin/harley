@@ -21,4 +21,7 @@
     <string name="ble_state_disconnected">Disconnected</string>
     <string name="ble_perms_missing">Bluetooth + notification permissions needed</string>
     <string name="grant_ble_perms">Grant Bluetooth permissions</string>
+    <string name="paired_clusters_label">Paired with this phone</string>
+    <string name="forget_paired_cluster">Forget %1$s</string>
+    <string name="forget_paired_cluster_hint">Removes the phone-side bond. Use this if the cluster forgot you but the phone still has it paired.</string>
 </resources>

@@ -41,6 +41,7 @@ add_library(vrod_pure STATIC
     ${MAIN_DIR}/poi/poi_math.c
     ${MAIN_DIR}/poi/poi_db.c
     ${MAIN_DIR}/poi/poi_alert.c
+    ${MAIN_DIR}/ble/ble_visibility.c
     external/freertos_stub/freertos_stub.c
     external/lvgl_tick_stub/lv_tick_stub.c
 )
@@ -53,6 +54,7 @@ target_include_directories(vrod_pure PUBLIC
     ${MAIN_DIR}/vehicle
     ${MAIN_DIR}/poi
     ${MAIN_DIR}/gps
+    ${MAIN_DIR}/ble
     external/freertos_stub
     external/lvgl_tick_stub
 )
@@ -107,6 +109,7 @@ add_unit_test(test_gesture)
 add_unit_test(test_gps_format)
 add_unit_test(test_poi_index)
 add_unit_test(test_alert_engine)
+add_unit_test(test_ble_visibility)
 
 # Widget cache-regression tests link against the LVGL stub.
 function(add_widget_test name)

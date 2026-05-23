@@ -25,11 +25,13 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
+import android.bluetooth.BluetoothDevice
 import com.vrodcluster.companion.R
 import com.vrodcluster.companion.ble.BleAccess
 import com.vrodcluster.companion.ble.BleConnState
 import com.vrodcluster.companion.ble.BleService
 import com.vrodcluster.companion.ble.BleState
+import com.vrodcluster.companion.ble.BondedClusters
 import com.vrodcluster.companion.notif.AllowList
 import com.vrodcluster.companion.notif.NotifAccess
 
@@ -45,12 +47,22 @@ fun StatusScreen(onConfigureApps: () -> Unit) {
     var notifGranted by remember { mutableStateOf(NotifAccess.isGranted(context)) }
     var mutedCount   by remember { mutableStateOf(AllowList.blocked(context).size) }
     var blePerms     by remember { mutableStateOf(BleAccess.allGranted(context)) }
+    // Re-list on resume. The phone-side bond state can change via
+    // Android system events (e.g. user unpaired from Settings, or our
+    // own removeBond completed asynchronously), and there's no Compose
+    // observable for it; resume is the natural refresh point.
+    var bondedClusters by remember {
+        mutableStateOf<List<BluetoothDevice>>(
+            if (BleAccess.allGranted(context)) BondedClusters.list(context) else emptyList()
+        )
+    }
     DisposableEffect(owner) {
         val observer = LifecycleEventObserver { _, event ->
             if (event == Lifecycle.Event.ON_RESUME) {
-                notifGranted = NotifAccess.isGranted(context)
-                mutedCount   = AllowList.blocked(context).size
-                blePerms     = BleAccess.allGranted(context)
+                notifGranted   = NotifAccess.isGranted(context)
+                mutedCount     = AllowList.blocked(context).size
+                blePerms       = BleAccess.allGranted(context)
+                bondedClusters = if (blePerms) BondedClusters.list(context) else emptyList()
             }
         }
         owner.lifecycle.addObserver(observer)
@@ -116,6 +128,41 @@ fun StatusScreen(onConfigureApps: () -> Unit) {
                         }
                         else -> Button(onClick = { BleService.stop(context) }) {
                             Text(stringResource(R.string.disconnect_cluster))
+                        }
+                    }
+
+                    // Paired-cluster forget panel. Only renders when the
+                    // phone actually has bonds for cluster-shaped devices,
+                    // so the steady-state UI stays uncluttered. Useful
+                    // when the cluster's NVS got wiped but the phone
+                    // still has the bond (Samsung's BT settings hides
+                    // the cluster in that state, so this is the only
+                    // way to recover without diving into developer
+                    // options).
+                    if (bondedClusters.isNotEmpty()) {
+                        Text(
+                            stringResource(R.string.paired_clusters_label),
+                            style = MaterialTheme.typography.bodyMedium,
+                        )
+                        Text(
+                            stringResource(R.string.forget_paired_cluster_hint),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                        bondedClusters.forEach { dev ->
+                            val label = dev.name ?: dev.address
+                            Button(onClick = {
+                                BondedClusters.forget(dev)
+                                // Optimistic: drop it from the list right
+                                // away. The system broadcasts ACTION_BOND_STATE_CHANGED
+                                // asynchronously, but we'd need a receiver
+                                // for it; resume-refresh covers the
+                                // common case where the user backgrounds
+                                // and returns.
+                                bondedClusters = bondedClusters - dev
+                            }) {
+                                Text(stringResource(R.string.forget_paired_cluster, label))
+                            }
                         }
                     }
                 }

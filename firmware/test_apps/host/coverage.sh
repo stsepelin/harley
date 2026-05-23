@@ -44,6 +44,7 @@ SCOPED=(
     '*/main/phone/phone_protocol.c'
     '*/main/settings/settings.c'
     '*/main/vehicle/vehicle_data.c'
+    '*/main/ble/ble_visibility.c'
 )
 
 BUILD_DIR=build-cov

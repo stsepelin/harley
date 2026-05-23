@@ -57,3 +57,14 @@ void ble_peripheral_pair_respond(bool accept);
 // Clear every stored bond from NVS. The next connect from any phone
 // re-triggers the pairing flow. Safe to call from any task.
 void ble_peripheral_forget_all_bonds(void);
+
+// --- Visibility (stage 8) -------------------------------------------------
+
+// Re-apply the (bond, visible_override) → advertising-mode decision and
+// restart advertising. Called by the settings screen after toggling the
+// BT_VISIBILITY row, so a flag-change takes effect immediately without
+// waiting for the next disconnect. The override flag itself is read
+// from settings_store_current(); this function only triggers the
+// re-evaluation. Safe to call from any task; no-op while a central is
+// connected (the new mode picks up at the next disconnect).
+void ble_peripheral_refresh_visibility(void);

@@ -9,6 +9,9 @@ static void test_defaults_known_values(void)
     TEST_ASSERT_EQUAL_UINT8(60,        s.brightness);
     TEST_ASSERT_TRUE       (           s.sound_enabled);
     TEST_ASSERT_EQUAL_UINT8(70,        s.volume);
+    // Default is "invisible to strangers once bonded" — directed
+    // advertising is the safer steady state. The override is opt-in.
+    TEST_ASSERT_FALSE(s.ble_visible_override);
 }
 
 static void test_validate_passes_valid_values(void)

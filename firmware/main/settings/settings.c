@@ -2,10 +2,11 @@
 
 void settings_default(settings_t *out)
 {
-    out->units         = UNITS_KPH;
-    out->brightness    = 60;
-    out->sound_enabled = true;
-    out->volume        = 70;
+    out->units                = UNITS_KPH;
+    out->brightness           = 60;
+    out->sound_enabled        = true;
+    out->volume               = 70;
+    out->ble_visible_override = false;
 }
 
 void settings_validate(settings_t *out)
