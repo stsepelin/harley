@@ -335,9 +335,13 @@ J1850 VPW uses CRC-8 with polynomial 0x1D. Implement in firmware or use existing
 - 30 FPS rendering with skip-if-unchanged caches; sim/UI core-pinned
 - See `firmware/docs/01-PHASE2-DISPLAY-PLAN.md` "Outcome" for the full delta
 
-### Phase 2.5: Off-bike feature work — ⏳ next
-While J1850 + GPS hardware ships, work the features that need only the
-board we already have (Waveshare ESP32-P4 with onboard ESP32-C6 BLE/WiFi).
+### Phase 2.5: Off-bike feature work — ✅ complete
+Filled the bench time while J1850 + GPS hardware shipped; everything below
+landed on the board we already had (Waveshare ESP32-P4 with onboard
+ESP32-C6 BLE/WiFi). Capped off with the BMW-style gauge redesign and a
+CI-enforced 100% line/branch coverage gate over all host-testable firmware
+code. Loose ends carried forward are listed at the bottom of
+`02-PHASE2.5-OFFBIKE-PLAN.md`.
 
 - Touch + screen-switching framework (GT911 → LVGL indev, screen
   manager swapping ride / settings)
@@ -351,7 +355,7 @@ board we already have (Waveshare ESP32-P4 with onboard ESP32-C6 BLE/WiFi).
 
 See `02-PHASE2.5-OFFBIKE-PLAN.md` for the full plan + ordering.
 
-### Phase 3: IM Simulation + GPS (Weekends 5-6) — ⏳ blocked on hardware
+### Phase 3: IM Simulation + GPS (Weekends 5-6) — ⏳ next (parts arrived June 2026)
 - Program IM message replay via IRLZ44N TX
 - Test: disconnect stock cluster, verify no U1255
 - Wire NEO-6M/M8N to P4 UART

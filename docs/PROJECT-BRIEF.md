@@ -11,7 +11,7 @@ Custom digital instrument cluster replacement for a **2009 Harley-Davidson VRSCF
 ## Hardware Status
 
 - ✅ **Display board acquired and working** — Waveshare ESP32-P4-WIFI6-Touch-LCD-3.4C
-- 🛒 **Parts on order from AliExpress** (~€230 total): GPS module (NEO-6M/M8N), IRLZ44N MOSFETs, 2N2222 transistors, zener diodes, resistor kit, prototyping supplies, T-tap connectors, GT 12-pin connector, buck converter, etc.
+- ✅ **Parts arrived** (June 2026, ~€230 from AliExpress): GPS module (NEO-6M/M8N), IRLZ44N MOSFETs, 2N2222 transistors, zener diodes, resistor kit, prototyping supplies, T-tap connectors, GT 12-pin connector, buck converter, etc. — Phase 3 is unblocked.
 - 🔧 **Local items needed**: Conformal coating spray, junction box
 
 ## Development Environment
@@ -20,7 +20,7 @@ Custom digital instrument cluster replacement for a **2009 Harley-Davidson VRSCF
 - **Editor**: Zed
 - **Framework**: ESP-IDF v6.0.1 (with patched Waveshare BSP — `esp_lvgl_adapter ^0.4`)
 - **Target chip**: esp32p4
-- **Project root**: `/Users/stsepelin/Workspace/My Projects/harley/cluster`
+- **Project root**: `/Users/stsepelin/Workspace/My Projects/harley` (firmware in `firmware/`, Android app in `companion/`)
 
 ## Repository Structure
 
@@ -67,33 +67,46 @@ harley/
 ## Current status
 
 - ✅ **Phase 2 — Display & Gauge UI** complete (see `firmware/docs/01-PHASE2-DISPLAY-PLAN.md`).
-- ⏳ **Phase 2.5 — Off-bike feature work** in progress (see
-  `02-PHASE2.5-OFFBIKE-PLAN.md`): touch + screen switching, settings,
-  units toggle, BLE, speed-camera framework. All possible on the
-  board we already have while J1850 + GPS hardware ships.
-- 🟡 **Phase 3 — J1850 bus + IM simulation + GPS** blocked on parts.
+- ✅ **Phase 2.5 — Off-bike feature work** complete (see
+  `02-PHASE2.5-OFFBIKE-PLAN.md`): touch + screen switching, settings +
+  units toggle, Android BLE phone integration with SC bonding +
+  directed advertising, host notification emulator, speed-camera
+  framework, no-sim build flag — plus the BMW-style gauge redesign
+  and the 100% host-test coverage gate. Loose ends (media TX buttons,
+  companion auto-reconnect, Stage 8 E2E record, iOS decision) are
+  listed at the bottom of the phase plan.
+- ⏳ **Phase 3 — J1850 bus + IM simulation + GPS** is next: the parts
+  arrived (June 2026).
 
-Phase 2 deliverable summary: working 800×800 round gauge running off a
-synthetic driving cycle. Includes tach (270° glow arc, redline split,
-zoom-on-cursor labels, baked Gaussian cursor sprite, shift-light flash
-at >9000 RPM), speed display, gear indicator, fuel bar, temperature,
-turn signals + hazard, 7 warning lamps in two chevrons (oil, engine,
-ABS, battery, immobiliser, low + high beam — beam slot rotates),
-clock + odometer + dual trip counters cycling in a shared slot, and
-an embedded GIF boot animation (LVGL's AnimatedGIF decoder; PPA HW
-accel was tried and dropped — caused banding on this BSP).
-Same widget code drives a desktop SDL2 simulator under
-`firmware/simulator/` for iteration without flashing.
+Phase 2 deliverable summary (as redesigned at the end of Phase 2.5,
+BMW-EfficientDynamics styling): working 800×800 round gauge running
+off a synthetic driving cycle. Includes tach (270° scale with inner
+shadow bezel, capsule ticks, two-segment rounded redline, zoom +
+colour-coupled labels 2/4/6/8/10 + OFF, baked Gaussian cursor sprite,
+shift-light blink via the gear digit at >9000 RPM), speed display
+(three digit slots, pegs at 999), gear selector with baked outline
+(orange N), fuel arc (solid fill band, red when low, white section
+majors), temperature, turn signals + hazard, 7 warning lamps in two
+chevrons (oil, engine, ABS, battery, immobiliser, low + high beam —
+beam slot rotates), clock + odometer + dual trip counters cycling in
+a shared slot, and an embedded GIF boot animation (LVGL's AnimatedGIF
+decoder; PPA HW accel was tried and dropped — caused banding on this
+BSP). Everything visual is pre-baked into ARGB sprites (see
+`firmware/docs/DISPLAY-PERF-AND-MEMORY.md`); the same widget code
+drives a desktop SDL2 simulator under `firmware/simulator/` for
+iteration without flashing.
 
-### Immediate next step: Phase 2.5 — Stage 1
+### Immediate next step: Phase 3 — J1850 + GPS bring-up
 
-Touch + screen-switching infrastructure. Foundation for the settings
-screen / units toggle / BLE call overlay everything else in Phase 2.5
-hangs on. See `02-PHASE2.5-OFFBIKE-PLAN.md` for the full plan.
-
-Phase 3 (J1850 + GPS) takes over the moment hardware lands; the
-data-abstraction layer (`vehicle_data_t`) means a sim → bus swap
-won't touch the UI.
+Parts are in hand. Order of attack per the master plan: build the
+IRLZ44N/2N2222 transceiver on a breadboard → passive J1850 sniff
+through the proxy-box T-taps (bike keeps its stock cluster) → decode
+against the HarleyDroid table → IM message replay (verify no U1255 /
+TSSM lockout) → wire the NEO-6M to a P4 UART and parse NMEA into
+`gps_source_t`. The consumer side is already built and host-tested:
+`vehicle_data_t` means the sim → bus swap won't touch the UI, and the
+speed-camera alert engine from Phase 2.5 Stage 7 is waiting on real
+GPS fixes.
 
 ## Design Decisions Already Made
 
@@ -143,5 +156,6 @@ When starting a new Claude Code session, the repo's `CLAUDE.md` is read
 automatically — it has the always-true conventions. For project history
 and roadmap context, point at this file plus `00-MASTER-PROJECT-PLAN.md`.
 
-If you're picking up after Phase 2 (current state), the next-step is
-**Phase 3 (J1850 bus + IM simulation + GPS)** — see the master plan.
+If you're picking up at the current state (Phase 2.5 complete, parts
+in hand), the next step is **Phase 3 (J1850 bus + IM simulation +
+GPS)** — see the master plan.

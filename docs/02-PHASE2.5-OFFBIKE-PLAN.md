@@ -1,11 +1,13 @@
 # Phase 2.5: Off-bike Feature Work
 
-> **Status: ⏳ in progress**
+> **Status: ✅ complete** (June 2026 — all 8 stages landed; loose ends
+> carried forward are listed at the bottom of this file)
 >
 > Inserted between Phase 2 (gauge UI, complete) and Phase 3 (J1850 + GPS,
-> blocked on parts) to keep the project moving while hardware ships. All
-> work in this phase runs on the Waveshare ESP32-P4 board we already
-> have — no bike harness, no GPS module needed.
+> which was blocked on parts) to keep the project moving while hardware
+> shipped. All work in this phase ran on the Waveshare ESP32-P4 board we
+> already had — no bike harness, no GPS module needed. The parts have
+> since arrived; Phase 3 is the active phase.
 
 ## Goal
 
@@ -488,6 +490,23 @@ shippable without waiting on parts.
 5. **Stage 4** — host-side notif emulator ✅
 6. **Stage 5** — BLE pairing + bonding ✅
 7. **Stage 7** — speed-camera framework off-bike portion ✅
-8. **Stage 8** — BLE visibility hardening (~half a day, small —
-   directed advertising + a settings toggle; closes the discovery
-   path Stage 5 left open).
+8. **Stage 8** — BLE visibility hardening ✅
+
+## Loose ends carried forward
+
+Small items left open when the phase closed; none block Phase 3.
+
+- **Cluster → phone media TX** — the media banner's prev/play/next
+  buttons encode nothing yet (`access_tx_cb` is flagged pending and
+  the companion has no command handler). Cluster-side TLV encode +
+  a `MediaSessionManager` dispatch in the companion.
+- **Companion auto-reconnect-on-advert** — after a cluster power
+  cycle the rider must tap "Connect cluster". On the bike that's
+  every ignition cycle; wire `BleService` to rescan/reconnect when
+  the bonded peer's directed advertising reappears.
+- **Stage 8 end-to-end verification record** — the 4-step
+  directed-advertising checklist (fresh pair → power-cycle
+  invisibility → visibility toggle for a second phone → forget-all)
+  has not been formally run through on hardware and written down.
+- **iOS scope decision** — still open; the plan's recommendation is
+  Option A (defer ANCS/AMS to Phase 4, Stage 3 stays Android-only).
