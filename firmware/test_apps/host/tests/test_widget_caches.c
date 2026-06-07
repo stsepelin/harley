@@ -332,6 +332,20 @@ static void test_fuel_cache_clamps_overrange(void)
     TEST_ASSERT_EQUAL_INT(0, g_lv_obj_invalidate_calls);
 }
 
+// Low fuel actually bakes the red band (caught by the CI gate: every other
+// test uses level >= 3, so the red arm of the fill colour never ran), and
+// critically-low turns the pump icon red.
+static void test_fuel_low_level_renders_red(void)
+{
+    lv_obj_t *w = fuel_arc_create(NULL);
+    fuel_arc_set_level(w, 4);
+    lv_stub_reset();
+    fuel_arc_set_level(w, 2);  // low: band rebakes red
+    TEST_ASSERT_EQUAL_INT(1, g_lv_obj_invalidate_calls);
+    fuel_arc_set_level(w, 1);  // critically low: icon follows
+    TEST_ASSERT_EQUAL_HEX32(VROD_RED_BRIGHT, g_lv_last_text_color);
+}
+
 // Strip-buffer allocation failure: the widget must degrade to icon-only
 // (no bake, no invalidate) instead of crashing.
 static void test_fuel_alloc_fail_degrades(void)
@@ -992,6 +1006,7 @@ void RunTests(void)
     RUN_TEST(test_fuel_cache_skips_unchanged);
     RUN_TEST(test_fuel_cache_fires_on_change);
     RUN_TEST(test_fuel_cache_clamps_overrange);
+    RUN_TEST(test_fuel_low_level_renders_red);
     RUN_TEST(test_fuel_alloc_fail_degrades);
     RUN_TEST(test_notif_banner_inactive_is_quiet);
     RUN_TEST(test_notif_banner_cache_skips_unchanged);
