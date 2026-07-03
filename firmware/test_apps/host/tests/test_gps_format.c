@@ -84,6 +84,16 @@ static void test_bearing_returns_zero_for_coincident_points(void)
     TEST_ASSERT_EQUAL_UINT16(0, b);
 }
 
+static void test_bearing_wraps_just_west_of_north_to_zero(void)
+{
+    // A target a hair west of due north: dlon = -1 in 1e-7° units over a
+    // 45° latitude span. atan2f yields a tiny negative angle, +360 rounds
+    // to exactly 360.0f in float — the >=360 clamp must wrap it back so
+    // the "0..359" contract holds.
+    uint16_t b = poi_math_bearing_deg(0, 0, 450000000, -1);
+    TEST_ASSERT_EQUAL_UINT16(0, b);
+}
+
 static void test_heading_delta_basic(void)
 {
     TEST_ASSERT_EQUAL_INT16(  0, poi_math_heading_delta(  0,   0));
@@ -116,6 +126,7 @@ void RunTests(void)
     RUN_TEST(test_bearing_south_due_south);
     RUN_TEST(test_bearing_west_due_west);
     RUN_TEST(test_bearing_returns_zero_for_coincident_points);
+    RUN_TEST(test_bearing_wraps_just_west_of_north_to_zero);
     RUN_TEST(test_heading_delta_basic);
     RUN_TEST(test_heading_delta_wraps_around_north);
 }

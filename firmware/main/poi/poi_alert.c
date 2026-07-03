@@ -33,7 +33,8 @@ void poi_alert_tick(const gps_source_t *gps)
     // If we already have an active alert, check whether we should keep
     // it (still close) or dismiss it (we've passed). Reading distance
     // directly here is cheaper than a full query when the alert is hot.
-    if (s_alert.active && s_alert.cam) {
+    // (cam is always non-NULL while active — both are set together below.)
+    if (s_alert.active) {
         uint32_t d = poi_math_distance_m(gps->lat_e7, gps->lon_e7,
                                             s_alert.cam->lat_e7,
                                             s_alert.cam->lon_e7);

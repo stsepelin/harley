@@ -20,7 +20,7 @@ bool poi_db_open(poi_db_t *db, const uint8_t *buf, size_t len)
 static size_t insert_sorted(poi_hit_t *out, size_t count, size_t cap,
                             const poi_hit_t *hit)
 {
-    if (cap == 0) return 0;
+    // cap >= 1 guaranteed: poi_db_query rejects out_cap == 0 up front.
     // Find the position where this hit's distance fits.
     size_t pos = count;
     while (pos > 0 && out[pos - 1].distance_m > hit->distance_m) pos--;

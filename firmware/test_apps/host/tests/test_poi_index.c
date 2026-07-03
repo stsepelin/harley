@@ -143,6 +143,75 @@ static void test_query_filters_by_camera_facing_direction(void)
     TEST_ASSERT_EQUAL_size_t(1, n);
 }
 
+static void test_open_rejects_null_db_and_validates_null_buffer(void)
+{
+    // NULL db → false, no crash.
+    TEST_ASSERT_FALSE(poi_db_open(NULL, (const uint8_t *)cardinal_cams, sizeof(cardinal_cams)));
+
+    // NULL buffer is a valid *empty* db only when len is 0.
+    poi_db_t db;
+    TEST_ASSERT_TRUE(poi_db_open(&db, NULL, 0));
+    TEST_ASSERT_EQUAL_size_t(0, db.count);
+    TEST_ASSERT_FALSE(poi_db_open(&db, NULL, 12));
+}
+
+static void test_query_rejects_degenerate_arguments(void)
+{
+    poi_db_t db;
+    poi_db_open(&db, (const uint8_t *)cardinal_cams, sizeof(cardinal_cams));
+    poi_hit_t hit;
+
+    TEST_ASSERT_EQUAL_size_t(0, poi_db_query(NULL, TALLINN_LAT, TALLINN_LON, 0, 1500, 45, &hit, 1));
+    TEST_ASSERT_EQUAL_size_t(0, poi_db_query(&db, TALLINN_LAT, TALLINN_LON, 0, 1500, 45, NULL, 1));
+    TEST_ASSERT_EQUAL_size_t(0, poi_db_query(&db, TALLINN_LAT, TALLINN_LON, 0, 1500, 45, &hit, 0));
+
+    // An opened-but-empty db (NULL buffer, len 0) never matches.
+    poi_db_t empty;
+    poi_db_open(&empty, NULL, 0);
+    TEST_ASSERT_EQUAL_size_t(0,
+                             poi_db_query(&empty, TALLINN_LAT, TALLINN_LON, 0, 1500, 45, &hit, 1));
+
+    // Non-NULL buffer with len 0 → records set, count 0 — also no match.
+    poi_db_t zero;
+    poi_db_open(&zero, (const uint8_t *)cardinal_cams, 0);
+    TEST_ASSERT_EQUAL_size_t(0,
+                             poi_db_query(&zero, TALLINN_LAT, TALLINN_LON, 0, 1500, 45, &hit, 1));
+}
+
+static void test_query_full_bucket_drops_farther_hit(void)
+{
+    // out_cap = 1 with the NEAR camera first in the array: the far
+    // camera arrives at insert_sorted with the bucket already holding a
+    // closer hit — it must be dropped, not shifted in.
+    poi_record_t cams[2] = {
+        {TALLINN_LAT + 18000, TALLINN_LON, POI_KIND_SPEED, 50, 0xFFFF},  // near
+        {TALLINN_LAT + 90000, TALLINN_LON, POI_KIND_SPEED, 50, 0xFFFF},  // far
+    };
+    poi_db_t db;
+    poi_db_open(&db, (const uint8_t *)cams, sizeof(cams));
+
+    poi_hit_t hit;
+    size_t    n = poi_db_query(&db, TALLINN_LAT, TALLINN_LON, 0, 1500, 45, &hit, 1);
+    TEST_ASSERT_EQUAL_size_t(1, n);
+    TEST_ASSERT_EQUAL_PTR(&cams[0], hit.cam);
+}
+
+static void test_query_directional_camera_facing_left_of_rider(void)
+{
+    // Camera ahead of a northbound rider but facing 300° — the facing
+    // delta is -60°, past the ±45° tolerance on the *negative* side
+    // (the mirror of the east-facing case above) → no hit.
+    poi_record_t cam_facing_wnw = {TALLINN_LAT + 18000, TALLINN_LON, POI_KIND_SPEED, 50,
+                                   /*heading=*/300};
+    poi_db_t     db;
+    poi_db_open(&db, (const uint8_t *)&cam_facing_wnw, sizeof(cam_facing_wnw));
+
+    poi_hit_t hit;
+    size_t    n = poi_db_query(&db, TALLINN_LAT, TALLINN_LON,
+                               /*heading=*/0, 1500, 45, &hit, 1);
+    TEST_ASSERT_EQUAL_size_t(0, n);
+}
+
 static void test_query_omnidirectional_camera_matches_any_heading(void)
 {
     // heading_deg == 0xFFFF means "catches both directions" (red-light
@@ -169,5 +238,9 @@ void RunTests(void)
     RUN_TEST(test_query_sorted_by_distance_ascending);
     RUN_TEST(test_query_respects_out_cap);
     RUN_TEST(test_query_filters_by_camera_facing_direction);
+    RUN_TEST(test_open_rejects_null_db_and_validates_null_buffer);
+    RUN_TEST(test_query_rejects_degenerate_arguments);
+    RUN_TEST(test_query_full_bucket_drops_farther_hit);
+    RUN_TEST(test_query_directional_camera_facing_left_of_rider);
     RUN_TEST(test_query_omnidirectional_camera_matches_any_heading);
 }

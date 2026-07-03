@@ -25,9 +25,10 @@ uint32_t poi_math_distance_m(int32_t lat_a_e7, int32_t lon_a_e7,
     float dlon_rad   = (float)(lon_b_e7 - lon_a_e7) * DEG_PER_E7 * DEG_TO_RAD;
     float x          = dlon_rad * cosf(mean_lat);
     float y          = dlat_rad;
-    float d          = EARTH_RADIUS_M * sqrtf(x * x + y * y);
-    if (d < 0.0f) d = 0.0f;
-    if (d > (float)UINT32_MAX) d = (float)UINT32_MAX;
+    // No clamps needed: sqrt is non-negative, and even absurd int32
+    // coordinates (±214°) cap the result at ~7e7 m — far below
+    // UINT32_MAX, so the cast can't overflow.
+    float d = EARTH_RADIUS_M * sqrtf(x * x + y * y);
     return (uint32_t)(d + 0.5f);
 }
 

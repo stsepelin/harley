@@ -152,6 +152,83 @@ static void test_alert_switches_to_closer_camera_when_two_are_in_range(void)
     TEST_ASSERT_EQUAL_PTR(&two_cams[1], a.cam);   // the closer record
 }
 
+static void test_tick_ignores_null_db_and_null_gps(void)
+{
+    // Before init (or init'd against NULL) a tick must be a no-op.
+    poi_alert_init(NULL);
+    gps_source_t g = make_fix(TALLINN_LAT, TALLINN_LON, 0);
+    poi_alert_tick(&g);
+
+    poi_alert_t a;
+    poi_alert_get(&a);
+    TEST_ASSERT_FALSE(a.active);
+
+    // NULL gps sample with a live db: also a no-op, state untouched.
+    poi_db_t db = open_single_cam_db();
+    poi_alert_init(&db);
+    poi_alert_tick(NULL);
+    poi_alert_get(&a);
+    TEST_ASSERT_FALSE(a.active);
+}
+
+static void test_get_tolerates_null_out(void)
+{
+    poi_alert_get(NULL);  // must not crash
+}
+
+static void test_active_alert_distance_updates_on_approach(void)
+{
+    poi_db_t db = open_single_cam_db();
+    poi_alert_init(&db);
+
+    // 300 m out → alert latches.
+    gps_source_t far_fix = make_fix(TALLINN_LAT - 9000, TALLINN_LON, 0);
+    poi_alert_tick(&far_fix);
+    poi_alert_t a;
+    poi_alert_get(&a);
+    TEST_ASSERT_TRUE(a.active);
+    uint32_t d_far = a.distance_m;
+
+    // Same camera still the closest hit next tick — the alert must stay
+    // latched on it and only the distance may change.
+    gps_source_t near_fix = make_fix(TALLINN_LAT + 9000, TALLINN_LON, 0);
+    poi_alert_tick(&near_fix);
+    poi_alert_get(&a);
+    TEST_ASSERT_TRUE(a.active);
+    TEST_ASSERT_EQUAL_PTR(&SINGLE_CAM[0], a.cam);
+    TEST_ASSERT_TRUE(a.distance_m < d_far);
+    TEST_ASSERT_UINT32_WITHIN(20, 100, a.distance_m);
+}
+
+static void test_active_alert_replaced_by_closer_different_camera(void)
+{
+    // Two cameras north of the start point: A at ~200 m, B at ~400 m.
+    static const poi_record_t gauntlet[] = {
+        {TALLINN_LAT + 18000, TALLINN_LON, POI_KIND_SPEED, 50, 0xFFFF},  // A
+        {TALLINN_LAT + 36000, TALLINN_LON, POI_KIND_SPEED, 50, 0xFFFF},  // B
+    };
+    poi_db_t db;
+    poi_db_open(&db, (const uint8_t *)gauntlet, sizeof(gauntlet));
+    poi_alert_init(&db);
+
+    // From the start, A is the closest in-cone hit.
+    gps_source_t at_start = make_fix(TALLINN_LAT, TALLINN_LON, 0);
+    poi_alert_tick(&at_start);
+    poi_alert_t a;
+    poi_alert_get(&a);
+    TEST_ASSERT_TRUE(a.active);
+    TEST_ASSERT_EQUAL_PTR(&gauntlet[0], a.cam);
+
+    // Rider now just past A (~250 m in): A is behind (out of cone) but
+    // within the hysteresis hold; B is dead ahead and in-cone. The
+    // active alert must switch to B while A's hold is still live.
+    gps_source_t past_a = make_fix(TALLINN_LAT + 22500, TALLINN_LON, 0);
+    poi_alert_tick(&past_a);
+    poi_alert_get(&a);
+    TEST_ASSERT_TRUE(a.active);
+    TEST_ASSERT_EQUAL_PTR(&gauntlet[1], a.cam);
+}
+
 void RunTests(void)
 {
     RUN_TEST(test_no_alert_without_fix);
@@ -160,4 +237,8 @@ void RunTests(void)
     RUN_TEST(test_alert_fires_on_approach);
     RUN_TEST(test_alert_dismisses_after_passing_with_hysteresis);
     RUN_TEST(test_alert_switches_to_closer_camera_when_two_are_in_range);
+    RUN_TEST(test_tick_ignores_null_db_and_null_gps);
+    RUN_TEST(test_get_tolerates_null_out);
+    RUN_TEST(test_active_alert_distance_updates_on_approach);
+    RUN_TEST(test_active_alert_replaced_by_closer_different_camera);
 }
