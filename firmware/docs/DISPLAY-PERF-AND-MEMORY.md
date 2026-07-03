@@ -74,6 +74,16 @@ creation (`vApplicationGet{Idle,Timer}TaskMemory ... pxStackBufferTemp != NULL`)
 or any unchecked `malloc` fails and the device crash-loops. PSRAM is the
 opposite — ~15 MB+ free. Watch internal RAM, not PSRAM.
 
+One more constraint discovered in Phase 3 (July 2026): on rev<v3
+silicon the ~274 KB of SRAM above 0x4ff3afc0 joins the heap only after
+both CPUs are scheduling — **before that, every task stack fights for
+a ~151 KB pool** (RETENT_RAM+RTCRAM+TCM). esp_hosted's WiFi-sized SDIO
+queues used to eat ~88 KB of it, leaving ~2 KB of boot margin; that is
+why "one more component" (esp_adc) tipped the boot into an assert
+loop. Fixed by `CONFIG_ESP_HOSTED_SDIO_TX/RX_Q_SIZE=6` (BLE HCI needs
+nothing more). Regression canary: `CONFIG_VROD_ADC_REPRO`. Full story
+in `ble-bringup-bisect.md`.
+
 Internal-RAM levers (and their cost):
 - `CONFIG_LV_DRAW_SW_DRAW_UNIT_CNT=1` (not 2). Each SW draw thread reserves a
   **32 KB internal** stack (FreeType needs ≥32 KB). One unit frees ~32 KB; with

@@ -43,6 +43,7 @@ add_library(vrod_pure STATIC
     ${MAIN_DIR}/poi/poi_db.c
     ${MAIN_DIR}/poi/poi_alert.c
     ${MAIN_DIR}/gps/nmea.c
+    ${MAIN_DIR}/j1850/j1850_vpw.c
     ${MAIN_DIR}/ble/ble_visibility.c
     external/freertos_stub/freertos_stub.c
     external/lvgl_tick_stub/lv_tick_stub.c
@@ -56,6 +57,7 @@ target_include_directories(vrod_pure PUBLIC
     ${MAIN_DIR}/vehicle
     ${MAIN_DIR}/poi
     ${MAIN_DIR}/gps
+    ${MAIN_DIR}/j1850
     ${MAIN_DIR}/ble
     external/freertos_stub
     external/lvgl_tick_stub
@@ -117,6 +119,7 @@ add_unit_test(test_phone_data)
 add_unit_test(test_gesture)
 add_unit_test(test_gps_format)
 add_unit_test(test_nmea)
+add_unit_test(test_j1850_vpw)
 add_unit_test(test_poi_index)
 add_unit_test(test_alert_engine)
 add_unit_test(test_ble_visibility)

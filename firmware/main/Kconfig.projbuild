@@ -81,6 +81,54 @@ menu "V-Rod cluster"
         help
             Factory default for both NEO-6M and NEO-M8N is 9600.
 
+    config VROD_ADC_REPRO
+        bool "esp_adc boot-crash repro instrumentation"
+        default n
+        help
+            Boot-margin regression canary. Forces esp_adc (and its
+            global constructor) into the link, probes heap integrity
+            before it runs, and dumps per-heap state + every block if
+            an allocation fails. The bug it was built for is fixed
+            (pre-scheduler heap margin on rev<v3 silicon — see the
+            addendum in docs/ble-bringup-bisect.md), but re-run this
+            after IDF/toolchain bumps or when adding boot-time
+            components. Use with sdkconfig.adc-repro in a separate
+            build dir. Never enable in a real build.
+
+    config VROD_PIN_WIGGLE_GPIO
+        int "Bench pin-wiggle test GPIO (-1 = off)"
+        range -1 54
+        default -1
+        help
+            Toggles the chosen GPIO between 0V and 3.3V every 2.5 s and
+            logs each transition, so a 40-pin-header hole can be matched
+            to a GPIO number with a DMM instead of by counting
+            silkscreen positions (see firmware/docs/PINS.md for the
+            header map and the pins that must never be probed hot).
+            -1 compiles the tool out entirely. Bench only — never leave
+            enabled in a bike build.
+
+    config VROD_J1850_SNIFFER
+        bool "J1850 passive sniffer (Phase 3 Stage 2 capture build)"
+        default n
+        help
+            Logs every J1850 VPW frame seen on the RX GPIO over serial:
+            hex bytes + CRC verdict + any in-frame response, plus a
+            10-second stats line (frames / bad CRC / pulse overruns).
+            Strictly read-only — this build has no TX path, so it
+            cannot disturb the bus or the stock cluster.
+
+            Capture with:  script -q capture.log idf.py -p PORT monitor
+            Off by default; only the bench capture build sets it.
+
+    config VROD_J1850_RX_GPIO
+        int "GPIO wired to the J1850 RX divider"
+        depends on VROD_J1850_SNIFFER
+        default 20
+        help
+            The 10k/4.7k divider node (bus 7V → ~2.2V). Set to the
+            header pin you actually wired.
+
     config VROD_BLE_INSECURE
         bool "Skip BLE pairing — any central can connect"
         default n

@@ -23,6 +23,15 @@
 #if CONFIG_VROD_GPS_UART
 #include "gps_uart.h"
 #endif
+#if CONFIG_VROD_J1850_SNIFFER
+#include "j1850_sniffer.h"
+#endif
+#if CONFIG_VROD_PIN_WIGGLE_GPIO >= 0
+#include "pin_wiggle.h"
+#endif
+#if CONFIG_VROD_ADC_REPRO
+void adc_repro_touch(void);
+#endif
 #include "settings_store.h"
 #include "sound.h"
 
@@ -83,6 +92,16 @@ void app_main(void)
 #endif
 #if CONFIG_VROD_GPS_UART
     gps_uart_start();
+#endif
+#if CONFIG_VROD_J1850_SNIFFER
+    // Log-only: coexists with the sim — it never writes vehicle_data.
+    j1850_sniffer_start();
+#endif
+#if CONFIG_VROD_PIN_WIGGLE_GPIO >= 0
+    pin_wiggle_start();
+#endif
+#if CONFIG_VROD_ADC_REPRO
+    adc_repro_touch();
 #endif
 #if CONFIG_VROD_DEMO_POI
     poi_db_open(&s_demo_db, (const uint8_t *)s_demo_poi, sizeof(s_demo_poi));

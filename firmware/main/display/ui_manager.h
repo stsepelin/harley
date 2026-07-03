@@ -18,3 +18,9 @@ void ui_manager_show_settings(void);
 // on first call. BACK on that screen returns to the main settings
 // screen. Assumes the LVGL lock is already held.
 void ui_manager_show_settings_bluetooth(void);
+
+#if CONFIG_VROD_J1850_SNIFFER
+// Bench diagnostics sub-page (sniffer builds only). Lazy-creates on
+// first call. Assumes the LVGL lock is already held.
+void ui_manager_show_bench(void);
+#endif

@@ -162,6 +162,14 @@ static void bluetooth_button_clicked_cb(lv_event_t *e)
     ui_manager_show_settings_bluetooth();
 }
 
+#if CONFIG_VROD_J1850_SNIFFER
+static void bench_button_clicked_cb(lv_event_t *e)
+{
+    (void)e;
+    ui_manager_show_bench();
+}
+#endif
+
 // --- back ----------------------------------------------------------------
 
 static void back_cb(lv_event_t *e)
@@ -236,11 +244,43 @@ lv_obj_t *screen_settings_create(void)
     // forget devices). Styled as a row to fit the rest of the screen
     // visually but with a right-edge chevron-style cue ("›") so it
     // reads as a navigable subpage rather than a value-toggle.
+    // On sniffer builds the row shares the line with a BENCH sub-page
+    // shortcut, so both stay inside the round display's safe area.
+#if CONFIG_VROD_J1850_SNIFFER
+    lv_obj_t *bt_row = lv_obj_create(scr);
+    lv_obj_set_size(bt_row, (ROW_W - 20) / 2, 80);
+    lv_obj_align(bt_row, LV_ALIGN_TOP_MID, -(ROW_W / 4 + 5), 525);
+    lv_obj_set_style_bg_color(bt_row, lv_color_hex(0x1A1A1A), 0);
+    lv_obj_set_style_border_color(bt_row, lv_color_hex(VROD_TEXT_DIM), 0);
+    lv_obj_set_style_border_width(bt_row, 1, 0);
+    lv_obj_set_style_radius(bt_row, 12, 0);
+    lv_obj_set_style_pad_all(bt_row, 14, 0);
+    lv_obj_remove_flag(bt_row, LV_OBJ_FLAG_SCROLLABLE);
+    lv_obj_add_flag(bt_row, LV_OBJ_FLAG_CLICKABLE);
+    lv_obj_add_event_cb(bt_row, bluetooth_button_clicked_cb, LV_EVENT_CLICKED, NULL);
+    make_caption(bt_row, "BT", LV_ALIGN_LEFT_MID, VROD_TEXT);
+    make_caption(bt_row, ">", LV_ALIGN_RIGHT_MID, VROD_ORANGE);
+
+    lv_obj_t *bench_row = lv_obj_create(scr);
+    lv_obj_set_size(bench_row, (ROW_W - 20) / 2, 80);
+    lv_obj_align(bench_row, LV_ALIGN_TOP_MID, ROW_W / 4 + 5, 525);
+    lv_obj_set_style_bg_color(bench_row, lv_color_hex(0x1A1A1A), 0);
+    lv_obj_set_style_border_color(bench_row, lv_color_hex(VROD_TEXT_DIM), 0);
+    lv_obj_set_style_border_width(bench_row, 1, 0);
+    lv_obj_set_style_radius(bench_row, 12, 0);
+    lv_obj_set_style_pad_all(bench_row, 14, 0);
+    lv_obj_remove_flag(bench_row, LV_OBJ_FLAG_SCROLLABLE);
+    lv_obj_add_flag(bench_row, LV_OBJ_FLAG_CLICKABLE);
+    lv_obj_add_event_cb(bench_row, bench_button_clicked_cb, LV_EVENT_CLICKED, NULL);
+    make_caption(bench_row, "BENCH", LV_ALIGN_LEFT_MID, VROD_TEXT);
+    make_caption(bench_row, ">", LV_ALIGN_RIGHT_MID, VROD_ORANGE);
+#else
     lv_obj_t *bt_row = make_row(scr, 80, 525);
     lv_obj_add_flag(bt_row, LV_OBJ_FLAG_CLICKABLE);
     lv_obj_add_event_cb(bt_row, bluetooth_button_clicked_cb, LV_EVENT_CLICKED, NULL);
     make_caption(bt_row, "BLUETOOTH", LV_ALIGN_LEFT_MID, VROD_TEXT);
     make_caption(bt_row, ">", LV_ALIGN_RIGHT_MID, VROD_ORANGE);
+#endif
 
     // BACK button — glove-friendly tap target.
     lv_obj_t *back = lv_button_create(scr);

@@ -60,14 +60,18 @@ idf_component_register(
         simulator
         gps
         poi
+        j1850
         display
         display/widgets
         display/fonts
     EMBED_FILES
         assets/boot.gif
         assets/emoji.ttf
+    # esp_adc linkage used to crash-loop this board (near-zero
+    # pre-scheduler heap margin on rev<v3 silicon — fixed by the SDIO
+    # queue sizing in sdkconfig.defaults; see ble-bringup-bisect.md).
     REQUIRES waveshare__esp32_p4_wifi6_touch_lcd_xc lvgl__lvgl nvs_flash
-             espressif__esp_codec_dev bt spi_flash esp_driver_uart
+             espressif__esp_codec_dev bt spi_flash esp_driver_uart esp_adc
     LDFRAGMENTS linker.lf
 )
 
@@ -90,6 +94,26 @@ if(CONFIG_VROD_GPS_UART)
     target_sources(${COMPONENT_LIB} PRIVATE
         gps/nmea.c
         gps/gps_uart.c
+    )
+endif()
+
+# Bench pin-identification tool — see docs/PINS.md.
+if(NOT CONFIG_VROD_PIN_WIGGLE_GPIO EQUAL -1)
+    target_sources(${COMPONENT_LIB} PRIVATE pin_wiggle.c)
+endif()
+
+# esp_adc boot-crash repro — see main/adc_repro.c.
+if(CONFIG_VROD_ADC_REPRO)
+    target_sources(${COMPONENT_LIB} PRIVATE adc_repro.c)
+endif()
+
+# J1850 passive capture build (Phase 3 Stage 2). j1850_vpw.c is the
+# host-tested VPW codec; the sniffer is GPIO-edge glue around it.
+if(CONFIG_VROD_J1850_SNIFFER)
+    target_sources(${COMPONENT_LIB} PRIVATE
+        j1850/j1850_vpw.c
+        j1850/j1850_sniffer.c
+        display/screen_bench.c
     )
 endif()
 

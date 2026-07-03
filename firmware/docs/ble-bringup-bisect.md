@@ -264,6 +264,123 @@ cd /tmp/bleprph_test && rm -rf build && idf.py build
 
 Don't leave the toolchain swapped in — restore the 2.45 binaries when done.
 
+## Addendum (July 2026): the esp_adc "crash" — RESOLVED (it was never esp_adc)
+
+**Final root cause.** On P4 rev<v3 silicon, the ~274 KB of SRAM above
+`APP_USABLE_DIRAM_END` (0x4ff3afc0) is ROM-startup stack/data territory
+(`components/heap/port/esp32p4/memory_layout.c`); those two heap
+regions (18 KB + 256 KB) only join the allocator *after both CPUs are
+scheduling*. Until then, every internal allocation — meaning **every
+task stack** — must fit in RETENT_RAM + RTCRAM + TCM ≈ **151 KB**.
+This firmware's boot was consuming **~146.5 KB** of it, dominated by
+esp_hosted's SDIO transport at WiFi sizing: a ~47.7 KB mempool + a
+~40.1 KB queue allocation (TX/RX queues 20 deep × ~2 KB buffers) plus
+4 × 5.4 KB hosted task stacks. Boot margin: **~2 KB**.
+
+Linking esp_adc added ~600 bytes of statics — enough to push CPU1's
+idle-task stack allocation (1536 B, `MALLOC_CAP_INTERNAL|8BIT`) into
+failure → the `vApplicationGet*TaskMemory` assert loop. esp_adc was
+the straw, not the load: the instrumented repro proved a build
+*without* esp_adc dies identically once heap poisoning's few KB of
+overhead are added.
+
+**The fix** (in `sdkconfig.defaults`): the SDIO link to the C6 carries
+BLE HCI only — WiFi is unused on the bike — so the queues don't need
+WiFi sizing:
+
+```
+CONFIG_ESP_HOSTED_SDIO_TX_Q_SIZE=6
+CONFIG_ESP_HOSTED_SDIO_RX_Q_SIZE=6
+```
+
+That returns ~56 KB to the pre-scheduler pool (margin ~2 KB → ~58 KB).
+Verified on hardware: the worst-case build (esp_adc linked +
+comprehensive heap poisoning) now boots clean, BLE directed
+advertising up, and `boot complete` arrives at ~4.5 s instead of
+~9.7 s. The bench screen's ADC voltage readout is restored.
+
+**Diagnostics kept in-tree** (`CONFIG_VROD_ADC_REPRO` +
+`sdkconfig.adc-repro`): forces esp_adc's constructor into the link,
+probes heap integrity pre-ctor, and dumps per-heap state + every block
+on a failed allocation. Re-run it after IDF/toolchain bumps or when
+adding boot-time components — it is the canary for this margin.
+Anything that must allocate large internal buffers should do so from
+`app_main` or later, never from a constructor or core-init function.
+
+The original (superseded) investigation notes follow for reference.
+
+### Original investigation notes (superseded by the above)
+
+Adding `esp_adc` to the build (for a bench voltage readout on the
+J1850 RX pin) produced a **deterministic pre-`app_main` crash loop**:
+
+```
+assert failed: vApplicationGetTimerTaskMemory port_common.c:97 (pxStackBufferTemp != NULL)
+```
+
+every cycle, right after the esp_hosted/sleep_gpio init prints —
+despite `idf.py size` showing 313 KB of DIRAM headroom and heap_init
+reporting ~380 KB free moments earlier. Bisect results (clean rebuilds
+each step):
+
+| Build | Result |
+|---|---|
+| sniffer build, no esp_adc | ✅ boots |
+| + `adc_oneshot` + `adc_cali` | ❌ assert loop |
+| + `adc_oneshot` only (nominal mV scaling) | ❌ assert loop |
+| esp_adc in REQUIRES but no calls (archive GC'd) | ✅ boots |
+
+The failing alloc is a few KB with hundreds of KB nominally free
+(heap_init reports ~380 KB internal moments earlier), so this is not
+exhaustion. Static analysis narrowed it further:
+
+- The assert fires at **scheduler start** (`vTaskStartScheduler` →
+  `xTimerCreateTimerTask` → `pvPortMalloc` returns NULL) — before any
+  project code runs.
+- The only esp_adc code that *executes* before that point is its
+  **global constructor**: `adc_hw_calibration()` in
+  `esp_adc/adc_common.c`, which runs at `do_global_ctors` time and does
+  real analog-domain work — `ANALOG_CLOCK_ENABLE()` (ref-counted
+  analog-I2C-master clock, which the bootloader deliberately leaves
+  always-on and the ctor's ENABLE/DISABLE pair can hard-gate OFF),
+  SAR power acquire/release, efuse calibration reads, and possibly
+  full self-calibration.
+- A build with esp_adc in REQUIRES but no references (archive
+  garbage-collected, constructor never linked) **boots fine** — it is
+  the constructor's presence, not the component's code size or
+  placement, that correlates with the failure.
+- Consistent with (but not identical to) upstream
+  [IDFGH-15337 / esp-idf#15996] "TimerTask stack allocated in TCM
+  crashes" — same neighbourhood: P4's exotic heap regions (RETENT_RAM,
+  RTCRAM, TCM/SPM) interacting with early task-stack allocation.
+
+The exact corruption mechanism needs one instrumented run on the
+device. The repro kit is checked in and ready:
+
+```sh
+cd firmware
+idf.py -B build-adc-repro \
+       -DSDKCONFIG=build-adc-repro/sdkconfig \
+       -DSDKCONFIG_DEFAULTS="sdkconfig.defaults;sdkconfig.adc-repro" \
+       -p /dev/cu.usbmodem5B5F0299541 build flash
+../tools/j1850_capture.py --reset -o /tmp/adc-repro.log
+```
+
+`main/adc_repro.c` (behind `CONFIG_VROD_ADC_REPRO`) forces the
+constructor into the link and probes heap integrity right before it
+runs; the overlay enables comprehensive heap poisoning,
+abort-on-failed-alloc, and halt-on-panic. The one crash dump then
+says which of three worlds we're in: heap corrupted by the ctor
+(poisoning prints where), allocation legitimately unsatisfiable
+(abort prints the caps), or corruption that predates esp_adc
+entirely (pre-ctor probe already fails).
+
+Interim state: the ADC readout was removed (`screen_bench.c` shows
+level/edges/counters only; pin voltage stays a DMM job). **This
+blocks Phase 6's fuel-level ADC** — run the repro after each
+IDF/toolchain bump; the crash dump plus the analysis above is the
+upstream bug report when it reproduces.
+
 ## Upstream issues to file
 
 The cluster-side workaround stands on its own and doesn't require

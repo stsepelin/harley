@@ -1,0 +1,27 @@
+# Overlay for the esp_adc boot-crash repro (see main/adc_repro.c and
+# the addendum in docs/ble-bringup-bisect.md). Build in a SEPARATE
+# build dir so the day-to-day sdkconfig stays untouched:
+#
+#   idf.py -B build-adc-repro \
+#          -DSDKCONFIG=build-adc-repro/sdkconfig \
+#          -DSDKCONFIG_DEFAULTS="sdkconfig.defaults;sdkconfig.adc-repro" \
+#          -p /dev/cu.usbmodem5B5F0299541 build flash
+#   tools/j1850_capture.py --reset -o /tmp/adc-repro.log
+#
+# The device will crash once and HALT (no reboot loop) with the heap
+# diagnostics on the console.
+
+CONFIG_VROD_ADC_REPRO=y
+
+# Canary bytes around every allocation + validation on free/realloc;
+# a corruption prints "CORRUPT HEAP @<addr>" instead of failing weirdly
+# somewhere downstream.
+CONFIG_HEAP_POISONING_COMPREHENSIVE=y
+
+# A failed allocation aborts with the requested size + caps in the
+# panic, instead of returning NULL for an assert to trip over later.
+CONFIG_HEAP_ABORT_WHEN_ALLOCATION_FAILS=y
+
+# Halt after the first panic so the whole dump can be read/captured
+# instead of scrolling away in a reboot loop.
+CONFIG_ESP_SYSTEM_PANIC_PRINT_HALT=y

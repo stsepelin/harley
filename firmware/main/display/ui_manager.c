@@ -156,6 +156,17 @@ void ui_manager_show_settings_bluetooth(void)
     lv_screen_load(s_settings_bt);
 }
 
+#if CONFIG_VROD_J1850_SNIFFER
+#include "screen_bench.h"
+void ui_manager_show_bench(void)
+{
+    static lv_obj_t *s_bench = NULL;
+    if (!s_bench)
+        s_bench = screen_bench_create();
+    lv_screen_load(s_bench);
+}
+#endif
+
 void ui_manager_init(void)
 {
     bsp_display_lock(-1);

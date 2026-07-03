@@ -138,3 +138,17 @@ CONFIG_LV_LOG_LEVEL_ERROR=y
 # default_registered_chips[] containing just the generic driver.
 # See docs/ble-bringup-bisect.md for the full story.
 CONFIG_SPI_FLASH_OVERRIDE_CHIP_DRIVER_LIST=y
+
+# --- P4 rev<v3 early-heap relief -------------------------------------
+# On rev<v3 silicon the ~274 KB of SRAM above APP_USABLE_DIRAM_END is
+# ROM-startup territory and only joins the heap after both CPUs are
+# scheduling. Until then every internal allocation (all task stacks)
+# must fit in RETENT_RAM+RTCRAM+TCM ~= 151 KB. esp_hosted's SDIO
+# queues at their WiFi-sized default (20 x ~2 KB, plus a matching
+# mempool) ate ~88 KB of that, leaving ~2 KB of boot margin — linking
+# anything more (esp_adc's constructor was the first victim) tipped it
+# into a vApplicationGet*TaskMemory assert loop. Our SDIO link carries
+# BLE HCI only; 6-deep queues are generous for that and restore ~56 KB
+# of margin. See docs/ble-bringup-bisect.md addendum.
+CONFIG_ESP_HOSTED_SDIO_TX_Q_SIZE=6
+CONFIG_ESP_HOSTED_SDIO_RX_Q_SIZE=6

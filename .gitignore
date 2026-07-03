@@ -19,3 +19,4 @@
 
 # simulator screenshot output (VROD_SHOT)
 firmware/simulator/*.png
+.venv/

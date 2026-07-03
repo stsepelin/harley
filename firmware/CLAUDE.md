@@ -158,12 +158,12 @@ Full policy in `test_apps/host/README.md`. Short version:
   `gear_table.c`, `sim_math.c`, `format.c`, `gesture.c`, `units.c`,
   `smooth.c`, `fuel_scale.c`, `phone_data.c`, `phone_protocol.c`,
   `settings.c`, `vehicle_data.c`, `ble_visibility.c`, `poi_math.c`,
-  `poi_db.c`, `poi_alert.c`, `nmea.c` — **plus all the widgets**
-  (including `tach_arc.c`), which run against the LVGL stub and sit
-  inside the same gate.
+  `poi_db.c`, `poi_alert.c`, `nmea.c`, `j1850_vpw.c` — **plus all the
+  widgets** (including `tach_arc.c`), which run against the LVGL stub
+  and sit inside the same gate.
 - **Out of scope:** fonts (generated), boot/screen wiring (BSP glue),
   `sim_engine.c`'s task body, `gps_source.c` / `gps_sim.c` /
-  `gps_uart.c` producers.
+  `gps_uart.c` / `j1850_sniffer.c` producers and capture glue.
 
 When you add code:
 

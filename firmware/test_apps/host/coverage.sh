@@ -50,6 +50,7 @@ SCOPED=(
     '*/main/poi/poi_db.c'
     '*/main/poi/poi_alert.c'
     '*/main/gps/nmea.c'
+    '*/main/j1850/j1850_vpw.c'
     '*/main/display/widgets/sprite_raster.h'
     '*/main/display/widgets/fuel_arc.c'
     '*/main/display/widgets/gear_indicator.c'

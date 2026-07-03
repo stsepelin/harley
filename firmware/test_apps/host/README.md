@@ -72,9 +72,11 @@ Today that's:
 | `main/poi/poi_db.c` | Binary camera-DB wrap + cone query + distance-sorted insert |
 | `main/poi/poi_alert.c` | Single-alert state machine with pass-by hysteresis |
 | `main/gps/nmea.c` | NMEA 0183 framer + RMC parser (checksum, ddmm.mmmm → 1e-7 deg, knots → km/h) |
+| `main/j1850/j1850_vpw.c` | J1850 VPW symbol codec: pulse-width decoder + encoder + CRC-8/SAE-J1850. Round-trip tested. |
 
 The `main/gps/` producers (`gps_source.c`, `gps_sim.c`, `gps_uart.c`)
-are FreeRTOS/UART glue and stay out of the gate.
+and `main/j1850/j1850_sniffer.c` (GPIO-ISR capture glue) are
+FreeRTOS/driver glue and stay out of the gate.
 
 ### Widgets — also gated at 100 %
 
