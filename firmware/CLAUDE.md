@@ -18,6 +18,10 @@ Background:
     internal-RAM budget, the debug playbook (sim+ASan first), and a
     feature-development checklist.
   - `docs/ble-bringup-bisect.md` — BLE link-trap resolution notes
+  - `docs/j1850-toggling-isr-candidate.md` — design note (not
+    implemented) for a future RX ISR that infers the pulse level by
+    toggling instead of reading the pin, so a glitch filter could
+    coexist. Read before touching the sniffer edge capture.
 
 This file is for *how to work in the firmware code*, not what we're
 working toward or why each decision is the way it is. Path references

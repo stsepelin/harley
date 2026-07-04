@@ -29,7 +29,7 @@
 | Item | Link | Price | Notes |
 |---|---|---|---|
 | **5pcs IRLZ44N Logic-Level MOSFET (TO-220)** | [AliExpress](https://www.aliexpress.com/item/1005007434482338.html) | ~€0.77 | J1850 bus TX driver. Logic-level gate turns on at 3.3V. |
-| **100pcs Transistor Assortment (incl. 2N2222A)** | [AliExpress](https://www.aliexpress.com/item/1005004188649994.html) | ~€3.77 | J1850 bus RX + 12V signal voltage dividers. |
+| **100pcs Transistor Assortment (incl. 2N2222A)** | [AliExpress](https://www.aliexpress.com/item/1005004188649994.html) | ~€3.77 | J1850 TX high-side switch (Q2). Needs a **PNP** — 2N2907A or S8550; the kit's 2N2222A is NPN and cannot serve as Q2 (see Phase 3 plan — a dedicated 2N2907A is on order). RX + 12V dividers are passive (zener + resistors), no transistor. |
 | **50pcs Zener Diode 1W Assortment (incl. 7.5V)** | [AliExpress](https://www.aliexpress.com/item/1005006639039658.html) | ~€0.65 | Bus voltage clamp protection. Use 7.5V variant. |
 | **600pcs Metal Film Resistor Kit (1% precision)** | [AliExpress](https://www.aliexpress.com/item/1005009347924494.html) | ~€20 | Voltage dividers (10kΩ, 4.7kΩ, 1kΩ, 100Ω). Useful long-term for any electronics project. |
 
@@ -110,7 +110,7 @@ Bike 12-pin                                                  │
        ┌───────────────────────┘                             │
        │                                                     │
        ├─ J1850 Data ──► DIY transceiver ──► P4 GPIO         │
-       │                  (IRLZ44N + 2N2222 + zener)         │
+       │                  (IRLZ44N + 2N2907A + zener)        │
        ├─ +12V ──► Mini560 buck ──► 5V ──► P4 USB-C          │
        ├─ Ground ──► common GND                              │
        ├─ Turn L ──► voltage divider ──► P4 GPIO             │
@@ -160,56 +160,77 @@ transceiver on a GPIO — the C6 is only the phone radio.)
 
 ## J1850 BIDIRECTIONAL TRANSCEIVER CIRCUIT
 
-> J1850 VPW is an **active-high** single-wire bus: recessive = 0V,
-> dominant = ~7V *sourced by the transmitting node*. The TX stage must
-> therefore be a switched high-side source — connected to the bus only
-> while transmitting a dominant symbol. (An earlier revision of this
-> schematic had the 12V pull permanently on the bus with a low-side
-> MOSFET shorting it to ground — that polarity is inverted and would
-> jam the bus dominant whenever idle. Do not build that version.)
+> **TX topology RESOLVED (2026-07-04): standard VPW → high-side TX.**
+> The bus idles LOW (~0.3 V) and pulses dominant HIGH (~7 V) — textbook
+> active-high VPW. Confirmed three ways: a bare-bus DMM (ESP
+> disconnected) reads idle ~0.3 V; an invert-off raw dump on short leads
+> shows idle LOW then a HIGH SOF; and with the RX glitch filter off the
+> sniffer decodes cleanly with **no** invert flag (same-level 0, 0 bad
+> CRC — 546 frames in one engine run). The earlier "idle HIGH /
+> low-side / inverted" reading was an artifact of the 500 ns hardware
+> glitch filter dropping the slow recessive falling edge (it delays the
+> filtered edge past the ISR's level read). Consequences, all landed:
+> **TX is a high-side PNP source (2N2907A needed)**; the
+> `CONFIG_VROD_J1850_RX_INVERT` flag is removed; the glitch filter
+> defaults off (`CONFIG_VROD_J1850_GLITCH_NS=0`, and the P4 hardware
+> filter cannot help here — see the sweep in
+> `firmware/docs/captures/SESSION-2026-07-04.md`). Canonical drawing:
+> [`j1850_tx.svg`](schematics/j1850_tx.svg); the low-side
+> `j1850_transceiver` drawing was the wrong inverted-bus hypothesis and
+> has been deleted — the wrong turn is recorded here in prose below.
 
-**Rendered schematics (canonical, print these for the bench):**
-[RX front end](schematics/j1850_rx.svg) — build first, sniff-only ·
-[TX stage](schematics/j1850_tx.svg) — Stage 4 only.
-Sources + regenerate instructions in [`schematics/`](schematics/).
+J1850 VPW is an **active-high** single-wire bus: recessive = 0V,
+dominant = ~7V *sourced by the transmitting node*. The TX stage is a
+switched high-side source — connected to the bus only while transmitting
+a dominant symbol. (Do not build a permanently-connected 12V pull with a
+low-side MOSFET shorting it to ground — that inverts the polarity and
+jams the bus dominant whenever idle.)
+
+The **RX front end alone** is correct and unchanged — build and verify
+this first; with no FET populated it can't disturb the bus:
+[RX front end](schematics/j1850_rx.svg). Sources + regenerate
+instructions in [`schematics/`](schematics/).
 
 ![J1850 RX front end](schematics/j1850_rx.svg)
 
+- **Reading**: 10kΩ/4.7kΩ steps the bus ~7.5V → ~2.4V (safe for the
+  P4's 3.3V GPIO); node B also feeds GPIO 22 (ADC amplitude probe).
+- **Protection**: the 7.5V zener clamps transients on the bus wire.
+- **Writing (TX)**: high-side PNP source — see the TX drawing below.
+  TX GPIO high → Q1 pulls Q2's base low → Q2 sources ~7V onto the bus
+  (dominant); low → Q2 off, bus floats to recessive 0V. A stuck-on TX
+  jams the bus dominant, so the firmware watchdog must kill TX if a
+  dominant level persists past one VPW symbol.
+- **Bench-validate first**: sniff-only (RX, no Q1/Q2) against the live
+  bus; then the self-sniff loop (TX → RX node) sets R5 and CRC-checks our
+  own frames before TX ever touches the bike. The high-side source drives
+  the ~7V dominant itself — no external pull-up rail needed.
+
+---
+
+**Canonical TX — high-side PNP source (Stage 4, gated on the 2N2907A).**
+Textbook active-high VPW: dominant = ~7V *sourced* onto the bus via a
+PNP high-side switch, level-shifted by a low-side NMOS off the 3.3V TX
+GPIO. Confirmed by the on-bike sweep (2026-07-04). Build only after the
+RX half is bench- and bike-validated:
+
 ![J1850 TX stage](schematics/j1850_tx.svg)
 
-Text fallback:
+Node list (matches `schematics/j1850_tx.svg` — the single source of truth):
 
-```
-                       +12V (from bike)
-                         ├──────────────┐
-                       emitter         ┌┴┐
-              ┌────── Q2: PNP          │ │ R6 10kΩ (base pull-up:
-      10kΩ ───┤ base   (2N2907/S8550)  └┬┘  Q2 hard off when idle)
-        │  R4 └────── collector ── 100Ω ─┴─► J1850 BUS
-      drain              R5                    │
-   Q1: IRLZ44N                                 ├── D1 7.5V Zener ── GND
-  gate ◄─ R3 1kΩ ─ ESP32-P4 TX GPIO            │   (cathode to bus; sets ~7V
-      source                                   │    dominant level + clamps)
-        │                                      │
-       GND                                     ├── R1 10kΩ ──┬── ESP32-P4 RX GPIO
-                                               │          R2 4.7kΩ
-                                               │             │
-                                               └─────────────┴── GND
-```
+- **Q2** (PNP, 2N2907A / S8550): emitter → **+12V**; collector → **R5
+  100Ω → J1850 bus**; base → **node A**.
+- **Node A** (Q2 base) is pulled to +12V by **R6 10kΩ** (holds Q2 hard
+  off at idle) and toward ground by **R4 10kΩ** in series with **Q1**.
+- **Q1** (IRLZ44N, low-side level shift): gate ← **R3 1kΩ** ← ESP32-P4
+  TX GPIO; source → GND.
+- **TX GPIO high** → Q1 on → node A pulled low → Q2 on → bus **sourced
+  HIGH (dominant)**. **TX GPIO low** → Q1 off → R6 holds node A at +12V →
+  Q2 off → bus released to **0V (recessive)**.
+- **D1 7.5V zener** (in the RX drawing) clamps the driven bus level.
 
-- **Writing**: TX GPIO high → Q1 conducts → pulls Q2's base low through
-  R4 → Q2 sources +12V through R5 onto the bus; the 7.5V zener clamps
-  the driven level to ~7V (the VPW dominant level). TX GPIO low → Q1
-  off, R6 holds Q2's base at the emitter rail → Q2 hard off → bus
-  released to recessive 0V. Never hold TX high outside a VPW symbol —
-  a stuck-high TX jams the whole bus.
-- **Reading**: 10kΩ/4.7kΩ steps 7V → ~2.2V (safe for the P4's 3.3V GPIO).
-- **Protection**: the same 7.5V zener clamps transients on the bus wire.
-- **Software**: Port `J1850-VPW-Arduino-Transceiver-Library` to ESP-IDF
-  (its schematic image in `img/schematics.jpg` is the reference for the
-  analog front end — cross-check on the breadboard before the bike).
-- **Bench-validate first**: sniff-only (RX path, no Q1/Q2 populated)
-  against the live bus before ever enabling TX.
+A stuck-high TX jams the bus dominant — the firmware TX watchdog is
+mandatory before this stage touches the bike.
 
 ### 12V Discrete Signal Voltage Divider (×6 — for turn L/R, high beam, neutral, oil pressure, ignition)
 
@@ -249,7 +270,7 @@ option: add a 3.3V zener (from the zener kit) across the lower resistor.
 │  │                                                   │       │
 │  │  ┌────────────────────────────────────────────┐  │       │
 │  │  │ DIY J1850 Transceiver                      │  │       │
-│  │  │ (IRLZ44N + 2N2222 + 7.5V zener +          │  │       │
+│  │  │ (IRLZ44N + 2N2907A + 7.5V zener +         │  │       │
 │  │  │  resistors) ──► Pin 7 (J1850 data)         │  │       │
 │  │  └────────────────────────────────────────────┘  │       │
 │  │                                                   │       │
@@ -431,6 +452,28 @@ See `02-PHASE2.5-OFFBIKE-PLAN.md` for the full plan + ordering.
 
 ### Phase 6: Full Cluster Replacement (Weekends 11-12)
 - Read all 12-pin discrete signals (turns, beam, oil, neutral, fuel)
+  - **Mixed polarity — the ×6 divider is identical hardware; polarity is
+    a per-line FIRMWARE flag, not a hardware or schematic difference.**
+    All six lines share one 10kΩ/2.7kΩ (+ optional 3.3V zener) divider,
+    built ×6 — no separate schematics. The discrete-signal decode must
+    carry a per-line active-high / active-low flag; do NOT hard-code
+    uniform polarity. Same class of bug as the J1850 inversion — the
+    discipline is to measure BOTH states (signal on/off, or gearbox
+    in/out of N) so the active level is proven, not inferred. Neutral
+    already surprised us by reading active-low.
+    - **CONFIRMED (measured both states, 2026-07):**
+      - **Neutral** (pin 10, TN/tan): **ACTIVE-LOW**. N = 0 V, in-gear
+        (2nd) = ~11 V — the neutral switch pulls the line to ground in N.
+        Firmware: neutral lamp ON when the input reads **LOW**.
+      - **Turn L/R** (pins 3/4): **ACTIVE-HIGH**. Off = 0 V, on = flicker
+        to ~10-20 V (the flasher relay's inductive kick). Also on the
+        J1850 bus via the TSSM (`48 DA 40 39`) — the discrete tap is a
+        backup source; pick one, don't decode both.
+    - **TBD — measure on the next bike visit before wiring / decoding:**
+      - **High beam** (pin 2): likely active-high like the turns — confirm.
+      - **Oil pressure** (pin 9): unknown, and the oil-pressure switch is
+        commonly **ground-switched (active-low)** — measure, don't guess.
+      - **Ignition sense** (pin 6): unknown — confirm.
   - **Fuel sender caveat (verified July 2026):** the 2009 VRSC uses an
     **ultrasonic** fuel level sensor (P/N 75210-09, mandatory for MY2009
     — HD service bulletin M-1249), not a plain float. It is powered
@@ -447,6 +490,22 @@ See `02-PHASE2.5-OFFBIKE-PLAN.md` for the full plan + ordering.
     ultrasonic sender. The J1850 fuel-gauge broadcast (A8 83 61 12) is
     almost certainly IM-originated (the sender wires to the IM), so it
     disappears when the stock IM does — Stage 2 captures will confirm.
+- **J1850 RX front end — add hysteresis for the permanent harness.** The
+  bench build reads the bare 10kΩ/4.7kΩ resistive divider straight into a
+  GPIO; fine on short leads, but no noise margin. On the permanent install
+  (longer harness runs, ignition/coil switching noise, vibration) the RX
+  must square the bus up with a **comparator / Schmitt input** (distinct
+  on/off thresholds), NOT the P4 hardware glitch filter. Why not the
+  filter: it delays the filtered edge relative to the sniffer ISR's pin
+  read, desyncing the level recorded for the just-ended pulse → 0 frames
+  at ANY nonzero window (the Phase 3 glitch-window sweep — 400/800/1200/
+  1600 ns all decoded zero frames while 0 ns gave 546/0-bad; see
+  `firmware/docs/captures/SESSION-2026-07-04.md`). A comparator gives
+  clean fast edges with no filter-vs-read race, rejects near-threshold
+  chatter in hardware, and sharpens exactly the slow passive recessive
+  (dominant→idle) fall we measured. Software alternative under evaluation
+  (would let a conservative filter coexist):
+  `firmware/docs/j1850-toggling-isr-candidate.md`.
 - Display all indicator icons on gauge
 - 3D print mounting bracket for 86mm display in 95mm bezel
 - Conformal coat PCB
@@ -491,13 +550,15 @@ HEADER             DATA          MEANING
 28 1B 10 02 HH LL  HH LL        RPM = (HH<<8 | LL) / 4
 48 29 10 02 HH LL  HH LL        Speed = (HH<<8 | LL) / 128  [km/h]
 48 3B 40 XX         XX           Neutral if (XX & 0x20), Clutch if (XX & 0x80)
-48 DA 40 39 XX      XX           Turn signals: 1=left, 2=right, 3=both
+48 DA 40 39 XX      XX           Turn signals: bitfield, 3=both. On the
+                                 2009 VRSCF (verified 2026-07-04):
+                                 2=LEFT, 1=RIGHT (swapped vs HarleyDroid)
 68 88 10 03         —            Check Engine OFF
 68 88 10 83         —            Check Engine ON
 A8 3B 10 03 XX      XX           Gear: 1,3,7,15,31,63 → gears 1-6
-A8 49 10 10 XX      XX           Engine temp — HarleyDroid decodes the raw
-                                 byte as °C directly (no offset); verify
-                                 against the stock gauge during the sniff
+A8 49 10 10 XX      XX           Engine temp = raw byte °C (no offset).
+                                 CONFIRMED 2026-07-04: 0x40=64°C climbing
+                                 as engine warmed. (Old "°F" was wrong.)
 A8 69 10 06 HH LL  HH LL        Odometer: 1 tick = 0.4 meters
 A8 83 10 0A HH LL  HH LL        Fuel consumption: 1 tick = 0.000040 L
 A8 83 61 12 DX      DX           Fuel gauge 0-6 (0=empty, 6=full)

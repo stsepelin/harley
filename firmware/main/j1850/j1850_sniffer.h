@@ -20,16 +20,18 @@ typedef struct {
     size_t   last_len;  // 0 = no frame seen yet
     bool     last_crc_ok;
     bool     pin_level;  // live gpio_get_level of the RX pin
+
+    // Glitch-window auto-sweep (CONFIG_VROD_J1850_GLITCH_SWEEP only);
+    // sweep_active stays false in normal builds.
+    bool     sweep_active;
+    uint32_t sweep_ns;           // window currently applied
+    uint32_t sweep_pass;         // full-cycle count so far
+    int64_t  sweep_deadline_us;  // esp_timer time this window ends
 } j1850_sniffer_stats_t;
 
 void j1850_sniffer_get_stats(j1850_sniffer_stats_t *out);
 
-// One-shot ADC read of the RX pin, in millivolts, for the bench screen
-// (GPIO 20 sits on ADC1). Returns -1 when the configured pin has no ADC
-// channel or calibration isn't available. The pad is flipped to analog
-// for the read and restored to digital input + edge IRQ before
-// returning. (Linking esp_adc used to crash-loop this board — root
-// cause was near-zero pre-scheduler heap margin on rev<v3 silicon,
-// fixed via the SDIO queue sizing in sdkconfig.defaults; the story
-// lives in docs/ble-bringup-bisect.md.)
-int j1850_sniffer_sample_pin_mv(void);
+// Bus-amplitude ADC reads live in j1850_adc_probe.c on a DEDICATED pin
+// (GPIO 22) — the sniffer pin can't be time-shared between the digital
+// edge ISR and the ADC (the shared read came back garbage). The sniffer
+// stays purely digital.

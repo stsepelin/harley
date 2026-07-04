@@ -24,7 +24,11 @@ with schemdraw.Drawing(file="j1850_tx.svg", show=False) as d:
     rail_l = d.add(elm.Dot())
 
     d.add(elm.Line().right().at(node_a.center).length(2.2))
-    q2 = d.add(elm.BjtPnp(circle=True).right().flip().anchor("base")
+    # .right() puts the emitter up (to +12V) and collector down (to the
+    # bus) — a clean high-side source. Do NOT .flip(): that swaps E/C, so
+    # the emitter's up-wire crosses back through the collector node and
+    # the drawing reads as a C-E short.
+    q2 = d.add(elm.BjtPnp(circle=True).right().anchor("base")
                .label("Q2  2N2907 / S8550\n(assortment)", loc="right", ofst=(0.4, 0.7)))
 
     d.add(elm.Line().up().at(q2.emitter).toy(rail_l.center))

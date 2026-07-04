@@ -1,0 +1,324 @@
+     0.005   Host chip_ip[18]
+     0.012  I (1830) H_API: ESP-Hosted starting. Hosted_Tasks: prio:23, stack: 5120 RPC_task_stack: 5120
+     0.016  I (1838) H_API: ** add_esp_wifi_remote_channels **
+     0.021  I (1844) sleep_gpio: Configure to isolate all GPIO pins in sleep state
+     0.029  I (1849) sleep_gpio: Enable automatic switching of GPIO sleep configuration
+     0.033  I (1856) H_SDIO_DRV: sdio_data_to_rx_buf_task started
+     0.038  I (1861) main_task: Started on CPU0
+     0.044  I (1864) esp_psram: Reserving pool of 32K of internal memory for DMA/internal allocations
+     0.049  I (1872) main_task: Calling app_main()
+     0.055  I (1875) esp_lvgl:adapter: LVGL adapter initialized successfully
+     0.060  W (1881) ledc: GPIO 26 is not usable, maybe conflict with others
+     0.066  I (1887) esp32_p4_wifi6_touch_lcd_xc: MIPI DSI PHY Powered on
+     0.071  I (1893) esp32_p4_wifi6_touch_lcd_xc: Install MIPI DSI LCD control panel
+     0.081  I (1898) esp32_p4_wifi6_touch_lcd_xc: Install Waveshare ESP32-P4-WIFI6-Touch-LCD-XC LCD control panel
+     0.081  I (1907) jd9365: version: 2.0.2
+     0.228  I (2066) jd9365: LCD ID: 93 65 04
+     0.373  I (2208) esp32_p4_wifi6_touch_lcd_xc: Display initialized
+     0.378  I (2209) esp_lvgl:bridge_v9: Initializing hardware resources
+     0.384  I (2209) esp_lvgl:bridge_v9: Hardware resources initialized successfully
+     0.479  I (2314) esp32_p4_wifi6_touch_lcd_xc: Touch 0x5d found
+     0.486  I (2314) GT911: I2C address initialization procedure skipped - using default GT9xx setup
+     0.500  I (2335) GT911: TouchPad_ID:0x39,0x32,0x37
+     0.506  I (2335) GT911: TouchPad_Config_Version:90
+     0.517  W (2335) esp_lvgl:touch: LV_USE_GESTURE_RECOGNITION is disabled; only single-point pointer events are available
+     0.522  I (2341) esp_lvgl:touch: Touch input device registered successfully (IRQ mode: disabled)
+     0.528  I (2349) esp_lvgl:adapter: LVGL task started successfully
+     0.533  I (2349) esp_lvgl:bridge: Initializing hardware resources
+     0.539  I (2359) esp_lvgl:bridge: Hardware resources initialized successfully
+     0.544  I (2375) emoji_font: emoji.ttf embedded: 1982596 bytes
+     0.550  I (2376) emoji_font: emoji fallback attached: 26=0x4ff3f95c 33=0x4ff3faec
+     0.553  I (2377) j1850: passive sniffer on GPIO20 (read-only build)
+     0.705  W (2535) i2s_common: dma frame num is adjusted to 256 to align the dma buffer with 64, bufsize = 512
+     0.716  W (2535) i2s_common: dma frame num is adjusted to 256 to align the dma buffer with 64, bufsize = 512
+     0.717  I (2547) ES8311: Work in Slave mode
+     0.728  I (2551) I2S_IF: Paired data: 0x4ff6d544, current mode: playback, paired in_enable: 0, paired out_enable: 0
+     0.739  W (2554) i2s_common: dma frame num is adjusted to 256 to align the dma buffer with 64, bufsize = 512
+     0.745  I (2563) I2S_IF: STD: TX, data_bit: 16, slot_bit: 16, ws_width: 16, slot_mode: MONO, slot_mask: 0x1
+     0.750  I (2572) I2S_IF: STD: TX, sample_rate_hz: 22050, mclk_multiple: 256, clk_src: 0
+     0.758  I (2594) Adev_Codec: Open codec device OK
+     0.783  I (2617) transport: Attempt connection with slave: retry[0]
+     0.788  W (2617) H_SDIO_DRV: Reset slave using GPIO[54]
+     0.790  I (2617) os_wrapper_esp: GPIO [54] configured
+     2.350  I (4179) sdio_wrapper: SDIO master: Slot 1, Data-Lines: 4-bit Freq(KHz)[40000 KHz]
+     2.355  I (4179) sdio_wrapper: GPIOs: CLK[18] CMD[19] D0[14] D1[15] D2[16] D3[17] Slave_Reset[54]
+     2.359  I (4183) sdio_wrapper: Queues: Tx[6] Rx[6] SDIO-Rx-Mode[1]
+     2.417  I (4251) sdio_wrapper: Function 0 Blocksize: 512
+     2.420  I (4251) sdio_wrapper: Function 1 Blocksize: 512
+     2.516  I (4351) H_SDIO_DRV: Card init success, TRANSPORT_RX_ACTIVE
+     2.522  I (4351) transport: set_transport_state: 1
+     2.527  I (4351) transport: Waiting for esp_hosted slave to be ready
+     2.533  I (4356) H_SDIO_DRV: SDIO Host operating in STREAMING MODE
+     2.538  I (4356) H_SDIO_DRV: Starting SDIO process rx task
+     2.544  I (4360) H_SDIO_DRV: Open data path at slave
+     2.544  I (4376) H_SDIO_DRV: Received ESP_PRIV_IF type message
+     2.549  I (4376) transport: Received INIT event from ESP32 peripheral
+     2.555  I (4378) transport: EVENT: 12
+     2.560  I (4381) transport: Identified slave [esp32c6]
+     2.561  I (4385) transport: EVENT: 11
+     2.566  I (4388) transport: capabilities: 0xd
+     2.566  I (4391) transport: Features supported are:
+     2.572  I (4395) transport: 	 * WLAN
+     2.577  I (4398) transport: 	   - HCI over SDIO
+     2.577  I (4401) transport: 	   - BLE only
+     2.583  I (4404) transport: EVENT: 13
+     2.588  W (4407) transport: Version mismatch: Host [2.12.0] > Co-proc [0.0.0] ==> Upgrade co-proc to avoid RPC timeouts
+     2.594  I (4417) transport: ESP board type is : 13
+     2.599  I (4421) transport: Base transport is set-up, TRANSPORT_TX_ACTIVE
+     2.605  I (4427) H_API: Transport active
+     2.605  I (4430) transport: Slave chip Id[12]
+     2.610  I (4433) transport: raw_tp_dir[-], flow_ctrl: low[60] high[80]
+     2.616  I (4439) transport: transport_delayed_init
+     2.621  I (4443) esp_cli: Registering command: crash
+     2.622  I (4447) esp_cli: Registering command: reboot
+     2.627  I (4451) esp_cli: Registering command: mem-dump
+     2.633  I (4455) esp_cli: Registering command: task-dump
+     2.638  I (4459) esp_cli: Registering command: cpu-dump
+     2.644  I (4464) esp_cli: Registering command: heap-trace
+     2.644  I (4468) esp_cli: Registering command: sock-dump
+     2.650  I (4472) esp_cli: Registering command: host-power-save
+     2.655  I (4477) vhci_drv: Host BT Support: Enabled
+     2.660  I (4481) vhci_drv: 	BT Transport Type: VHCI
+     2.661  I (4485) H_SDIO_DRV: Received INIT event
+     2.666  I (4489) H_SDIO_DRV: Event type: 0x22
+     2.666  I (4492) H_SDIO_DRV: Write thread started
+     2.720  I (4554) vrod_gauge: boot complete
+     2.721  I (4554) main_task: Returned from app_main()
+     2.732  I (4567) NimBLE: GAP procedure initiated: stop advertising.
+     2.737  I (4569) NimBLE: GAP procedure initiated: stop advertising.
+     2.743  I (4571) NimBLE: GAP procedure initiated: advertise;
+     2.748  I (4571) NimBLE: disc_mode=0
+     2.754  I (4574) NimBLE:  direct_addr_type=0 direct_addr=
+     2.754  I (4578) NimBLE: 24:24:b7:82:1e:6e
+     2.765  I (4582) NimBLE:  adv_channel_map=0 own_addr_type=0 adv_filter_policy=0 adv_itvl_min=0 adv_itvl_max=0
+     2.765  I (4590) NimBLE:
+     2.769  I (4595) ble_peripheral: advertising (directed) to bonded peer
+     3.019  I (4856) RPC_WRAP: Coprocessor Boot-up
+    10.543  I (12378) j1850: stats: 0 frames, 0 bad CRC, 0 overruns, 0 edges
+    20.545  I (22380) j1850: stats: 0 frames, 0 bad CRC, 0 overruns, 0 edges
+    30.547  I (32382) j1850: stats: 0 frames, 0 bad CRC, 0 overruns, 0 edges
+    40.550  I (42384) j1850: stats: 0 frames, 0 bad CRC, 0 overruns, 7 edges
+    50.553  I (52386) j1850: stats: 0 frames, 0 bad CRC, 0 overruns, 532 edges
+    60.553  I (62386) j1850: stats: 0 frames, 0 bad CRC, 0 overruns, 356 edges
+    70.556  I (72388) j1850: stats: 0 frames, 0 bad CRC, 0 overruns, 469 edges
+    80.558  I (82390) j1850: stats: 0 frames, 0 bad CRC, 0 overruns, 261 edges
+    90.558  I (92391) j1850: stats: 0 frames, 0 bad CRC, 0 overruns, 275 edges
+   100.560  I (102392) j1850: stats: 0 frames, 0 bad CRC, 0 overruns, 36 edges
+   110.562  I (112394) j1850: stats: 0 frames, 0 bad CRC, 0 overruns, 566 edges
+   120.564  I (122396) j1850: stats: 0 frames, 0 bad CRC, 0 overruns, 211 edges
+   130.566  I (132398) j1850: stats: 0 frames, 0 bad CRC, 0 overruns, 76 edges
+   140.567  I (142398) j1850: stats: 0 frames, 0 bad CRC, 0 overruns, 399 edges
+   150.567  I (152398) j1850: stats: 0 frames, 0 bad CRC, 0 overruns, 45 edges
+   160.569  I (162400) j1850: stats: 0 frames, 0 bad CRC, 0 overruns, 655 edges
+   170.571  I (172401) j1850: stats: 0 frames, 0 bad CRC, 0 overruns, 289 edges
+   180.573  I (182402) j1850: stats: 0 frames, 0 bad CRC, 0 overruns, 416 edges
+   190.575  I (192404) j1850: stats: 0 frames, 0 bad CRC, 0 overruns, 520 edges
+   200.575  I (202405) j1850: stats: 0 frames, 0 bad CRC, 0 overruns, 20 edges
+   210.579  I (212407) j1850: stats: 0 frames, 0 bad CRC, 0 overruns, 549 edges
+   220.579  I (222408) j1850: stats: 0 frames, 0 bad CRC, 0 overruns, 588 edges
+   230.581  I (232410) j1850: stats: 0 frames, 0 bad CRC, 0 overruns, 573 edges
+   240.584  I (242412) j1850: stats: 0 frames, 0 bad CRC, 0 overruns, 472 edges
+   250.585  I (252413) j1850: stats: 0 frames, 0 bad CRC, 0 overruns, 314 edges
+   260.588  I (262415) j1850: stats: 0 frames, 0 bad CRC, 0 overruns, 228 edges
+   270.589  I (272417) j1850: stats: 0 frames, 0 bad CRC, 0 overruns, 388 edges
+   280.592  I (282418) j1850: stats: 0 frames, 0 bad CRC, 0 overruns, 542 edges
+   290.597  I (292420) j1850: stats: 0 frames, 0 bad CRC, 0 overruns, 596 edges
+   300.595  I (302421) j1850: stats: 0 frames, 0 bad CRC, 0 overruns, 415 edges
+   310.597  I (312423) j1850: stats: 0 frames, 0 bad CRC, 0 overruns, 202 edges
+   320.598  I (322424) j1850: stats: 0 frames, 0 bad CRC, 0 overruns, 437 edges
+   330.599  I (332425) j1850: stats: 0 frames, 0 bad CRC, 0 overruns, 402 edges
+   340.601  I (342426) j1850: stats: 0 frames, 0 bad CRC, 0 overruns, 47 edges
+   350.605  I (352427) j1850: stats: 0 frames, 0 bad CRC, 0 overruns, 538 edges
+   360.604  I (362429) j1850: stats: 0 frames, 0 bad CRC, 0 overruns, 132 edges
+   370.606  I (372431) j1850: stats: 0 frames, 0 bad CRC, 0 overruns, 188 edges
+   380.611  I (382433) j1850: stats: 0 frames, 0 bad CRC, 0 overruns, 362 edges
+   390.615  I (392435) j1850: stats: 0 frames, 0 bad CRC, 0 overruns, 912 edges
+   400.613  I (402437) j1850: stats: 0 frames, 0 bad CRC, 0 overruns, 0 edges
+   410.615  I (412439) j1850: stats: 0 frames, 0 bad CRC, 0 overruns, 338 edges
+   420.619  I (422441) j1850: stats: 0 frames, 0 bad CRC, 0 overruns, 0 edges
+   430.620  I (432443) j1850: stats: 0 frames, 0 bad CRC, 0 overruns, 144 edges
+   440.625  I (442444) j1850: stats: 0 frames, 0 bad CRC, 0 overruns, 371 edges
+   450.623  I (452446) j1850: stats: 0 frames, 0 bad CRC, 0 overruns, 210 edges
+   460.626  I (462447) j1850: stats: 0 frames, 0 bad CRC, 0 overruns, 518 edges
+   470.628  I (472448) j1850: stats: 0 frames, 0 bad CRC, 0 overruns, 484 edges
+   480.630  I (482448) j1850: stats: 0 frames, 0 bad CRC, 0 overruns, 0 edges
+   490.628  I (492449) j1850: stats: 0 frames, 0 bad CRC, 0 overruns, 435 edges
+   500.631  I (502451) j1850: stats: 0 frames, 0 bad CRC, 0 overruns, 46 edges
+   510.632  I (512453) j1850: stats: 0 frames, 0 bad CRC, 0 overruns, 732 edges
+   520.636  I (522455) j1850: stats: 0 frames, 0 bad CRC, 0 overruns, 0 edges
+   530.638  I (532457) j1850: stats: 0 frames, 0 bad CRC, 0 overruns, 163 edges
+   540.638  I (542458) j1850: stats: 0 frames, 0 bad CRC, 0 overruns, 208 edges
+   550.640  I (552460) j1850: stats: 0 frames, 0 bad CRC, 0 overruns, 0 edges
+   560.645  I (562462) j1850: stats: 0 frames, 0 bad CRC, 0 overruns, 0 edges
+   570.645  I (572464) j1850: stats: 0 frames, 0 bad CRC, 0 overruns, 0 edges
+   580.647  I (582466) j1850: stats: 0 frames, 0 bad CRC, 0 overruns, 0 edges
+   590.648  I (592466) j1850: stats: 0 frames, 0 bad CRC, 0 overruns, 0 edges
+   600.650  I (602468) j1850: stats: 0 frames, 0 bad CRC, 0 overruns, 0 edges
+   610.650  I (612468) j1850: stats: 0 frames, 0 bad CRC, 0 overruns, 0 edges
+   620.652  I (622470) j1850: stats: 0 frames, 0 bad CRC, 0 overruns, 0 edges
+   630.655  I (632472) j1850: stats: 0 frames, 0 bad CRC, 0 overruns, 0 edges
+   640.657  I (642474) j1850: stats: 0 frames, 0 bad CRC, 0 overruns, 0 edges
+   650.659  I (652476) j1850: stats: 0 frames, 0 bad CRC, 0 overruns, 0 edges
+   660.665  I (662478) j1850: stats: 0 frames, 0 bad CRC, 0 overruns, 0 edges
+   670.665  I (672480) j1850: stats: 0 frames, 0 bad CRC, 0 overruns, 0 edges
+   680.666  I (682480) j1850: stats: 0 frames, 0 bad CRC, 0 overruns, 0 edges
+   690.668  I (692482) j1850: stats: 0 frames, 0 bad CRC, 0 overruns, 0 edges
+   700.669  I (702484) j1850: stats: 0 frames, 0 bad CRC, 0 overruns, 1386 edges
+   710.670  I (712485) j1850: stats: 0 frames, 0 bad CRC, 0 overruns, 73 edges
+   720.673  I (722486) j1850: stats: 0 frames, 0 bad CRC, 0 overruns, 16 edges
+   730.673  I (732488) j1850: stats: 0 frames, 0 bad CRC, 0 overruns, 719 edges
+   740.676  I (742490) j1850: stats: 0 frames, 0 bad CRC, 0 overruns, 335 edges
+   750.677  I (752492) j1850: stats: 0 frames, 0 bad CRC, 0 overruns, 0 edges
+   760.680  I (762494) j1850: stats: 0 frames, 0 bad CRC, 0 overruns, 0 edges
+   770.684  I (772495) j1850: stats: 0 frames, 0 bad CRC, 0 overruns, 127 edges
+   780.685  I (782497) j1850: stats: 0 frames, 0 bad CRC, 0 overruns, 101 edges
+   790.685  I (792498) j1850: stats: 0 frames, 0 bad CRC, 0 overruns, 106 edges
+   800.686  I (802499) j1850: stats: 0 frames, 0 bad CRC, 0 overruns, 277 edges
+   810.688  I (812500) j1850: stats: 0 frames, 0 bad CRC, 0 overruns, 12 edges
+   820.695  I (822502) j1850: stats: 0 frames, 0 bad CRC, 0 overruns, 33 edges
+   830.691  I (832503) j1850: stats: 0 frames, 0 bad CRC, 0 overruns, 566 edges
+   840.694  I (842505) j1850: stats: 0 frames, 0 bad CRC, 0 overruns, 380 edges
+   850.695  I (852507) j1850: stats: 0 frames, 0 bad CRC, 0 overruns, 0 edges
+   860.698  I (862509) j1850: stats: 0 frames, 0 bad CRC, 0 overruns, 145 edges
+   870.702  I (872511) j1850: stats: 0 frames, 0 bad CRC, 0 overruns, 0 edges
+   880.700  I (882511) j1850: stats: 0 frames, 0 bad CRC, 0 overruns, 0 edges
+   890.702  I (892513) j1850: stats: 0 frames, 0 bad CRC, 0 overruns, 0 edges
+   900.704  I (902515) j1850: stats: 0 frames, 0 bad CRC, 0 overruns, 0 edges
+   910.706  I (912517) j1850: stats: 0 frames, 0 bad CRC, 0 overruns, 0 edges
+   920.709  I (922519) j1850: stats: 0 frames, 0 bad CRC, 0 overruns, 0 edges
+   930.709  I (932519) j1850: stats: 0 frames, 0 bad CRC, 0 overruns, 0 edges
+   940.713  I (942521) j1850: stats: 0 frames, 0 bad CRC, 0 overruns, 0 edges
+   950.714  I (952523) j1850: stats: 0 frames, 0 bad CRC, 0 overruns, 0 edges
+   960.714  I (962523) j1850: stats: 0 frames, 0 bad CRC, 0 overruns, 0 edges
+   970.717  I (972525) j1850: stats: 0 frames, 0 bad CRC, 0 overruns, 0 edges
+   980.719  I (982527) j1850: stats: 0 frames, 0 bad CRC, 0 overruns, 0 edges
+   990.721  I (992529) j1850: stats: 0 frames, 0 bad CRC, 0 overruns, 0 edges
+  1000.723  I (1002531) j1850: stats: 0 frames, 0 bad CRC, 0 overruns, 0 edges
+  1010.725  I (1012533) j1850: stats: 0 frames, 0 bad CRC, 0 overruns, 0 edges
+  1020.728  I (1022535) j1850: stats: 0 frames, 0 bad CRC, 0 overruns, 0 edges
+  1030.730  I (1032537) j1850: stats: 0 frames, 0 bad CRC, 0 overruns, 0 edges
+  1040.733  I (1042539) j1850: stats: 0 frames, 0 bad CRC, 0 overruns, 0 edges
+  1050.735  I (1052541) j1850: stats: 0 frames, 0 bad CRC, 0 overruns, 0 edges
+  1060.738  I (1062543) j1850: stats: 0 frames, 0 bad CRC, 0 overruns, 0 edges
+  1070.738  I (1072544) j1850: stats: 0 frames, 0 bad CRC, 0 overruns, 391 edges
+  1080.741  I (1082546) j1850: stats: 0 frames, 0 bad CRC, 0 overruns, 147 edges
+  1090.744  I (1092548) j1850: stats: 0 frames, 0 bad CRC, 0 overruns, 0 edges
+  1100.743  I (1102548) j1850: stats: 0 frames, 0 bad CRC, 0 overruns, 360 edges
+  1110.745  I (1112549) j1850: stats: 0 frames, 0 bad CRC, 0 overruns, 159 edges
+  1120.747  I (1122551) j1850: stats: 0 frames, 0 bad CRC, 0 overruns, 96 edges
+  1130.748  I (1132552) j1850: stats: 0 frames, 0 bad CRC, 0 overruns, 394 edges
+  1140.750  I (1142554) j1850: stats: 0 frames, 0 bad CRC, 0 overruns, 0 edges
+  1150.751  I (1152555) j1850: stats: 0 frames, 0 bad CRC, 0 overruns, 106 edges
+  1160.754  I (1162557) j1850: stats: 0 frames, 0 bad CRC, 0 overruns, 270 edges
+  1170.755  I (1172558) j1850: stats: 0 frames, 0 bad CRC, 0 overruns, 398 edges
+  1180.757  I (1182560) j1850: stats: 0 frames, 0 bad CRC, 0 overruns, 0 edges
+  1190.759  I (1192562) j1850: stats: 0 frames, 0 bad CRC, 0 overruns, 0 edges
+  1200.762  I (1202564) j1850: stats: 0 frames, 0 bad CRC, 0 overruns, 0 edges
+  1210.764  I (1212566) j1850: stats: 0 frames, 0 bad CRC, 0 overruns, 0 edges
+  1220.766  I (1222568) j1850: stats: 0 frames, 0 bad CRC, 0 overruns, 0 edges
+  1230.769  I (1232570) j1850: stats: 0 frames, 0 bad CRC, 0 overruns, 0 edges
+  1240.772  I (1242572) j1850: stats: 0 frames, 0 bad CRC, 0 overruns, 0 edges
+  1250.774  I (1252574) j1850: stats: 0 frames, 0 bad CRC, 0 overruns, 0 edges
+  1260.773  I (1262574) j1850: stats: 0 frames, 0 bad CRC, 0 overruns, 0 edges
+  1270.774  I (1272574) j1850: stats: 0 frames, 0 bad CRC, 0 overruns, 0 edges
+  1280.780  I (1282576) j1850: stats: 0 frames, 0 bad CRC, 0 overruns, 0 edges
+  1290.779  I (1292578) j1850: stats: 0 frames, 0 bad CRC, 0 overruns, 0 edges
+  1300.781  I (1302580) j1850: stats: 0 frames, 0 bad CRC, 0 overruns, 0 edges
+  1310.783  I (1312582) j1850: stats: 0 frames, 0 bad CRC, 0 overruns, 0 edges
+  1320.786  I (1322584) j1850: stats: 0 frames, 0 bad CRC, 0 overruns, 0 edges
+  1330.788  I (1332586) j1850: stats: 0 frames, 0 bad CRC, 0 overruns, 0 edges
+  1340.790  I (1342588) j1850: stats: 0 frames, 0 bad CRC, 0 overruns, 0 edges
+  1350.793  I (1352590) j1850: stats: 0 frames, 0 bad CRC, 0 overruns, 0 edges
+  1360.796  I (1362592) j1850: stats: 0 frames, 0 bad CRC, 0 overruns, 0 edges
+  1370.796  I (1372594) j1850: stats: 0 frames, 0 bad CRC, 0 overruns, 0 edges
+  3068.395  I (2314) esp32_p4_wifi6_touch_lcd_xc: Touch 0x5d found
+  3068.397  I (2314) GT911: I2C address initialization procedure skipped - using default GT9xx setup
+  3068.411  I (2335) GT911: TouchPad_ID:0x39,0x32,0x37
+  3068.415  I (2335) GT911: TouchPad_Config_Version:90
+  3068.429  W (2335) esp_lvgl:touch: LV_USE_GESTURE_RECOGNITION is disabled; only single-point pointer events are available
+  3068.432  I (2341) esp_lvgl:touch: Touch input device registered successfully (IRQ mode: disabled)
+  3068.438  I (2349) esp_lvgl:adapter: LVGL task started successfully
+  3068.447  I (2349) esp_lvgl:bridge: Initializing hardware resources
+  3068.455  I (2359) esp_lvgl:bridge: Hardware resources initialized successfully
+  3068.456  I (2375) emoji_font: emoji.ttf embedded: 1982596 bytes
+  3068.459  I (2376) emoji_font: emoji fallback attached: 26=0x4ff3f95c 33=0x4ff3faec
+  3068.464  I (2377) j1850: passive sniffer on GPIO20 (read-only build)
+  3068.615  W (2535) i2s_common: dma frame num is adjusted to 256 to align the dma buffer with 64, bufsize = 512
+  3068.627  W (2535) i2s_common: dma frame num is adjusted to 256 to align the dma buffer with 64, bufsize = 512
+  3068.627  I (2547) ES8311: Work in Slave mode
+  3068.637  I (2550) I2S_IF: Paired data: 0x4ff6d544, current mode: playback, paired in_enable: 0, paired out_enable: 0
+  3068.648  W (2554) i2s_common: dma frame num is adjusted to 256 to align the dma buffer with 64, bufsize = 512
+  3068.654  I (2563) I2S_IF: STD: TX, data_bit: 16, slot_bit: 16, ws_width: 16, slot_mode: MONO, slot_mask: 0x1
+  3068.663  I (2572) I2S_IF: STD: TX, sample_rate_hz: 22050, mclk_multiple: 256, clk_src: 0
+  3068.669  I (2594) Adev_Codec: Open codec device OK
+  3068.696  I (2617) transport: Attempt connection with slave: retry[0]
+  3068.698  W (2617) H_SDIO_DRV: Reset slave using GPIO[54]
+  3068.700  I (2617) os_wrapper_esp: GPIO [54] configured
+  3070.259  I (4179) sdio_wrapper: SDIO master: Slot 1, Data-Lines: 4-bit Freq(KHz)[40000 KHz]
+  3070.265  I (4179) sdio_wrapper: GPIOs: CLK[18] CMD[19] D0[14] D1[15] D2[16] D3[17] Slave_Reset[54]
+  3070.269  I (4183) sdio_wrapper: Queues: Tx[6] Rx[6] SDIO-Rx-Mode[1]
+  3070.328  I (4251) sdio_wrapper: Function 0 Blocksize: 512
+  3070.329  I (4251) sdio_wrapper: Function 1 Blocksize: 512
+  3070.428  I (4351) H_SDIO_DRV: Card init success, TRANSPORT_RX_ACTIVE
+  3070.431  I (4351) transport: set_transport_state: 1
+  3070.437  I (4351) transport: Waiting for esp_hosted slave to be ready
+  3070.444  I (4356) H_SDIO_DRV: SDIO Host operating in STREAMING MODE
+  3070.448  I (4356) H_SDIO_DRV: Starting SDIO process rx task
+  3070.453  I (4360) H_SDIO_DRV: Open data path at slave
+  3070.454  I (4374) H_SDIO_DRV: Received ESP_PRIV_IF type message
+  3070.461  I (4374) transport: Received INIT event from ESP32 peripheral
+  3070.464  I (4378) transport: EVENT: 12
+  3070.470  I (4381) transport: Identified slave [esp32c6]
+  3070.470  I (4385) transport: EVENT: 11
+  3070.475  I (4388) transport: capabilities: 0xd
+  3070.476  I (4391) transport: Features supported are:
+  3070.481  I (4395) transport: 	 * WLAN
+  3070.488  I (4398) transport: 	   - HCI over SDIO
+  3070.488  I (4401) transport: 	   - BLE only
+  3070.494  I (4404) transport: EVENT: 13
+  3070.498  W (4407) transport: Version mismatch: Host [2.12.0] > Co-proc [0.0.0] ==> Upgrade co-proc to avoid RPC timeouts
+  3070.506  I (4417) transport: ESP board type is : 13
+  3070.509  I (4421) transport: Base transport is set-up, TRANSPORT_TX_ACTIVE
+  3070.514  I (4427) H_API: Transport active
+  3070.515  I (4430) transport: Slave chip Id[12]
+  3070.523  I (4433) transport: raw_tp_dir[-], flow_ctrl: low[60] high[80]
+  3070.525  I (4439) transport: transport_delayed_init
+  3070.531  I (4443) esp_cli: Registering command: crash
+  3070.532  I (4447) esp_cli: Registering command: reboot
+  3070.537  I (4451) esp_cli: Registering command: mem-dump
+  3070.542  I (4455) esp_cli: Registering command: task-dump
+  3070.548  I (4459) esp_cli: Registering command: cpu-dump
+  3070.553  I (4464) esp_cli: Registering command: heap-trace
+  3070.554  I (4468) esp_cli: Registering command: sock-dump
+  3070.563  I (4472) esp_cli: Registering command: host-power-save
+  3070.565  I (4477) vhci_drv: Host BT Support: Enabled
+  3070.570  I (4481) vhci_drv: 	BT Transport Type: VHCI
+  3070.571  I (4485) H_SDIO_DRV: Received INIT event
+  3070.578  I (4489) H_SDIO_DRV: Event type: 0x22
+  3070.579  I (4492) H_SDIO_DRV: Write thread started
+  3070.630  I (4554) vrod_gauge: boot complete
+  3070.630  I (4554) main_task: Returned from app_main()
+  3070.646  I (4567) NimBLE: GAP procedure initiated: stop advertising.
+  3070.647  I (4569) NimBLE: GAP procedure initiated: stop advertising.
+  3070.654  I (4572) NimBLE: GAP procedure initiated: advertise;
+  3070.658  I (4572) NimBLE: disc_mode=0
+  3070.664  I (4574) NimBLE:  direct_addr_type=0 direct_addr=
+  3070.664  I (4579) NimBLE: 24:24:b7:82:1e:6e
+  3070.675  I (4582) NimBLE:  adv_channel_map=0 own_addr_type=0 adv_filter_policy=0 adv_itvl_min=0 adv_itvl_max=0
+  3070.675  I (4591) NimBLE:
+  3070.678  I (4596) ble_peripheral: advertising (directed) to bonded peer
+  3070.928  I (4856) RPC_WRAP: Coprocessor Boot-up
+  3078.453  I (12378) j1850: stats: 0 frames, 0 bad CRC, 0 overruns, 0 edges
+  3088.455  I (22380) j1850: stats: 0 frames, 0 bad CRC, 0 overruns, 0 edges
+  3098.459  I (32382) j1850: stats: 0 frames, 0 bad CRC, 0 overruns, 0 edges
+  3108.461  I (42384) j1850: stats: 0 frames, 0 bad CRC, 0 overruns, 0 edges
+  3118.462  I (52386) j1850: stats: 0 frames, 0 bad CRC, 0 overruns, 0 edges
+  3128.468  I (62386) j1850: stats: 0 frames, 0 bad CRC, 0 overruns, 0 edges
+  3138.464  I (72388) j1850: stats: 0 frames, 0 bad CRC, 0 overruns, 0 edges
+  3148.464  I (82388) j1850: stats: 0 frames, 0 bad CRC, 0 overruns, 0 edges
+  3158.466  I (92390) j1850: stats: 0 frames, 0 bad CRC, 0 overruns, 0 edges
+  3168.470  I (102392) j1850: stats: 0 frames, 0 bad CRC, 0 overruns, 0 edges
+  3178.471  I (112394) j1850: stats: 0 frames, 0 bad CRC, 0 overruns, 0 edges
+  3188.473  I (122396) j1850: stats: 0 frames, 0 bad CRC, 0 overruns, 0 edges
+  3198.476  I (132398) j1850: stats: 0 frames, 0 bad CRC, 0 overruns, 0 edges
+  3208.476  I (142398) j1850: stats: 0 frames, 0 bad CRC, 0 overruns, 0 edges

@@ -1,0 +1,121 @@
+     3.884  I (32378) j1850: stats: 0 frames, 0 bad CRC, 0 overruns, 0 edges
+    13.886  I (42380) j1850: stats: 0 frames, 0 bad CRC, 0 overruns, 0 edges
+    23.888  I (52382) j1850: stats: 0 frames, 0 bad CRC, 0 overruns, 0 edges
+    33.891  I (62384) j1850: stats: 0 frames, 0 bad CRC, 0 overruns, 0 edges
+    43.894  I (72386) j1850: stats: 0 frames, 0 bad CRC, 0 overruns, 0 edges
+    53.136  I (81627) j1850: raw  1: low  79253697 us
+    53.140  I (81627) j1850: raw  2: HIGH   194 us
+    53.141  I (81627) j1850: raw  3: low     71 us
+    53.146  I (81627) j1850: raw  4: HIGH    58 us
+    53.152  I (81630) j1850: raw  5: low    135 us
+    53.153  I (81633) j1850: raw  6: HIGH   121 us
+    53.157  I (81637) j1850: raw  7: low    136 us
+    53.162  I (81640) j1850: raw  8: HIGH   121 us
+    53.164  I (81644) j1850: raw  9: low     71 us
+    53.170  I (81647) j1850: raw 10: HIGH   122 us
+    53.171  I (81651) j1850: raw 11: low    136 us
+    53.174  I (81654) j1850: raw 12: HIGH    56 us
+    53.179  I (81658) j1850: raw 13: low    137 us
+    53.180  I (81661) j1850: raw 14: HIGH    56 us
+    53.185  I (81665) j1850: raw 15: low    136 us
+    53.190  I (81668) j1850: raw 16: HIGH    56 us
+    53.190  I (81671) j1850: raw 17: HIGH   136 us
+    53.196  I (81675) j1850: raw 18: low     57 us
+    53.196  I (81678) j1850: raw 19: HIGH    70 us
+    53.202  I (81682) j1850: raw 20: low     58 us
+    53.207  I (81685) j1850: raw 21: HIGH    71 us
+    53.207  I (81689) j1850: raw 22: low    122 us
+    53.213  I (81692) j1850: raw 23: HIGH    70 us
+    53.218  I (81696) j1850: raw 24: low    122 us
+    53.219  I (81699) j1850: raw 25: HIGH    70 us
+    53.224  I (81703) j1850: raw 26: low    123 us
+    53.225  I (81706) j1850: raw 27: HIGH    70 us
+    53.229  I (81710) j1850: raw 28: low    123 us
+    53.235  I (81713) j1850: raw 29: HIGH    70 us
+    53.236  I (81717) j1850: raw 30: low    123 us
+    53.241  I (81720) j1850: raw 31: HIGH    70 us
+    53.246  I (81724) j1850: raw 32: low    122 us
+    53.247  I (81727) j1850: raw 33: HIGH   135 us
+    53.251  I (81730) j1850: raw 34: low    122 us
+    53.252  I (81734) j1850: raw 35: HIGH   136 us
+    53.257  I (81737) j1850: raw 36: low     61 us
+    53.262  I (81741) j1850: raw 37: HIGH    67 us
+    53.263  I (81744) j1850: raw 38: low    121 us
+    53.268  I (81748) j1850: raw 39: HIGH    71 us
+    53.273  I (81751) j1850: raw 40: low     57 us
+    53.274  I (81755) j1850: raw 41: HIGH    71 us
+    53.279  I (81758) j1850: raw 42: low     57 us
+    53.279  I (81762) j1850: raw 43: HIGH 97657 us
+    53.285  I (81765) j1850: raw 44: low    194 us
+    53.289  I (81769) j1850: raw 45: HIGH    71 us
+    53.290  I (81772) j1850: raw 46: low     56 us
+    53.896  I (82388) j1850: stats: 0 frames, 0 bad CRC, 0 overruns, 46 edges
+    58.356  I (86847) j1850: raw 47: HIGH 5118367 us
+    58.361  I (86847) j1850: raw 48: low     56 us
+    58.361  I (86847) j1850: raw 49: HIGH    74 us
+    58.367  I (86847) j1850: raw 50: low    118 us
+    58.372  I (86850) j1850: raw 51: HIGH    72 us
+    58.372  I (86854) j1850: raw 52: low    123 us
+    58.378  I (86857) j1850: raw 53: HIGH    70 us
+    58.383  I (86860) j1850: raw 54: low    121 us
+    58.383  I (86864) j1850: raw 55: HIGH    71 us
+    58.389  I (86867) j1850: raw 56: low    121 us
+    58.389  I (86871) j1850: raw 57: HIGH    72 us
+    58.397  I (86874) j1850: raw 58: low     56 us
+    58.400  I (86878) j1850: raw 59: HIGH   137 us
+    58.400  I (86881) j1850: raw 60: low     55 us
+    58.405  I (86885) j1850: raw 61: HIGH    72 us
+    58.411  I (86888) j1850: raw 62: low    121 us
+    58.412  I (86892) j1850: raw 63: HIGH    71 us
+    58.413  I (86895) j1850: raw 64: low    122 us
+    63.897  I (92388) j1850: stats: 0 frames, 0 bad CRC, 0 overruns, 277 edges
+    73.897  I (102389) j1850: stats: 0 frames, 0 bad CRC, 0 overruns, 400 edges
+    83.900  I (112391) j1850: stats: 0 frames, 0 bad CRC, 0 overruns, 840 edges
+    93.901  I (122392) j1850: stats: 0 frames, 0 bad CRC, 0 overruns, 785 edges
+   103.903  I (132394) j1850: stats: 0 frames, 0 bad CRC, 0 overruns, 59 edges
+   113.904  I (142395) j1850: stats: 0 frames, 0 bad CRC, 0 overruns, 231 edges
+   123.906  I (152396) j1850: stats: 0 frames, 0 bad CRC, 0 overruns, 407 edges
+   133.908  I (162398) j1850: stats: 0 frames, 0 bad CRC, 0 overruns, 840 edges
+   143.910  I (172400) j1850: stats: 0 frames, 0 bad CRC, 0 overruns, 715 edges
+   153.912  I (182402) j1850: stats: 0 frames, 0 bad CRC, 0 overruns, 0 edges
+   163.914  I (192403) j1850: stats: 0 frames, 0 bad CRC, 0 overruns, 654 edges
+   173.916  I (202405) j1850: stats: 0 frames, 0 bad CRC, 0 overruns, 98 edges
+   183.919  I (212407) j1850: stats: 0 frames, 0 bad CRC, 0 overruns, 0 edges
+   193.921  I (222409) j1850: stats: 0 frames, 0 bad CRC, 0 overruns, 20 edges
+   203.923  I (232411) j1850: stats: 0 frames, 0 bad CRC, 0 overruns, 296 edges
+   213.931  I (242412) j1850: stats: 0 frames, 0 bad CRC, 0 overruns, 312 edges
+   223.926  I (252414) j1850: stats: 0 frames, 0 bad CRC, 0 overruns, 0 edges
+   233.928  I (262415) j1850: stats: 0 frames, 0 bad CRC, 0 overruns, 429 edges
+   243.389  I (271877) j1850: 68 FF 60 03 AD | CRC OK
+   243.930  I (272417) j1850: stats: 1 frames, 0 bad CRC, 0 overruns, 780 edges
+   253.941  I (282419) j1850: stats: 1 frames, 0 bad CRC, 0 overruns, 0 edges
+   263.938  I (292421) j1850: stats: 1 frames, 0 bad CRC, 0 overruns, 56 edges
+   273.937  I (302423) j1850: stats: 1 frames, 0 bad CRC, 0 overruns, 840 edges
+   283.939  I (312425) j1850: stats: 1 frames, 0 bad CRC, 0 overruns, 76 edges
+   293.942  I (322427) j1850: stats: 1 frames, 0 bad CRC, 0 overruns, 12 edges
+   303.944  I (332429) j1850: stats: 1 frames, 0 bad CRC, 0 overruns, 444 edges
+   313.945  I (342430) j1850: stats: 1 frames, 0 bad CRC, 0 overruns, 26 edges
+   323.949  I (352431) j1850: stats: 1 frames, 0 bad CRC, 0 overruns, 50 edges
+   333.949  I (362433) j1850: stats: 1 frames, 0 bad CRC, 0 overruns, 165 edges
+   343.954  I (372434) j1850: stats: 1 frames, 0 bad CRC, 0 overruns, 548 edges
+   353.954  I (382436) j1850: stats: 1 frames, 0 bad CRC, 0 overruns, 0 edges
+   363.955  I (392438) j1850: stats: 1 frames, 0 bad CRC, 0 overruns, 387 edges
+   373.958  I (402440) j1850: stats: 1 frames, 0 bad CRC, 0 overruns, 164 edges
+   383.959  I (412442) j1850: stats: 1 frames, 0 bad CRC, 0 overruns, 0 edges
+   393.964  I (422444) j1850: stats: 1 frames, 0 bad CRC, 0 overruns, 0 edges
+   403.963  I (432445) j1850: stats: 1 frames, 0 bad CRC, 0 overruns, 8 edges
+   413.964  I (442446) j1850: stats: 1 frames, 0 bad CRC, 0 overruns, 347 edges
+   423.967  I (452448) j1850: stats: 1 frames, 0 bad CRC, 0 overruns, 12 edges
+   433.969  I (462449) j1850: stats: 1 frames, 0 bad CRC, 0 overruns, 509 edges
+   443.970  I (472451) j1850: stats: 1 frames, 0 bad CRC, 0 overruns, 0 edges
+   453.971  I (482452) j1850: stats: 1 frames, 0 bad CRC, 0 overruns, 470 edges
+   463.973  I (492453) j1850: stats: 1 frames, 0 bad CRC, 0 overruns, 262 edges
+   473.975  I (502455) j1850: stats: 1 frames, 0 bad CRC, 0 overruns, 593 edges
+   483.975  I (512455) j1850: stats: 1 frames, 0 bad CRC, 0 overruns, 64 edges
+   493.977  I (522456) j1850: stats: 1 frames, 0 bad CRC, 0 overruns, 30 edges
+   503.978  I (532457) j1850: stats: 1 frames, 0 bad CRC, 0 overruns, 838 edges
+   513.980  I (542458) j1850: stats: 1 frames, 0 bad CRC, 0 overruns, 615 edges
+   523.984  I (552460) j1850: stats: 1 frames, 0 bad CRC, 0 overruns, 0 edges
+   533.985  I (562462) j1850: stats: 1 frames, 0 bad CRC, 0 overruns, 496 edges
+   543.986  I (572463) j1850: stats: 1 frames, 0 bad CRC, 0 overruns, 396 edges
+   553.994  I (582465) j1850: stats: 1 frames, 0 bad CRC, 0 overruns, 270 edges

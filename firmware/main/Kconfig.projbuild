@@ -129,6 +129,112 @@ menu "V-Rod cluster"
             The 10k/4.7k divider node (bus 7V → ~2.2V). Set to the
             header pin you actually wired.
 
+    config VROD_J1850_ADC_GPIO
+        int "Bus-amplitude ADC probe GPIO (-1 = off)"
+        depends on VROD_J1850_SNIFFER
+        range -1 54
+        default -1
+        help
+            Stage 4 TX-prep diagnostic. Reads node B (the RX divider
+            output) via the ADC on a DEDICATED GPIO — run a second wire
+            from node B to this header pin. Must NOT be the sniffer pin
+            (VROD_J1850_RX_GPIO / GPIO 20): that pin can't be time-shared
+            between the digital edge ISR + glitch filter and the ADC (the
+            analog read comes back garbage). Use GPIO 22 (ADC1 ch6, free
+            on the header). Logs bus idle/low levels every 2 s; the idle
+            (max) reading is the resting-HIGH voltage the TX driver must
+            overcome. -1 compiles the probe out. Bench diagnostic only.
+
+    config VROD_J1850_GLITCH_NS
+        int "RX glitch-filter window (ns, 0 = filter off)"
+        depends on VROD_J1850_SNIFFER
+        range 0 1600
+        default 0
+        help
+            Hardware flex glitch-filter window on the RX pin: a pulse
+            narrower than this is discarded before it reaches the
+            interrupt matrix. Clocked from the 40 MHz XTAL, so the
+            window is quantised to 25 ns steps and the P4's 64-tick
+            field caps it at 1600 ns — the hardware CANNOT do the
+            1-5 us some notes imagined.
+
+            Default 0 (off), and this is settled, not provisional. The
+            on-bike glitch-window sweep decoded ZERO frames at every
+            nonzero window (400/800/1200/1600 ns alike) while 0 ns gave
+            546 frames / 0 bad CRC — a hard cliff, not a gradient. Cause:
+            the flex filter delays the filtered edge relative to the
+            sniffer ISR's gpio_get_level() read, so the level recorded
+            for the just-ended pulse is systematically wrong and frames
+            never assemble. The delay amount barely matters, so no window
+            is usable. (This same edge/level desync, not any real bus
+            inversion, is what the removed RX_INVERT flag was masking.)
+
+            Noise immunity for the permanent harness is therefore
+            deferred to an RX hysteresis (comparator / Schmitt) front end
+            in Phase 6 — see the master plan Phase 6 note. A software
+            alternative that could let a conservative filter coexist is
+            designed in firmware/docs/j1850-toggling-isr-candidate.md
+            (infer the level by toggling instead of reading the pin). Use
+            VROD_J1850_GLITCH_SWEEP to re-measure if the front end
+            changes.
+
+    config VROD_J1850_GLITCH_SWEEP
+        bool "Auto-sweep the RX glitch window (bench diagnostic)"
+        depends on VROD_J1850_SNIFFER
+        default n
+        help
+            Temporary hands-free bench tool. Ignores VROD_J1850_GLITCH_NS
+            and instead cycles the window through 0 / 400 / 800 / 1200 /
+            1600 ns (1600 = the XTAL-clocked hardware ceiling), dwelling
+            ~9 s each and resetting all counters at every change, then
+            loops. Prints a labeled block per window:
+
+              filter=<Xns> [pass K]: frames=.. badCRC=.. ovr=.. same-level=..
+
+            so a single engine start compares every window across both
+            idle and a throttle blip. The BENCH screen shows the current
+            window + seconds remaining so you know when to blip mid-window
+            (not on a boundary). Tracks the largest window that stayed
+            clean (same-level=0 AND badCRC=0) across ALL passes. Never
+            enable in a real build.
+
+    config VROD_J1850_TX
+        bool "J1850 VPW transmitter (Phase 3 Stage 4)"
+        default n
+        help
+            Compiles the TX driver: RMT-timed VPW symbols from the
+            host-tested j1850_vpw.c encoder, driving the high-side
+            transceiver (standard VPW, TX GPIO HIGH = bus dominant). An
+            independent gptimer watchdog forces the line recessive (LOW)
+            if a dominant persists past the longest valid symbol — a
+            stuck-HIGH TX jams the whole bus. Off by default; only Stage 4
+            builds set it. Physically wire the TX transistor stage
+            (docs/schematics/j1850_tx.svg) only after the self-sniff loop
+            below validates the firmware.
+
+    config VROD_J1850_TX_GPIO
+        int "GPIO driving the TX transceiver (Q1 gate via R3)"
+        depends on VROD_J1850_TX
+        range 0 54
+        default 24
+        help
+            A free header pin (see firmware/docs/PINS.md — 24 is the first
+            unclaimed one, clear of RX/GPS/ADC). Confirm the physical hole
+            with VROD_PIN_WIGGLE_GPIO before soldering. Boots and idles LOW
+            (recessive); only driven HIGH while emitting a dominant symbol.
+
+    config VROD_J1850_TX_SELFTEST
+        bool "TX self-sniff bench validation loop"
+        depends on VROD_J1850_TX && VROD_J1850_SNIFFER
+        default n
+        help
+            Bench gate before the bike: emits the IM keep-alive set on TX,
+            the unchanged RX sniffer decodes it off the same bus node, and
+            each frame is logged PASS/FAIL with the decoded bytes + CRC
+            verdict. Needs the TX output tied to the RX bus node with the
+            bench recessive-LOW termination (see the Stage 4 section of
+            docs/03-PHASE3-J1850-GPS-PLAN.md). Bench only.
+
     config VROD_BLE_INSECURE
         bool "Skip BLE pairing — any central can connect"
         default n

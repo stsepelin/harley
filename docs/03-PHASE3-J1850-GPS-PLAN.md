@@ -56,12 +56,25 @@ Phase 3 kickoff — the old drawing would jam the bus:
 
 ### Stage 2 — Passive sniff (bike + proxy box, stock cluster in place)
 
-> **Bench portion ✅ (July 2026).** Two-wire link verified end to end:
-> divider node → GPIO 20, common ground, ESP on its own USB. BENCH
-> screen showed LINE reacting to input toggling (pin identity proven,
-> 5218 edges from manual toggling), FRAMES 0 / bad 0 / ovr 0 in
-> silence — the decoder correctly refuses noise. What remains in this
-> stage is the bike half below.
+> **✅ LIVE SNIFF DONE (2026-07-04).** Full on-bike capture session —
+> ignition-on, discrete inputs, and engine running — all decoded. See
+> `firmware/docs/captures/SESSION-2026-07-04.md` for the complete
+> record. Headlines:
+> - Bus polarity **RESOLVED (2026-07-04): standard VPW** (idle LOW,
+>   dominant HIGH → **high-side TX**). The old "needs `RX_INVERT`"
+>   reading was the 500 ns glitch filter dropping the recessive edge;
+>   with the filter off, decode is clean with no invert flag (546
+>   frames, 0 bad CRC). `RX_INVERT` removed, glitch filter defaults off.
+>   See the master plan transceiver section + session notes.
+> - Decoded live: **RPM** (tracked idle→4125), **temp** (raw °C,
+>   confirmed), gear, check-engine, fuel-consumption ticks, turn
+>   signals (L/R swapped vs the table). ~2% bad CRC even at 5k rpm.
+> - **IM keep-alive set identified** (`68 FF 40/60`, `29 FE 40/60`,
+>   steady ~2 s) — the Stage 4 replay targets.
+> - Beam + neutral are **discrete wires** (pins 2/10), not on the bus.
+>
+> Still open in Stage 2: a **riding capture** for road speed
+> (`48 29 10 02`) + its km/h-vs-mph divisor. Everything else is done.
 
 - T-tap pin 7 (LGN/V, J1850 data) through the proxy box; RX-only
   transceiver → P4 GPIO.
@@ -118,17 +131,76 @@ Phase 3 kickoff — the old drawing would jam the bus:
 
 ### Stage 4 — IM simulation + TX
 
-- Populate the TX half (IRLZ44N + PNP + 100Ω). Verify on the bench PSU
-  before the bike: TX GPIO high must put ~7V on the bus node, idle must
-  read 0V. **A stuck-high TX jams the whole bus** — add a watchdog that
-  hard-disables TX if a symbol runs long.
-- VPW symbol *encoder* (same `j1850_vpw.c` module, host-tested) + RMT
-  TX with the required IFS/arbitration waits.
-- Replay the Stage 2 IM message set at captured intervals.
-- Test ladder: replay onto the bench bus (sniff own TX, CRC-check) →
-  bike with stock cluster still attached (no DTCs while both talk) →
-  disconnect stock cluster → check for U1255 / TSSM lockout → full key
-  fob unlock → start → ride → stop cycle.
+> **TX firmware landed (2026-07): driver + watchdog + self-sniff loop.**
+> `CONFIG_VROD_J1850_TX` compiles `j1850_tx.c` (RMT-timed VPW from the
+> host-tested `j1850_vpw.c` encoder) + `j1850_tx_logic.c` (pure: CRC
+> frame build + the dominant-time guard, host tests at 100%). No TX
+> hardware is built yet — build the transistor stage
+> (`schematics/j1850_tx.svg`) only after the self-sniff loop below passes.
+
+**Polarity (settled): standard VPW, high-side.** TX GPIO **HIGH = bus
+dominant** (Q1 → Q2 sources ~7V); **LOW = recessive** (released). This is
+the reverse of the old inversion-era note — the jam condition is
+stuck-**HIGH**, not stuck-low.
+
+**Watchdog (mandatory, implemented).** Three layers, none relying on the
+TX task loop:
+1. Pre-transmit pure guard (`j1850_tx_stream_within_limits`) refuses any
+   stream whose active symbol exceeds `J1850_TX_DOMINANT_MAX_US` (300 µs,
+   margin over the 200 µs SOF). The encoder never emits one; a failure
+   means upstream corruption.
+2. An independent gptimer samples the (input-enabled) TX pad every 50 µs;
+   a dominant that outlasts 300 µs makes its ISR detach the pad from RMT
+   and drive it LOW — ISR-safe register writes, fires even if the task
+   hangs. Latches a fault; TX stays disabled until re-init.
+3. RMT `init_level` / `eot_level` = LOW and a boot-time output-LOW keep
+   the line recessive before, between, and after frames; the hardware
+   gate pulldown (Q1 gate → GND) backs it up.
+
+**TX GPIO: `CONFIG_VROD_J1850_TX_GPIO`, default 24** — the first free
+header pin (see `firmware/docs/PINS.md`), clear of RX (20) / GPS (21) /
+fuel-ADC (22). Confirm the physical hole with `VROD_PIN_WIGGLE_GPIO`
+before soldering.
+
+**Bench self-sniff wiring (recessive = LOW).** With no vehicle, nothing
+else defines the recessive state, so the bench must:
+- Tie the **TX collector output (after R5) to the RX bus node** — the
+  same node the RX divider taps (`schematics/j1850_rx.svg`).
+- Add a **bus pull-down to GND** (≈10 kΩ) at that node so the line rests
+  **LOW = recessive** when Q2 is off; Q2 turning on pulls it **HIGH =
+  dominant**. (On the bike the other nodes hold recessive; the bench
+  pull-down stands in for them. Do NOT add a pull-up — that was the
+  inverted-bus mistake.)
+- Common ground between the PSU, the transceiver, and the P4.
+- Bench-check first with a PSU/DMM: TX GPIO HIGH → ~7 V at the bus node,
+  idle → ~0 V. The 7.5 V zener (RX drawing) clamps the driven level.
+- Optionally watch the **dominant→recessive fall** on the GPIO 22 ADC
+  probe: the passive recessive fall is slow, so confirm it settles LOW
+  between symbols — if not, the bench pull-down is too weak.
+
+**Self-sniff validation (`CONFIG_VROD_J1850_TX_SELFTEST`).** The TX task
+emits the IM keep-alive set; the unchanged RX sniffer decodes it off the
+shared node; each frame logs one line:
+```
+j1850tx: self-sniff PASS: rx [68 FF 40 03 D8 ] CRC OK
+j1850tx: self-sniff FAIL: sent=1 decoded=0 rx [(none)] CRC BAD [TX FAULT]
+```
+plus a periodic `self-sniff tally: N pass, M fail`. **Every frame must
+PASS before the bike.**
+
+- Replay the Stage 2 IM message set at captured intervals (the same
+  keep-alive set the self-sniff emits).
+- Test ladder: **(1)** watchdog trigger test — on boot the selftest build
+  runs `wd_selftest()`, which drives the pad dominant BYPASSING RMT + the
+  pre-transmit guard and confirms layer 2 (the gptimer ISR) detaches the
+  pad and drives it LOW; must log `watchdog trigger test: PASS` (this is
+  also the acceptance test for the P4 pad readback, so a FAIL means the
+  watchdog is blind — stop) → **(2)** bench self-sniff — emit → own
+  sniffer decodes, CRC-valid, every frame PASS → **(3)** bike with stock
+  cluster still attached (no DTCs while both talk) → **(4)** later,
+  separately: disconnect stock cluster → U1255 / TSSM lockout checks →
+  full key fob unlock → start → ride → stop. One variable at a time; (1)
+  and (2) gate the bike.
 - Fallback if TSSM security fails without the stock IM: keep the stock
   IM wired in parallel under the airbox (master plan option C).
 

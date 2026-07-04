@@ -42,12 +42,20 @@ def main() -> int:
         CAPTURES_DIR / (datetime.datetime.now().strftime("%Y-%m-%d-%H%M") + ".log")
     out_path.parent.mkdir(parents=True, exist_ok=True)
 
-    try:
-        ser = serial.Serial(args.port, 115200, timeout=1)
-    except serial.SerialException as e:
-        print(f"cannot open {args.port}: {e}", file=sys.stderr)
-        print("is the cluster plugged in? (ls /dev/cu.usbmodem*)", file=sys.stderr)
-        return 1
+    def open_port():
+        # Garage reality: USB gets bumped. Wait for the port instead of
+        # dying — Ctrl-C still exits cleanly with the summary.
+        announced = False
+        while True:
+            try:
+                return serial.Serial(args.port, 115200, timeout=1)
+            except serial.SerialException:
+                if not announced:
+                    print(f"waiting for {args.port} (plug the board in; Ctrl-C to stop)...")
+                    announced = True
+                time.sleep(2)
+
+    ser = open_port()
     if args.reset:
         ser.setDTR(False)
         ser.setRTS(True)
@@ -62,7 +70,17 @@ def main() -> int:
     try:
         with open(out_path, "w", encoding="utf-8") as out:
             while True:
-                raw = ser.readline()
+                try:
+                    raw = ser.readline()
+                except serial.SerialException:
+                    print("-- USB link lost; waiting for the board to come back --")
+                    try:
+                        ser.close()
+                    except Exception:
+                        pass
+                    ser = open_port()
+                    print("-- reconnected, capture continues --")
+                    continue
                 if not raw:
                     continue
                 line = ANSI_RE.sub("", raw.decode("utf-8", "replace")).rstrip()

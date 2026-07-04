@@ -3,6 +3,12 @@
 #include "theme.h"
 #include "ui_manager.h"
 #include <stdio.h>
+#if CONFIG_VROD_J1850_GLITCH_SWEEP
+#include "esp_timer.h"
+#endif
+#if CONFIG_VROD_J1850_ADC_GPIO >= 0
+#include "j1850_adc_probe.h"
+#endif
 
 LV_FONT_DECLARE(jbm_bold_45);
 LV_FONT_DECLARE(jbm_bold_33);
@@ -11,24 +17,26 @@ LV_FONT_DECLARE(jbm_bold_26);
 // Same bezel-clearance geometry as the settings screen.
 #define ROW_W 540
 
-// Divider ratio for the back-calculated bus voltage: the pin sees
-// R2/(R1+R2) of the bus node (10k/4.7k), so bus_mv = pin_mv * 147/47.
+// node B (RX divider output) → bus voltage: bus_mv = node_B_mv * 147/47
+// (10k/4.7k inverse). The amplitude probe already applies this for its
+// serial log; the screen re-applies it for display.
 #define BUS_FROM_PIN_MV(mv) ((mv) * 147 / 47)
 
-// 2 Hz: fast enough to watch a PSU knob, slow enough that the ADC's
-// brief analog-mode window (which blinds the edge IRQ) stays harmless.
 #define REFRESH_MS 500
 
 static lv_obj_t *s_scr;
-static lv_obj_t *s_pin_value;
-static lv_obj_t *s_bus_value;
+static lv_obj_t *s_amp_value;
+static lv_obj_t *s_amp_lo;
 static lv_obj_t *s_line_value;
 static lv_obj_t *s_frames_value;
 static lv_obj_t *s_last_value;
+#if CONFIG_VROD_J1850_GLITCH_SWEEP
+static lv_obj_t *s_sweep_value;
+#endif
 
 // Skip-if-unchanged caches (house rule: setters never re-render for
 // the same value).
-static int      s_shown_mv = -2;  // -1 is a legal value ("N/A")
+static int      s_shown_amp_max = -2;
 static bool     s_shown_level;
 static uint32_t s_shown_edges  = UINT32_MAX;
 static uint32_t s_shown_frames = UINT32_MAX;
@@ -62,30 +70,42 @@ static lv_obj_t *make_caption(lv_obj_t *row, const char *text, lv_align_t align,
 static void refresh_cb(lv_timer_t *t)
 {
     (void)t;
-    // The screen object outlives visibility; only burn ADC samples (and
-    // the edge-IRQ blind window they cost) while actually being looked at.
+    // The screen object outlives visibility; skip work while hidden.
     if (lv_screen_active() != s_scr)
         return;
 
     char buf[48];
 
-    int mv = j1850_sniffer_sample_pin_mv();
-    if (mv != s_shown_mv) {
-        s_shown_mv = mv;
-        if (mv < 0) {
-            lv_label_set_text(s_pin_value, "N/A");
-            lv_label_set_text(s_bus_value, "no ADC on this pin");
-        } else {
-            snprintf(buf, sizeof(buf), "%d.%03dV", mv / 1000, mv % 1000);
-            lv_label_set_text(s_pin_value, buf);
-            int bus = BUS_FROM_PIN_MV(mv);
-            snprintf(buf, sizeof(buf), "bus =%d.%02dV", bus / 1000, (bus % 1000) / 10);
-            lv_label_set_text(s_bus_value, buf);
-        }
+#if CONFIG_VROD_J1850_ADC_GPIO >= 0
+    // Bus amplitude from the dedicated ADC probe (GPIO 22, second wire
+    // off node B). On this active-low bus, MAX = idle resting (HIGH)
+    // level — the number Stage 4 TX must overcome. MIN reads the driven
+    // (LOW) level only if a sample landed inside a pulse.
+    int amp_max, amp_min;
+    if (j1850_adc_probe_get(&amp_max, &amp_min) && amp_max != s_shown_amp_max) {
+        s_shown_amp_max = amp_max;
+        int hi          = BUS_FROM_PIN_MV(amp_max);
+        int lo          = BUS_FROM_PIN_MV(amp_min);
+        snprintf(buf, sizeof(buf), "%d.%02dV", hi / 1000, (hi % 1000) / 10);
+        lv_label_set_text(s_amp_value, buf);
+        snprintf(buf, sizeof(buf), "lo %d.%02dV", lo / 1000, (lo % 1000) / 10);
+        lv_label_set_text(s_amp_lo, buf);
     }
+#endif
 
     j1850_sniffer_stats_t st;
     j1850_sniffer_get_stats(&st);
+
+#if CONFIG_VROD_J1850_GLITCH_SWEEP
+    if (st.sweep_active) {
+        int rem = (int)((st.sweep_deadline_us - esp_timer_get_time()) / 1000000);
+        if (rem < 0)
+            rem = 0;
+        snprintf(buf, sizeof(buf), "SWEEP %luns  %ds  p%lu", (unsigned long)st.sweep_ns, rem,
+                 (unsigned long)st.sweep_pass);
+        lv_label_set_text(s_sweep_value, buf);
+    }
+#endif
 
     if (st.pin_level != s_shown_level || st.edges_last_period != s_shown_edges) {
         s_shown_level = st.pin_level;
@@ -137,17 +157,33 @@ lv_obj_t *screen_bench_create(void)
     lv_obj_set_style_text_font(title, &jbm_bold_45, 0);
     lv_obj_align(title, LV_ALIGN_TOP_MID, 0, 50);
 
-    // RX PIN — calibrated mV at the GPIO, and what that implies at the
-    // bus node through the 10k/4.7k divider. 7.00V on the bench PSU
-    // should read ~2.24V pin / ~7.0V bus.
-    lv_obj_t *pin_row = make_row(s_scr, 130, 130);
-    make_caption(pin_row, "RX PIN", LV_ALIGN_TOP_LEFT, VROD_TEXT);
-    s_pin_value = make_caption(pin_row, "--", LV_ALIGN_TOP_RIGHT, VROD_ORANGE);
-    s_bus_value = lv_label_create(pin_row);
-    lv_label_set_text(s_bus_value, "--");
-    lv_obj_set_style_text_color(s_bus_value, lv_color_hex(VROD_TEXT_DIM), 0);
-    lv_obj_set_style_text_font(s_bus_value, &jbm_bold_26, 0);
-    lv_obj_align(s_bus_value, LV_ALIGN_BOTTOM_RIGHT, 0, 0);
+#if CONFIG_VROD_J1850_GLITCH_SWEEP
+    // Glitch-window sweep status: current window + seconds left + pass,
+    // so the rider knows when to blip the throttle mid-window.
+    s_sweep_value = lv_label_create(s_scr);
+    lv_label_set_text(s_sweep_value, "SWEEP --");
+    lv_obj_set_style_text_color(s_sweep_value, lv_color_hex(VROD_ORANGE), 0);
+    lv_obj_set_style_text_font(s_sweep_value, &jbm_bold_26, 0);
+    lv_obj_align(s_sweep_value, LV_ALIGN_TOP_MID, 0, 102);
+#endif
+
+    // BUS AMP — idle (HIGH) resting level + driven (LOW) level from the
+    // dedicated ADC probe on GPIO 22. Needs CONFIG_VROD_J1850_ADC_GPIO
+    // and a second wire off node B; shows "probe off" otherwise.
+    lv_obj_t *amp_row = make_row(s_scr, 130, 130);
+    make_caption(amp_row, "BUS AMP", LV_ALIGN_TOP_LEFT, VROD_TEXT);
+#if CONFIG_VROD_J1850_ADC_GPIO >= 0
+    s_amp_value = make_caption(amp_row, "--", LV_ALIGN_TOP_RIGHT, VROD_ORANGE);
+    s_amp_lo    = lv_label_create(amp_row);
+    lv_label_set_text(s_amp_lo, "lo --");
+#else
+    s_amp_value = make_caption(amp_row, "off", LV_ALIGN_TOP_RIGHT, VROD_TEXT_DIM);
+    s_amp_lo    = lv_label_create(amp_row);
+    lv_label_set_text(s_amp_lo, "set ADC_GPIO");
+#endif
+    lv_obj_set_style_text_color(s_amp_lo, lv_color_hex(VROD_TEXT_DIM), 0);
+    lv_obj_set_style_text_font(s_amp_lo, &jbm_bold_26, 0);
+    lv_obj_align(s_amp_lo, LV_ALIGN_BOTTOM_RIGHT, 0, 0);
 
     // LINE — live logic level + edge count over the last 10 s window.
     lv_obj_t *line_row = make_row(s_scr, 80, 280);

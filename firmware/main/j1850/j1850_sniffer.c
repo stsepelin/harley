@@ -3,9 +3,6 @@
 
 #include "driver/gpio.h"
 #include "driver/gpio_filter.h"
-#include "esp_adc/adc_cali.h"
-#include "esp_adc/adc_cali_scheme.h"
-#include "esp_adc/adc_oneshot.h"
 #include "esp_log.h"
 #include "esp_timer.h"
 #include "freertos/FreeRTOS.h"
@@ -21,6 +18,13 @@ static const char *TAG = "j1850";
 #define PULSE_QUEUE_LEN 512
 #define STATS_PERIOD_MS 10000
 
+// Standard VPW: idle/recessive reads LOW at our pin, dominant reads
+// HIGH — so the pin level IS the logical active level, no inversion.
+// (An earlier "inverted" reading was the 500 ns glitch filter dropping
+// slow recessive falling edges, not a real polarity flip; confirmed by
+// the glitch-window sweep — see docs/captures/SESSION-2026-07-04.md.)
+#define RX_PASSIVE_PHYS_LEVEL 0  // physical pin level while idle
+
 typedef struct {
     uint8_t  active;  // level of the pulse that just ENDED
     uint32_t dur_us;
@@ -33,8 +37,47 @@ static int               s_level;  // bus level since the last edge
 static volatile uint32_t s_overruns;
 static volatile uint32_t s_edges;  // raw ISR count — noise shows here
 
+// Live flex glitch filter, NULL when none is active. Clocked from the
+// 40 MHz XTAL: the P4's 64-tick window field caps this at 1600 ns, so
+// the window is set/torn-down at runtime (the sweep retunes it live).
+static gpio_glitch_filter_handle_t s_filter;
+
+static void j1850_set_glitch(uint32_t ns)
+{
+    if (s_filter) {
+        gpio_glitch_filter_disable(s_filter);
+        gpio_del_glitch_filter(s_filter);
+        s_filter = NULL;
+    }
+    if (ns == 0) {
+        ESP_LOGI(TAG, "glitch filter off");
+        return;
+    }
+    const gpio_flex_glitch_filter_config_t fcfg = {
+        .clk_src         = GLITCH_FILTER_CLK_SRC_XTAL,
+        .gpio_num        = SNIFF_GPIO,
+        .window_width_ns = ns,
+        .window_thres_ns = ns,
+    };
+    esp_err_t err = gpio_new_flex_glitch_filter(&fcfg, &s_filter);
+    if (err == ESP_OK) {
+        ESP_ERROR_CHECK(gpio_glitch_filter_enable(s_filter));
+        ESP_LOGI(TAG, "glitch filter %luns", (unsigned long)ns);
+    } else {
+        s_filter = NULL;  // out of range / no slot: run unfiltered
+        ESP_LOGW(TAG, "glitch filter %luns rejected (%s); unfiltered", (unsigned long)ns,
+                 esp_err_to_name(err));
+    }
+}
+
+#if CONFIG_VROD_J1850_GLITCH_SWEEP
+// Achievable windows only: 1600 ns is the XTAL-clocked hardware ceiling.
+static const uint32_t SWEEP_NS[] = {0, 400, 800, 1200, 1600};
+#define SWEEP_N        (sizeof(SWEEP_NS) / sizeof(SWEEP_NS[0]))
+#define SWEEP_DWELL_MS 9000
+#endif
+
 // Restoring this after an ADC sample re-arms the digital input path.
-static gpio_config_t s_pin_cfg;
 
 // Shared with the bench screen via j1850_sniffer_get_stats().
 static portMUX_TYPE          s_stats_mux = portMUX_INITIALIZER_UNLOCKED;
@@ -102,11 +145,47 @@ static void sniffer_task(void *arg)
     int64_t  last_stats_us   = esp_timer_get_time();
     int64_t  flushed_edge_us = 0;
 
+    // Corruption metric: clean VPW strictly alternates active/passive, so
+    // two consecutive pulses at the SAME held level = a missed or spurious
+    // edge (ringing/noise). On clean short leads this should be ~0; a
+    // nonzero rate is the signal-integrity smell we're chasing.
+    uint32_t same_level  = 0;
+    int      prev_active = -1;
+
+    // Bench bring-up diagnostic: dump the first RAW_DUMP_N real pulses as
+    // (held-level, width-us) so we can tell VPW (clusters at 64/128/200)
+    // from a timebase bug (scaled widths) from noise (chaotic tiny). Self-
+    // limits, then the sniffer logs frames normally.
+    uint32_t raw_dumped = 0;
+#define RAW_DUMP_N 64
+
+#if CONFIG_VROD_J1850_GLITCH_SWEEP
+    size_t   sweep_i    = 0;
+    uint32_t sweep_pass = 0;
+    bool     win_clean[SWEEP_N];
+    for (size_t i = 0; i < SWEEP_N; i++)
+        win_clean[i] = true;
+    portENTER_CRITICAL(&s_stats_mux);
+    s_stats.sweep_active      = true;
+    s_stats.sweep_ns          = SWEEP_NS[0];
+    s_stats.sweep_pass        = 0;
+    s_stats.sweep_deadline_us = esp_timer_get_time() + (int64_t)SWEEP_DWELL_MS * 1000;
+    portEXIT_CRITICAL(&s_stats_mux);
+#endif
+
     for (;;) {
         pulse_evt_t   evt;
         j1850_frame_t frame;
 
         if (xQueueReceive(s_queue, &evt, pdMS_TO_TICKS(2)) == pdTRUE) {
+            if (prev_active >= 0 && (int)(evt.active != 0) == prev_active)
+                same_level++;
+            prev_active = (evt.active != 0);
+            if (raw_dumped < RAW_DUMP_N) {
+                raw_dumped++;
+                ESP_LOGI(TAG, "raw %2lu: %s %5lu us", (unsigned long)raw_dumped,
+                         evt.active ? "HIGH" : "low ", (unsigned long)evt.dur_us);
+            }
             if (j1850_vpw_rx_pulse(&rx, evt.active != 0, evt.dur_us, &frame)) {
                 frames++;
                 if (!frame.crc_ok)
@@ -124,7 +203,8 @@ static void sniffer_task(void *arg)
             int     level = s_level;
             portEXIT_CRITICAL(&s_edge_mux);
             int64_t idle_us = esp_timer_get_time() - last;
-            if (level == 0 && last != flushed_edge_us && idle_us > J1850_VPW_SOF_MAX_US + 60) {
+            if (level == RX_PASSIVE_PHYS_LEVEL && last != flushed_edge_us &&
+                idle_us > J1850_VPW_SOF_MAX_US + 60) {
                 flushed_edge_us = last;
                 if (j1850_vpw_rx_pulse(&rx, false, (uint32_t)idle_us, &frame)) {
                     frames++;
@@ -136,20 +216,57 @@ static void sniffer_task(void *arg)
             }
         }
 
-        int64_t now = esp_timer_get_time();
-        if (now - last_stats_us > (int64_t)STATS_PERIOD_MS * 1000) {
+        int64_t       now = esp_timer_get_time();
+        const int64_t period_us =
+#if CONFIG_VROD_J1850_GLITCH_SWEEP
+            (int64_t)SWEEP_DWELL_MS * 1000;
+#else
+            (int64_t)STATS_PERIOD_MS * 1000;
+#endif
+        if (now - last_stats_us > period_us) {
             last_stats_us = now;
             // Edge rate is the wiring-health number: a real idle bus is
             // ~0; a floating pin or a DC level parked on the input
             // threshold shows up as thousands per period.
-            ESP_LOGI(TAG, "stats: %lu frames, %lu bad CRC, %lu overruns, %lu edges",
-                     (unsigned long)frames, (unsigned long)crc_bad, (unsigned long)s_overruns,
-                     (unsigned long)s_edges);
             portENTER_CRITICAL(&s_stats_mux);
             s_stats.edges_last_period = s_edges;
             s_stats.overruns          = s_overruns;
             portEXIT_CRITICAL(&s_stats_mux);
-            s_edges = 0;
+#if CONFIG_VROD_J1850_GLITCH_SWEEP
+            ESP_LOGI(TAG, "filter=%luns [pass %lu]: frames=%lu badCRC=%lu ovr=%lu same-level=%lu",
+                     (unsigned long)SWEEP_NS[sweep_i], (unsigned long)sweep_pass,
+                     (unsigned long)frames, (unsigned long)crc_bad, (unsigned long)s_overruns,
+                     (unsigned long)same_level);
+            if (crc_bad != 0 || same_level != 0)
+                win_clean[sweep_i] = false;
+            if (++sweep_i >= SWEEP_N) {
+                sweep_i = 0;
+                sweep_pass++;
+                uint32_t best = 0;
+                for (size_t i = 0; i < SWEEP_N; i++)
+                    if (win_clean[i] && SWEEP_NS[i] > best)
+                        best = SWEEP_NS[i];
+                ESP_LOGI(TAG, "sweep pass %lu done: largest all-clean window = %luns",
+                         (unsigned long)sweep_pass, (unsigned long)best);
+            }
+            j1850_set_glitch(SWEEP_NS[sweep_i]);
+            j1850_vpw_rx_init(&rx);  // drop any frame straddling the change
+            frames      = 0;
+            crc_bad     = 0;
+            s_overruns  = 0;
+            prev_active = -1;
+            portENTER_CRITICAL(&s_stats_mux);
+            s_stats.sweep_ns          = SWEEP_NS[sweep_i];
+            s_stats.sweep_pass        = sweep_pass;
+            s_stats.sweep_deadline_us = now + period_us;
+            portEXIT_CRITICAL(&s_stats_mux);
+#else
+            ESP_LOGI(TAG, "stats: %lu frames, %lu bad CRC, %lu overruns, %lu edges, %lu same-level",
+                     (unsigned long)frames, (unsigned long)crc_bad, (unsigned long)s_overruns,
+                     (unsigned long)s_edges, (unsigned long)same_level);
+#endif
+            s_edges    = 0;
+            same_level = 0;
         }
     }
 }
@@ -159,7 +276,7 @@ void j1850_sniffer_start(void)
     s_queue = xQueueCreate(PULSE_QUEUE_LEN, sizeof(pulse_evt_t));
     configASSERT(s_queue);
 
-    s_pin_cfg = (gpio_config_t){
+    const gpio_config_t cfg = {
         .pin_bit_mask = 1ULL << SNIFF_GPIO,
         .mode         = GPIO_MODE_INPUT,
         // The RX divider drives the pin at all times — no pulls.
@@ -167,28 +284,18 @@ void j1850_sniffer_start(void)
         .pull_down_en = GPIO_PULLDOWN_DISABLE,
         .intr_type    = GPIO_INTR_ANYEDGE,
     };
-    ESP_ERROR_CHECK(gpio_config(&s_pin_cfg));
+    ESP_ERROR_CHECK(gpio_config(&cfg));
 
-    // Hardware glitch filter: silicon suppresses pulses under ~500 ns
-    // before they reach the interrupt matrix. Real VPW symbols are
-    // >=34 us, so nothing legitimate is touched — but RF pickup and
-    // threshold chatter (floating pin, or a DC test level parked near
-    // VIH) stop hammering core 0 with edge interrupts, which otherwise
-    // visibly lags the sim/UI producers. Best-effort: if no filter
-    // slot is free we run unfiltered, same as before.
-    gpio_glitch_filter_handle_t            filter = NULL;
-    const gpio_flex_glitch_filter_config_t fcfg   = {
-        .clk_src         = GLITCH_FILTER_CLK_SRC_DEFAULT,
-        .gpio_num        = SNIFF_GPIO,
-        .window_width_ns = 500,
-        .window_thres_ns = 500,
-    };
-    esp_err_t ferr = gpio_new_flex_glitch_filter(&fcfg, &filter);
-    if (ferr == ESP_OK) {
-        ESP_ERROR_CHECK(gpio_glitch_filter_enable(filter));
-    } else {
-        ESP_LOGW(TAG, "no glitch filter (%s); running unfiltered", esp_err_to_name(ferr));
-    }
+    // Hardware glitch filter suppresses pulses under the configured
+    // window before they reach the interrupt matrix. On this bare
+    // resistive RX front end a window >=~500 ns eats the slow recessive
+    // falling edge, so the tuned value is small (0 while unresolved).
+    // The sweep build retunes it live from the task.
+#if CONFIG_VROD_J1850_GLITCH_SWEEP
+    j1850_set_glitch(SWEEP_NS[0]);
+#else
+    j1850_set_glitch(CONFIG_VROD_J1850_GLITCH_NS);
+#endif
 
     s_level        = gpio_get_level(SNIFF_GPIO);
     s_last_edge_us = esp_timer_get_time();
@@ -212,52 +319,4 @@ void j1850_sniffer_get_stats(j1850_sniffer_stats_t *out)
     *out = s_stats;
     portEXIT_CRITICAL(&s_stats_mux);
     out->pin_level = gpio_get_level(SNIFF_GPIO) != 0;
-}
-
-int j1850_sniffer_sample_pin_mv(void)
-{
-    static adc_oneshot_unit_handle_t s_adc;
-    static adc_cali_handle_t         s_cali;
-    static adc_unit_t                s_unit;
-    static adc_channel_t             s_chan;
-    static bool                      s_tried, s_ok;
-
-    if (!s_tried) {
-        s_tried = true;
-        if (adc_oneshot_io_to_channel(SNIFF_GPIO, &s_unit, &s_chan) != ESP_OK) {
-            ESP_LOGW(TAG, "GPIO%d has no ADC channel; bench voltage unavailable",
-                     CONFIG_VROD_J1850_RX_GPIO);
-            return -1;
-        }
-        const adc_oneshot_unit_init_cfg_t ucfg = {.unit_id = s_unit};
-        if (adc_oneshot_new_unit(&ucfg, &s_adc) != ESP_OK)
-            return -1;
-        const adc_cali_curve_fitting_config_t ccfg = {
-            .unit_id  = s_unit,
-            .chan     = s_chan,
-            .atten    = ADC_ATTEN_DB_12,
-            .bitwidth = ADC_BITWIDTH_DEFAULT,
-        };
-        if (adc_cali_create_scheme_curve_fitting(&ccfg, &s_cali) != ESP_OK)
-            return -1;
-        s_ok = true;
-    }
-    if (!s_ok)
-        return -1;
-
-    // Configuring the channel flips the pad to its analog function; the
-    // digital input (and the edge IRQ with it) is dead until gpio_config
-    // restores it below. Sub-millisecond window, bench-screen only.
-    const adc_oneshot_chan_cfg_t chan_cfg = {
-        .atten    = ADC_ATTEN_DB_12,
-        .bitwidth = ADC_BITWIDTH_DEFAULT,
-    };
-    int raw = 0, mv = -1;
-    if (adc_oneshot_config_channel(s_adc, s_chan, &chan_cfg) == ESP_OK &&
-        adc_oneshot_read(s_adc, s_chan, &raw) == ESP_OK) {
-        if (adc_cali_raw_to_voltage(s_cali, raw, &mv) != ESP_OK)
-            mv = -1;
-    }
-    ESP_ERROR_CHECK(gpio_config(&s_pin_cfg));
-    return mv;
 }
