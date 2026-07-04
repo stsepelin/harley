@@ -133,8 +133,11 @@ if(CONFIG_VROD_J1850_TX)
 endif()
 
 # Bus-amplitude ADC probe (Stage 4 TX prep) — dedicated ADC pin, see
-# main/j1850/j1850_adc_probe.c.
-if(NOT CONFIG_VROD_J1850_ADC_GPIO EQUAL -1)
+# main/j1850/j1850_adc_probe.c. VROD_J1850_ADC_GPIO only exists when the
+# sniffer is on (it depends on it), so gate on the sniffer too — an
+# undefined symbol is not -1, and would otherwise compile the probe into
+# default builds where the symbol doesn't exist.
+if(CONFIG_VROD_J1850_SNIFFER AND NOT CONFIG_VROD_J1850_ADC_GPIO EQUAL -1)
     target_sources(${COMPONENT_LIB} PRIVATE j1850/j1850_adc_probe.c)
 endif()
 

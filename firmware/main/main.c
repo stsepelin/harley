@@ -26,7 +26,7 @@
 #if CONFIG_VROD_J1850_SNIFFER
 #include "j1850_sniffer.h"
 #endif
-#if CONFIG_VROD_J1850_ADC_GPIO >= 0
+#if defined(CONFIG_VROD_J1850_ADC_GPIO) && CONFIG_VROD_J1850_ADC_GPIO >= 0
 #include "j1850_adc_probe.h"
 #endif
 #if CONFIG_VROD_J1850_TX
@@ -103,7 +103,7 @@ void app_main(void)
     // Log-only: coexists with the sim — it never writes vehicle_data.
     j1850_sniffer_start();
 #endif
-#if CONFIG_VROD_J1850_ADC_GPIO >= 0
+#if defined(CONFIG_VROD_J1850_ADC_GPIO) && CONFIG_VROD_J1850_ADC_GPIO >= 0
     j1850_adc_probe_start();
 #endif
 #if CONFIG_VROD_J1850_TX
