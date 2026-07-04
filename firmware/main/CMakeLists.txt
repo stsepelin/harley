@@ -72,6 +72,7 @@ idf_component_register(
     # queue sizing in sdkconfig.defaults; see ble-bringup-bisect.md).
     REQUIRES waveshare__esp32_p4_wifi6_touch_lcd_xc lvgl__lvgl nvs_flash
              espressif__esp_codec_dev bt spi_flash esp_driver_uart esp_adc
+             esp_driver_rmt esp_driver_gptimer
     LDFRAGMENTS linker.lf
 )
 
@@ -107,13 +108,27 @@ if(CONFIG_VROD_ADC_REPRO)
     target_sources(${COMPONENT_LIB} PRIVATE adc_repro.c)
 endif()
 
-# J1850 passive capture build (Phase 3 Stage 2). j1850_vpw.c is the
-# host-tested VPW codec; the sniffer is GPIO-edge glue around it.
+# J1850 codec (Phase 3). j1850_vpw.c is the host-tested VPW encoder +
+# decoder, shared by the passive sniffer (Stage 2) and the TX driver
+# (Stage 4); pull it in once if either side is compiled.
+if(CONFIG_VROD_J1850_SNIFFER OR CONFIG_VROD_J1850_TX)
+    target_sources(${COMPONENT_LIB} PRIVATE j1850/j1850_vpw.c)
+endif()
+
+# Passive capture (Stage 2): GPIO-edge glue + the bench diagnostics screen.
 if(CONFIG_VROD_J1850_SNIFFER)
     target_sources(${COMPONENT_LIB} PRIVATE
-        j1850/j1850_vpw.c
         j1850/j1850_sniffer.c
         display/screen_bench.c
+    )
+endif()
+
+# TX driver (Stage 4): RMT-timed symbols + the watchdog. j1850_tx_logic.c
+# is the host-tested pure part (CRC frame build + dominant-time guard).
+if(CONFIG_VROD_J1850_TX)
+    target_sources(${COMPONENT_LIB} PRIVATE
+        j1850/j1850_tx_logic.c
+        j1850/j1850_tx.c
     )
 endif()
 

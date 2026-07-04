@@ -198,6 +198,43 @@ menu "V-Rod cluster"
             clean (same-level=0 AND badCRC=0) across ALL passes. Never
             enable in a real build.
 
+    config VROD_J1850_TX
+        bool "J1850 VPW transmitter (Phase 3 Stage 4)"
+        default n
+        help
+            Compiles the TX driver: RMT-timed VPW symbols from the
+            host-tested j1850_vpw.c encoder, driving the high-side
+            transceiver (standard VPW, TX GPIO HIGH = bus dominant). An
+            independent gptimer watchdog forces the line recessive (LOW)
+            if a dominant persists past the longest valid symbol — a
+            stuck-HIGH TX jams the whole bus. Off by default; only Stage 4
+            builds set it. Physically wire the TX transistor stage
+            (docs/schematics/j1850_tx.svg) only after the self-sniff loop
+            below validates the firmware.
+
+    config VROD_J1850_TX_GPIO
+        int "GPIO driving the TX transceiver (Q1 gate via R3)"
+        depends on VROD_J1850_TX
+        range 0 54
+        default 24
+        help
+            A free header pin (see firmware/docs/PINS.md — 24 is the first
+            unclaimed one, clear of RX/GPS/ADC). Confirm the physical hole
+            with VROD_PIN_WIGGLE_GPIO before soldering. Boots and idles LOW
+            (recessive); only driven HIGH while emitting a dominant symbol.
+
+    config VROD_J1850_TX_SELFTEST
+        bool "TX self-sniff bench validation loop"
+        depends on VROD_J1850_TX && VROD_J1850_SNIFFER
+        default n
+        help
+            Bench gate before the bike: emits the IM keep-alive set on TX,
+            the unchanged RX sniffer decodes it off the same bus node, and
+            each frame is logged PASS/FAIL with the decoded bytes + CRC
+            verdict. Needs the TX output tied to the RX bus node with the
+            bench recessive-LOW termination (see the Stage 4 section of
+            docs/03-PHASE3-J1850-GPS-PLAN.md). Bench only.
+
     config VROD_BLE_INSECURE
         bool "Skip BLE pairing — any central can connect"
         default n
