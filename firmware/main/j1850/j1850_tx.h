@@ -20,8 +20,15 @@ void j1850_tx_init(void);
 bool j1850_tx_send(const uint8_t *payload, size_t n);
 
 // True once the watchdog forced the bus recessive after a stuck dominant.
-// Latching: TX stays disabled until the next j1850_tx_init().
+// Latching: TX stays disabled until j1850_tx_reset() (or a re-init).
 bool j1850_tx_faulted(void);
+
+// Clear a latched fault and re-arm TX without a reboot. A watchdog trip
+// leaves the pad on the GPIO peripheral (driven LOW); this re-binds it to
+// RMT. The bus stays recessive throughout. For the Stage 4 replay: call
+// this to resume keep-alives after a transient fault. Returns false if TX
+// was never initialised or the re-bind failed.
+bool j1850_tx_reset(void);
 
 #if CONFIG_VROD_J1850_TX_SELFTEST
 // Bench self-sniff validation loop: emit the IM keep-alive set, let the

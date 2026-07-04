@@ -121,6 +121,23 @@ bool j1850_tx_faulted(void)
     return s_faulted;
 }
 
+bool j1850_tx_reset(void)
+{
+    if (!s_ready)
+        return false;
+    if (s_faulted) {
+        // A trip handed the pad to the GPIO peripheral; give it back to RMT
+        // (which idles LOW), then re-enable the watchdog readback.
+        if (rmt_tx_switch_gpio(s_chan, TX_GPIO, false) != ESP_OK)
+            return false;
+        gpio_input_enable(TX_GPIO);
+        gpio_set_level(TX_GPIO, 0);
+    }
+    s_dom_us  = 0;
+    s_faulted = false;
+    return true;
+}
+
 // Pack the alternating-level pulse stream into RMT symbols (two pulses
 // per symbol). n is even here — the caller appended the recessive EOF.
 static size_t pack_symbols(const j1850_pulse_t *p, size_t n, rmt_symbol_word_t *sym)
@@ -164,17 +181,23 @@ bool j1850_tx_send(const uint8_t *payload, size_t n)
     rmt_symbol_word_t symbols[MAX_SYMBOLS];
     size_t            ns = pack_symbols(pulses, np, symbols);
 
+    // A TX-side error must never panic the cluster (ESP_ERROR_CHECK
+    // aborts): log, leave the bus recessive, and let the caller decide.
+    // Refusing to key without the watchdog armed is the safe default.
     s_dom_us = 0;
-    ESP_ERROR_CHECK(gptimer_start(s_wd));
+    if (gptimer_start(s_wd) != ESP_OK) {
+        ESP_LOGE(TAG, "watchdog arm failed; refusing TX this frame");
+        return false;
+    }
 
     const rmt_transmit_config_t tx = {.loop_count = 0, .flags = {.eot_level = 0}};
     esp_err_t err = rmt_transmit(s_chan, s_encoder, symbols, ns * sizeof(symbols[0]), &tx);
     if (err == ESP_OK)
         err = rmt_tx_wait_all_done(s_chan, 100);
-    ESP_ERROR_CHECK(gptimer_stop(s_wd));
+    (void)gptimer_stop(s_wd);  // best-effort; eot_level already idles the bus LOW
 
     if (err != ESP_OK) {
-        ESP_LOGE(TAG, "transmit failed (%d); bus forced recessive", err);
+        ESP_LOGE(TAG, "transmit failed (%s); bus forced recessive", esp_err_to_name(err));
         s_faulted = true;
         return false;
     }
@@ -221,12 +244,8 @@ static bool wd_selftest(void)
     ESP_LOGI(TAG, "watchdog trigger test: %s (faulted=%d, line=%s)", tripped ? "PASS" : "FAIL",
              s_faulted, gpio_get_level(TX_GPIO) ? "HIGH" : "LOW");
 
-    // Re-bind RMT to the pad, restore the readback, clear the latch.
-    ESP_ERROR_CHECK(rmt_tx_switch_gpio(s_chan, TX_GPIO, false));
-    gpio_input_enable(TX_GPIO);
-    gpio_set_level(TX_GPIO, 0);
-    s_dom_us  = 0;
-    s_faulted = false;
+    // Recover through the normal fault-reset path (re-bind RMT + clear).
+    j1850_tx_reset();
     return tripped;
 }
 

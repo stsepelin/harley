@@ -13,7 +13,7 @@ static const char *TAG = "adc_probe";
 
 #define PROBE_GPIO        CONFIG_VROD_J1850_ADC_GPIO
 #define WINDOW_US         2000000            // 2 s min/max window
-#define BURST             256                // samples between WDT yields
+#define YIELD_US          1000               // max core hold between yields
 #define NODE_B_TO_BUS(mv) ((mv) * 147 / 47)  // 10k/4.7k divider inverse
 
 static volatile int  s_last_max_mv = -1;
@@ -71,10 +71,10 @@ static void probe_task(void *arg)
     ESP_LOGI(TAG, "amplitude probe on GPIO%d (ADC%d ch%d), dedicated wire off node B", PROBE_GPIO,
              unit + 1, chan);
 
-    int     win_min   = INT_MAX;
-    int     win_max   = INT_MIN;
-    int64_t win_start = esp_timer_get_time();
-    int     burst     = 0;
+    int     win_min    = INT_MAX;
+    int     win_max    = INT_MIN;
+    int64_t win_start  = esp_timer_get_time();
+    int64_t last_yield = win_start;
 
     for (;;) {
         int raw, mv;
@@ -100,10 +100,12 @@ static void probe_task(void *arg)
             win_start = now;
         }
 
-        // Tight loop, but yield periodically so the idle task feeds the
-        // watchdog. A burst of 256 reads is well under a tick.
-        if (++burst >= BURST) {
-            burst = 0;
+        // Sample fast to catch brief dominant pulses, but never hold the
+        // core longer than ~1 ms between yields: adc_oneshot_read blocks
+        // per conversion, so a fixed sample count could run several ms and
+        // starve the idle task (task watchdog) and lower-priority work.
+        if (now - last_yield >= YIELD_US) {
+            last_yield = now;
             vTaskDelay(1);
         }
     }
