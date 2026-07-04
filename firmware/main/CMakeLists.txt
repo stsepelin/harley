@@ -123,6 +123,14 @@ if(CONFIG_VROD_J1850_SNIFFER)
     )
 endif()
 
+# Toggling edge->level tracker (Phase 6 RX experiment prep). Gate (a):
+# compiles the host-tested j1850_edge module into the firmware. It is NOT
+# wired into the live ISR here — that is gate (b) VROD_J1850_TOGGLE_ISR_LIVE,
+# deferred to Phase 6. See docs/j1850-toggling-isr-candidate.md.
+if(CONFIG_VROD_J1850_TOGGLE_ISR)
+    target_sources(${COMPONENT_LIB} PRIVATE j1850/j1850_edge.c)
+endif()
+
 # Vehicle-data producer (Stage 3): pure decode table + the driver glue
 # that feeds the sniffer's decoded frames into vehicle_data.
 if(CONFIG_VROD_J1850)

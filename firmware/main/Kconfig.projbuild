@@ -212,6 +212,43 @@ menu "V-Rod cluster"
             clean (same-level=0 AND badCRC=0) across ALL passes. Never
             enable in a real build.
 
+    config VROD_J1850_TOGGLE_ISR
+        bool "Compile the toggling edge->level tracker (gate a; unused until the trial)"
+        depends on VROD_J1850_SNIFFER
+        default n
+        help
+            Gate (a) of two. Compiles main/j1850/j1850_edge.c (the
+            host-tested toggle + idle-anchor RX level reconstructor) into
+            the firmware so it is available for the Phase 6 on-hardware
+            trial.
+
+            HARMLESS ON ITS OWN: the live sniffer ISR still reads the pin
+            and is completely unaffected — this flag only puts the module
+            in the binary, nothing calls it. RX behaviour is byte-for-
+            behaviour identical to this flag being off.
+
+            Switching the live ISR to the tracker is the SEPARATE gate (b)
+            below (VROD_J1850_TOGGLE_ISR_LIVE), which is deliberately not
+            wired yet. See docs/j1850-toggling-isr-candidate.md.
+
+    config VROD_J1850_TOGGLE_ISR_LIVE
+        bool "Switch the live RX ISR to toggling (gate b; Phase 6 trial - NOT WIRED)"
+        depends on VROD_J1850_TOGGLE_ISR
+        default n
+        help
+            Gate (b) of two: the on-hardware experiment that would replace
+            the sniffer ISR's pin read with j1850_edge's toggle +
+            idle-anchor reconstruction, so a conservative glitch filter can
+            coexist without the filter-vs-pin-read race.
+
+            NOT YET FUNCTIONAL. Enabling this today has NO effect — the
+            sniffer ISR is intentionally left unchanged in this merge. The
+            wiring lands in Phase 6 and must be validated on the bench
+            against the filter-off baseline (546 frames / 0 bad CRC), one
+            variable at a time (toggle ISR + a conservative filter, invert
+            nothing). Kept here so the two-step opt-in is explicit; see
+            docs/j1850-toggling-isr-candidate.md.
+
     config VROD_J1850_TX
         bool "J1850 VPW transmitter (Phase 3 Stage 4)"
         default n

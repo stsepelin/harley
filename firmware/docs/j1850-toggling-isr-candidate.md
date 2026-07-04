@@ -1,22 +1,31 @@
-# J1850 RX: toggling-ISR candidate (core landed; on-hardware trial pending)
+# J1850 RX: toggling-ISR candidate (module merged behind a flag; trial pending)
 
-> **Status: pure tracker implemented + acceptance gate PASSING; the
-> sniffer ISR is NOT wired to it yet.** `main/j1850/j1850_edge.c` is the
-> toggle + idle-anchor level reconstructor, host-tested in
-> `test_j1850_edge.c` (clean-stream reconstruction through the decoder,
-> startup drop, idle-gap boundary, and injected missed/spurious-edge
-> re-sync) at 100% line+branch. The shipping RX path is UNCHANGED: the
-> sniffer ISR still reads the pin, the glitch filter is still OFF
-> (`CONFIG_VROD_J1850_GLITCH_NS=0`), `RX_INVERT` is gone, and
-> `j1850_vpw.c` is untouched.
+> **Status: pure tracker merged to main behind a compile flag; the sniffer
+> ISR is NOT wired to it yet.** `main/j1850/j1850_edge.c` is the toggle +
+> idle-anchor level reconstructor, host-tested in `test_j1850_edge.c`
+> (clean-stream reconstruction through the decoder, startup drop, idle-gap
+> boundary, and injected missed/spurious-edge re-sync) at 100% line+branch.
+> The shipping RX path is UNCHANGED: the sniffer ISR still reads the pin,
+> the glitch filter is still OFF (`CONFIG_VROD_J1850_GLITCH_NS=0`),
+> `RX_INVERT` is gone, and `j1850_vpw.c` is untouched.
 >
-> **Next (opt-in, deliberate):** wire `j1850_edge` into the sniffer behind
-> a `CONFIG_VROD_J1850_TOGGLE_ISR` flag — the ISR stops reading the pin and
-> only timestamps edges; the task reconstructs the level via
-> `j1850_edge_level()`; the idle-flush keeps an honest pin read (allowed —
-> the line is static there). Then a bench trial (toggle ISR + a
-> conservative filter) against the current filter-off baseline (546
-> frames / 0 bad CRC), one variable at a time.
+> **Two gates, both default off (see `main/Kconfig.projbuild`):**
+> - **(a) `CONFIG_VROD_J1850_TOGGLE_ISR`** — compiles `j1850_edge.c` into
+>   the firmware so it is available. HARMLESS: nothing calls it, so RX
+>   behaviour is byte-for-behaviour identical to the flag being off. This
+>   is what merged now.
+> - **(b) `CONFIG_VROD_J1850_TOGGLE_ISR_LIVE`** — would switch the live ISR
+>   to the tracker. **NOT WIRED** in this merge; enabling it today does
+>   nothing. Reserved so the two-step opt-in is explicit.
+>
+> **Phase 6 follow-up (opt-in, deliberate) — the actual gate-(b) work:**
+> wire `j1850_edge` into the sniffer under `TOGGLE_ISR_LIVE` — the ISR
+> stops reading the pin and only timestamps edges; the task reconstructs
+> the level via `j1850_edge_level()`; the idle-flush keeps an honest pin
+> read (allowed — the line is static there). Then a bench trial (toggle ISR
+> + a conservative filter, re-enabled to confirm toggling lets it coexist)
+> measured against the current filter-off baseline (546 frames / 0 bad
+> CRC), one variable at a time.
 
 ## Why this exists
 
