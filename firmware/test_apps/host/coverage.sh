@@ -54,6 +54,7 @@ SCOPED=(
     '*/main/j1850/j1850_tx_logic.c'
     '*/main/j1850/j1850_parse.c'
     '*/main/j1850/j1850_driver.c'
+    '*/main/j1850/j1850_edge.c'
     '*/main/j1850/ride_log_format.c'
     '*/main/display/widgets/sprite_raster.h'
     '*/main/display/widgets/fuel_arc.c'

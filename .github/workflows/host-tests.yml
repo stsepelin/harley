@@ -54,6 +54,7 @@ jobs:
                '*/firmware/main/j1850/j1850_tx_logic.c' \
                '*/firmware/main/j1850/j1850_parse.c' \
                '*/firmware/main/j1850/j1850_driver.c' \
+               '*/firmware/main/j1850/j1850_edge.c' \
                '*/firmware/main/j1850/ride_log_format.c' \
                '*/firmware/main/display/widgets/sprite_raster.h' \
                '*/firmware/main/display/widgets/fuel_arc.c' \
