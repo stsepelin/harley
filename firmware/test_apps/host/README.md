@@ -73,6 +73,7 @@ Today that's:
 | `main/poi/poi_alert.c` | Single-alert state machine with pass-by hysteresis |
 | `main/gps/nmea.c` | NMEA 0183 framer + RMC parser (checksum, ddmm.mmmm → 1e-7 deg, knots → km/h) |
 | `main/j1850/j1850_vpw.c` | J1850 VPW symbol codec: pulse-width decoder + encoder + CRC-8/SAE-J1850. Round-trip tested. |
+| `main/j1850/j1850_parse.c` | J1850 message decoder: frame -> vehicle_data (RPM/temp/gear/speed/turns/CEL), decode table bench-confirmed against real captures. |
 | `main/j1850/j1850_tx_logic.c` | J1850 TX pure logic: CRC frame build (round-tripped through encode→decode) + the watchdog dominant-length guard + on-air duration. |
 
 The `main/gps/` producers (`gps_source.c`, `gps_sim.c`, `gps_uart.c`),
