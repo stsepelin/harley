@@ -8,7 +8,7 @@
 static vehicle_data_t sample_payload(void)
 {
     vehicle_data_t d = {
-        .speed_kmh            = 128,
+        .speed_mph            = 128,
         .rpm                  = 6200,
         .gear                 = GEAR_5,
         .engine_temp_c        = 92,
@@ -43,7 +43,7 @@ static void test_init_zeroes_and_neutral(void)
     memset(&got, 0xAA, sizeof(got));   // poison so reads must overwrite
     vehicle_data_get(&got);
 
-    TEST_ASSERT_EQUAL_UINT16(0, got.speed_kmh);
+    TEST_ASSERT_EQUAL_UINT16(0, got.speed_mph);
     TEST_ASSERT_EQUAL_UINT16(0, got.rpm);
     TEST_ASSERT_EQUAL_INT(GEAR_NEUTRAL, got.gear);
     TEST_ASSERT_EQUAL_UINT8(0, got.fuel_level);
@@ -78,16 +78,16 @@ static void test_latest_set_wins(void)
     vehicle_data_init();
 
     vehicle_data_t a = sample_payload();
-    a.speed_kmh = 50;
+    a.speed_mph      = 50;
     vehicle_data_set(&a);
 
     vehicle_data_t b = sample_payload();
-    b.speed_kmh = 99;
+    b.speed_mph      = 99;
     vehicle_data_set(&b);
 
     vehicle_data_t got;
     vehicle_data_get(&got);
-    TEST_ASSERT_EQUAL_UINT16(99, got.speed_kmh);
+    TEST_ASSERT_EQUAL_UINT16(99, got.speed_mph);
 }
 
 // --- timeout / contention paths ----------------------------------------
@@ -104,13 +104,13 @@ static void test_set_is_dropped_when_take_fails(void)
     // Second write hits a timeout — must NOT mutate the stored data.
     g_stub_take_succeeds = 0;
     vehicle_data_t doomed = sample_payload();
-    doomed.speed_kmh = 999;
+    doomed.speed_mph      = 999;
     vehicle_data_set(&doomed);
 
     g_stub_take_succeeds = 1;
     vehicle_data_t got;
     vehicle_data_get(&got);
-    TEST_ASSERT_EQUAL_UINT16(baseline.speed_kmh, got.speed_kmh);
+    TEST_ASSERT_EQUAL_UINT16(baseline.speed_mph, got.speed_mph);
 }
 
 static void test_get_leaves_out_untouched_on_take_fail(void)

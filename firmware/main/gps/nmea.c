@@ -199,14 +199,16 @@ bool nmea_parse_rmc(const char *sentence, nmea_rmc_t *out)
     if (!parse_coord(f[5].s, f[5].len, 3, f[6].len == 1 ? f[6].s[0] : '?', 'E', 'W', &out->lon_e7))
         return false;
 
-    // Speed over ground, knots → km/h (× 1.852), rounded. Empty = 0
-    // (some receivers blank it while stationary).
+    // Speed over ground, knots → mph, rounded. 1 kn = 1852 m/h ÷ 1609.344 m/mi;
+    // knots_1e3 × 1852 / 1609344 is that ratio with knots_1e3 = knots × 1000.
+    // Speed is mph-canonical (see vehicle_data.h). Empty = 0 (some receivers
+    // blank it while stationary).
     if (f[7].len > 0) {
         int64_t knots_1e3;
         if (!parse_fixed(f[7].s, f[7].len, 3, &knots_1e3))
             return false;
-        int64_t kmh    = (knots_1e3 * 1852 + 500000) / 1000000;
-        out->speed_kmh = (kmh > 65535) ? 65535 : (uint16_t)kmh;
+        int64_t mph    = (knots_1e3 * 1852 + 804672) / 1609344;
+        out->speed_mph = (mph > 65535) ? 65535 : (uint16_t)mph;
     }
 
     // Course over ground, degrees true. Empty = 0 (blanked when there's

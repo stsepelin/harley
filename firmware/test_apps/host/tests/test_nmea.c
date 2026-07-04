@@ -102,7 +102,7 @@ static void test_parse_datasheet_example(void)
     TEST_ASSERT_TRUE(r.valid);
     TEST_ASSERT_EQUAL_INT32(481173000, r.lat_e7);
     TEST_ASSERT_EQUAL_INT32(115166667, r.lon_e7);
-    TEST_ASSERT_EQUAL_UINT16(41, r.speed_kmh);  // 22.4 kn × 1.852
+    TEST_ASSERT_EQUAL_UINT16(26, r.speed_mph);  // 22.4 kn × 1.15078 = 25.78
     TEST_ASSERT_EQUAL_UINT16(84, r.heading_deg);
     TEST_ASSERT_EQUAL_UINT32(((12 * 60 + 35) * 60 + 19) * 1000, r.time_utc_ms);
 }
@@ -128,7 +128,7 @@ static void test_parse_no_fix_sentence_is_ok_but_invalid(void)
     TEST_ASSERT_TRUE(nmea_parse_rmc(s, &r));
     TEST_ASSERT_FALSE(r.valid);
     TEST_ASSERT_EQUAL_INT32(0, r.lat_e7);
-    TEST_ASSERT_EQUAL_UINT16(0, r.speed_kmh);
+    TEST_ASSERT_EQUAL_UINT16(0, r.speed_mph);
 }
 
 static void test_parse_blank_speed_and_course_default_to_zero(void)
@@ -138,7 +138,7 @@ static void test_parse_blank_speed_and_course_default_to_zero(void)
     mk(s, sizeof(s), "GPRMC,120000,A,5926.2200,N,02445.2160,E,,,030726");
     TEST_ASSERT_TRUE(nmea_parse_rmc(s, &r));
     TEST_ASSERT_TRUE(r.valid);
-    TEST_ASSERT_EQUAL_UINT16(0, r.speed_kmh);
+    TEST_ASSERT_EQUAL_UINT16(0, r.speed_mph);
     TEST_ASSERT_EQUAL_UINT16(0, r.heading_deg);
 }
 
@@ -161,16 +161,18 @@ static void test_parse_time_with_fraction_and_course_wrap(void)
     TEST_ASSERT_TRUE(nmea_parse_rmc(s, &r));
     TEST_ASSERT_EQUAL_UINT32(((23 * 60 + 59) * 60 + 59) * 1000 + 250, r.time_utc_ms);
     TEST_ASSERT_EQUAL_UINT16(0, r.heading_deg);
-    TEST_ASSERT_EQUAL_UINT16(1, r.speed_kmh);  // 0.5 kn = 0.926 → 1
+    TEST_ASSERT_EQUAL_UINT16(1, r.speed_mph);  // 0.5 kn = 0.575 mph → 1
 }
 
 static void test_parse_speed_clamps_to_uint16(void)
 {
     char       s[128];
     nmea_rmc_t r;
-    mk(s, sizeof(s), "GPRMC,120000,A,0000.0000,N,00000.0000,E,40000,0.0,030726");
+    // 60000 kn ≈ 69046 mph, past the uint16 ceiling (40000 kn would fit in
+    // mph, so it needs to be higher than the old km/h-era value).
+    mk(s, sizeof(s), "GPRMC,120000,A,0000.0000,N,00000.0000,E,60000,0.0,030726");
     TEST_ASSERT_TRUE(nmea_parse_rmc(s, &r));
-    TEST_ASSERT_EQUAL_UINT16(65535, r.speed_kmh);
+    TEST_ASSERT_EQUAL_UINT16(65535, r.speed_mph);
 }
 
 static void test_parse_minutes_precision_truncates_past_1e5(void)

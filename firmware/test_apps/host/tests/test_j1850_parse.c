@@ -124,7 +124,7 @@ static void test_speed_parked_is_zero(void)
     const uint8_t  s[] = {0x48, 0x29, 0x10, 0x02, 0x00, 0x00, 0x56};
     j1850_frame_t  f   = real(s, sizeof(s));
     TEST_ASSERT_TRUE(j1850_parse(&f, &vd));
-    TEST_ASSERT_EQUAL_UINT16(0, vd.speed_kmh);
+    TEST_ASSERT_EQUAL_UINT16(0, vd.speed_mph);
 }
 
 // --- synthetic frames (gear ladder + speed math) ------------------------
@@ -154,7 +154,7 @@ static void test_speed_math_nonzero(void)
     uint8_t        pl[] = {0x48, 0x29, 0x10, 0x02, 0x40, 0x00};  // 0x4000 / 128
     j1850_frame_t  f    = synth(pl, sizeof(pl));
     TEST_ASSERT_TRUE(j1850_parse(&f, &vd));
-    TEST_ASSERT_EQUAL_UINT16(128, vd.speed_kmh);
+    TEST_ASSERT_EQUAL_UINT16(128, vd.speed_mph);
 }
 
 // --- rejection paths ----------------------------------------------------

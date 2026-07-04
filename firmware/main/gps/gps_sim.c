@@ -5,7 +5,8 @@
 #include <math.h>
 
 #define TICK_MS        200            // 5 Hz, matches M8N max rate
-#define SPEED_KMH      50
+#define SPEED_KMH      50             // loop angular velocity (physics stays metric)
+#define SPEED_MPH      31             // 50 km/h in mph, stored to gps_source
 #define TWO_PI         6.28318530718f
 #define HALF_PI        1.57079632679f
 #define RAD_TO_DEG     (180.0f / 3.14159265f)
@@ -42,7 +43,7 @@ static void gps_sim_task(void *arg)
         gps_source_t g = {
             .lat_e7      = (int32_t)lat,
             .lon_e7      = (int32_t)lon,
-            .speed_kmh   = SPEED_KMH,
+            .speed_mph   = SPEED_MPH,
             .heading_deg = (uint16_t)heading_deg,
             .fix_ok      = true,
             .time_ms     = t,

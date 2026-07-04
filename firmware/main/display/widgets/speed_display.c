@@ -20,7 +20,7 @@ LV_FONT_DECLARE(jbm_bold_33);
 typedef struct {
     lv_obj_t       *digit[MAX_DIGITS];
     lv_obj_t       *unit_label;
-    uint16_t        last_kmh;
+    uint16_t        last_mph;
     display_units_t last_units;
     char            shown[MAX_DIGITS];  // glyph currently in each slot, 0 = blank
     bool            has_value;
@@ -66,28 +66,29 @@ lv_obj_t *speed_display_create(lv_obj_t *parent)
     lv_obj_align(unit, LV_ALIGN_CENTER, 0, 95);
 
     sd->unit_label = unit;
-    sd->last_kmh   = 0;
+    sd->last_mph   = 0;
     sd->last_units = UNITS_KPH;
     sd->has_value  = false;
     lv_obj_set_user_data(cont, sd);
     return cont;
 }
 
-void speed_display_set_value(lv_obj_t *cont, uint16_t kmh, display_units_t units)
+void speed_display_set_value(lv_obj_t *cont, uint16_t mph, display_units_t units)
 {
     speed_data_t *sd = lv_obj_get_user_data(cont);
     if (!sd) return;
-    if (sd->has_value && sd->last_kmh == kmh && sd->last_units == units) return;
+    if (sd->has_value && sd->last_mph == mph && sd->last_units == units)
+        return;
 
     bool units_changed = sd->last_units != units;
-    sd->last_kmh   = kmh;
+    sd->last_mph       = mph;
     sd->last_units = units;
     sd->has_value  = true;
 
     // Peg at 999: the layout has three digit slots, and truncating a longer
     // number to its leading digits would read as a confident wrong value
     // (1024 -> "102"). 4+ digits only happens on a faulty/garbage reading.
-    unsigned shown_val = units_speed_display(kmh, units);
+    unsigned shown_val = units_speed_display(mph, units);
     if (shown_val > 999)
         shown_val = 999;
 

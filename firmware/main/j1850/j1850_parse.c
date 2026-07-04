@@ -48,7 +48,18 @@ bool j1850_parse(const j1850_frame_t *f, vehicle_data_t *vd)
         return true;
     }
     if (msg(f, TEMP, 4, 6)) {
-        vd->engine_temp_c = (int8_t)f->data[4];  // raw byte = degrees C
+        // PROVISIONAL scaling — the stock cluster shows NO temperature, so
+        // there is no dial to validate against; the raw byte's meaning is
+        // unconfirmed. Three candidates fit the captured 0x3E..0x48 climb:
+        //   raw as C     -> 62..72 C
+        //   raw as F     -> ~17..22 C
+        //   raw - 40 = C -> 22..32 C  (GM/OBD-style offset; HarleyDroid's
+        //                              wiki documents "C + 40", i.e. this)
+        // HarleyDroid is only a HINT (its turn-signal bits were wrong too).
+        // Keep raw-as-C for now; resolve with a two-point capture (cold ~=
+        // ambient, fully warm ~= 90-100 C). The sniffer logs the raw byte
+        // ("temp:" line). Do NOT lock this until that capture.
+        vd->engine_temp_c = (int8_t)f->data[4];
         return true;
     }
     if (msg(f, GEAR, 4, 6)) {
@@ -57,7 +68,7 @@ bool j1850_parse(const j1850_frame_t *f, vehicle_data_t *vd)
         return true;
     }
     if (msg(f, SPEED, 4, 7)) {
-        vd->speed_kmh = (uint16_t)(((f->data[4] << 8) | f->data[5]) / J1850_SPEED_DIVISOR);
+        vd->speed_mph = (uint16_t)(((f->data[4] << 8) | f->data[5]) / J1850_SPEED_DIVISOR);
         return true;
     }
     if (msg(f, TURN, 4, 6)) {

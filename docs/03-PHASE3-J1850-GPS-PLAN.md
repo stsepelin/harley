@@ -66,15 +66,18 @@ Phase 3 kickoff — the old drawing would jam the bus:
 >   with the filter off, decode is clean with no invert flag (546
 >   frames, 0 bad CRC). `RX_INVERT` removed, glitch filter defaults off.
 >   See the master plan transceiver section + session notes.
-> - Decoded live: **RPM** (tracked idle→4125), **temp** (raw °C,
->   confirmed), gear, check-engine, fuel-consumption ticks, turn
->   signals (L/R swapped vs the table). ~2% bad CRC even at 5k rpm.
+> - Decoded live: **RPM** (tracked idle→4125), gear, check-engine,
+>   fuel-consumption ticks, turn signals (L/R swapped vs the table),
+>   **temp** (raw byte climbs — units PROVISIONAL, see below), **speed**
+>   header (mph-native, DIV provisional). ~2% bad CRC even at 5k rpm.
 > - **IM keep-alive set identified** (`68 FF 40/60`, `29 FE 40/60`,
 >   steady ~2 s) — the Stage 4 replay targets.
 > - Beam + neutral are **discrete wires** (pins 2/10), not on the bus.
 >
-> Still open in Stage 2: a **riding capture** for road speed
-> (`48 29 10 02`) + its km/h-vs-mph divisor. Everything else is done.
+> Still open in Stage 2 (all need the bike): a **riding capture** for road
+> speed (`48 29 10 02`, native mph vs GPS to fix DIV) + gears 1-6, and a
+> **two-point temperature capture** (`A8 49 10 10`, raw byte at cold ~ambient
+> and fully warm — the stock cluster shows no temp, so no dial reference).
 
 - T-tap pin 7 (LGN/V, J1850 data) through the proxy box; RX-only
   transceiver → P4 GPIO.
@@ -119,10 +122,25 @@ Phase 3 kickoff — the old drawing would jam the bus:
 - Pure-logic message parser (`j1850_parse.c`): decode table from the
   master plan (HarleyDroid-derived). Host tests against real captured
   frames from Stage 2 — same fixture pattern as `phone_protocol`.
-- Bench-verify against the stock cluster: speed/RPM/gear/temp shown by
-  the sniffer must match the dial. **Two table entries need explicit
-  confirmation**: speed divisor (`/128` — km/h or mph?) and engine
-  temp units (HarleyDroid says raw °C, the old plan said °F).
+- **Two decode entries still blocked on the bike** (`j1850_parse.c` marks
+  both provisional; the sniffer logs raw hints for the capture):
+  - **Speed `48 29 10 02` — units SETTLED (mph-native), magnitude
+    provisional.** US-market bike → stock cluster reads miles → the ECM
+    value is mph-based; km/h is a display-layer conversion, NOT decode
+    (don't bake it into the parser). `vehicle_data.speed_mph` is now
+    mph-canonical throughout (the GPS/sim producers convert to mph, and
+    `units_speed_display` does mph→km/h only when the user selects metric),
+    so the parser stores the raw value with no conversion. Only the `/DIV`
+    scale (128 guess) is open. Confirm on a ride: compare the logged native
+    speed DIRECTLY to GPS mph across 30/50/70; correct DIV if off by a clean
+    factor.
+  - **Temp `A8 49 10 10` — FULLY PROVISIONAL.** The stock cluster shows
+    NO temperature, so there is no dial to check against; the raw byte's
+    meaning is unconfirmed. Candidates: raw°C / raw°F / `raw-40=°C`
+    (HarleyDroid's wiki documents `°C+40` = the offset form, but it's a
+    HINT — its turn bits were wrong). Resolve with a **two-point capture**:
+    raw byte cold (~ambient) + fully warm (~90-100°C) fixes scale+offset.
+  - Gear ladder (1-6) is also ride-confirmed but tracked separately.
 - `j1850_driver.c` glue: RMT RX → vpw decode → parse → `vehicle_data_set`.
   New Kconfig `VROD_J1850`, mutually exclusive producer with the sim
   (same pattern as `VROD_GPS_UART` vs `gps_sim`).

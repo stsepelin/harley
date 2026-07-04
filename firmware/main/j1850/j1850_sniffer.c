@@ -9,6 +9,7 @@
 #include "freertos/queue.h"
 #include "freertos/task.h"
 #include <string.h>
+#include "j1850_parse.h"  // J1850_SPEED_DIVISOR for the capture hint line
 #if CONFIG_VROD_J1850
 #include "j1850_driver.h"
 #endif
@@ -127,6 +128,26 @@ static void log_frame(const j1850_frame_t *f)
     ESP_LOGI(TAG, "%s", line);
 }
 
+// Capture-prep hints for the two fields still blocked on the bike. Speed:
+// emit the NATIVE decoded value (raw / DIV, mph-native) so it compares
+// DIRECTLY to GPS mph on a ride — DIV magnitude is provisional. Temp: emit
+// the RAW byte plus the three candidate scalings so a two-point capture
+// (cold ~ambient + fully warm) can solve the formula. See j1850_parse.h.
+static void log_hint(const j1850_frame_t *f)
+{
+    static const uint8_t SPEED[] = {0x48, 0x29, 0x10, 0x02};
+    static const uint8_t TEMP[]  = {0xA8, 0x49, 0x10, 0x10};
+    if (f->len >= 7 && memcmp(f->data, SPEED, 4) == 0) {
+        unsigned raw = ((unsigned)f->data[4] << 8) | f->data[5];
+        ESP_LOGI(TAG, "speed: raw=%u native=%u (raw/%d, mph-native; DIV provisional) vs GPS mph",
+                 raw, raw / J1850_SPEED_DIVISOR, J1850_SPEED_DIVISOR);
+    } else if (f->len >= 6 && memcmp(f->data, TEMP, 4) == 0) {
+        unsigned r = f->data[4];
+        ESP_LOGI(TAG, "temp: raw=0x%02X (%u) PROVISIONAL — C?=%u  F->C?=%d  (raw-40)C?=%d", r, r, r,
+                 (int)(((int)r - 32) * 5 / 9), (int)r - 40);
+    }
+}
+
 static void publish_frame(const j1850_frame_t *f, uint32_t frames, uint32_t crc_bad)
 {
     portENTER_CRITICAL(&s_stats_mux);
@@ -194,6 +215,7 @@ static void sniffer_task(void *arg)
                 if (!frame.crc_ok)
                     crc_bad++;
                 log_frame(&frame);
+                log_hint(&frame);
                 publish_frame(&frame, frames, crc_bad);
 #if CONFIG_VROD_J1850
                 j1850_driver_feed(&frame);
@@ -217,6 +239,7 @@ static void sniffer_task(void *arg)
                     if (!frame.crc_ok)
                         crc_bad++;
                     log_frame(&frame);
+                    log_hint(&frame);
                     publish_frame(&frame, frames, crc_bad);
 #if CONFIG_VROD_J1850
                     j1850_driver_feed(&frame);

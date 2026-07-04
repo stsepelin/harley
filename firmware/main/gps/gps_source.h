@@ -15,7 +15,7 @@
 typedef struct {
     int32_t  lat_e7;        // signed, 1e-7 deg. Tallinn ≈ +594370000.
     int32_t  lon_e7;        // signed, 1e-7 deg. Tallinn ≈ +247536000.
-    uint16_t speed_kmh;     // ground speed, 0..999 (>= 65535 km/h is rare)
+    uint16_t speed_mph;     // ground speed, mph-canonical (see vehicle_data.h)
     uint16_t heading_deg;   // 0..359 from true north
     bool     fix_ok;        // false until first valid fix
     uint32_t time_ms;       // monotonic since boot; NMEA time after Phase 5

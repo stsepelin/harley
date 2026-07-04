@@ -3,30 +3,31 @@
 
 // --- speed ---------------------------------------------------------------
 
-static void test_speed_kph_passthrough(void)
+// mph is canonical now, so the MPH display path is a passthrough.
+static void test_speed_mph_passthrough(void)
 {
-    TEST_ASSERT_EQUAL_UINT16(0,   units_speed_display(0,   UNITS_KPH));
-    TEST_ASSERT_EQUAL_UINT16(50,  units_speed_display(50,  UNITS_KPH));
-    TEST_ASSERT_EQUAL_UINT16(127, units_speed_display(127, UNITS_KPH));
+    TEST_ASSERT_EQUAL_UINT16(0, units_speed_display(0, UNITS_MPH));
+    TEST_ASSERT_EQUAL_UINT16(50, units_speed_display(50, UNITS_MPH));
+    TEST_ASSERT_EQUAL_UINT16(127, units_speed_display(127, UNITS_MPH));
 }
 
-// Hand-checked against the exact conversion factor 0.621371...
-static void test_speed_mph_round_to_nearest(void)
+// Hand-checked against the exact conversion factor 1.609344.
+static void test_speed_kph_round_to_nearest(void)
 {
-    TEST_ASSERT_EQUAL_UINT16(0,   units_speed_display(0,   UNITS_MPH));   // 0.00
-    TEST_ASSERT_EQUAL_UINT16(31,  units_speed_display(50,  UNITS_MPH));   // 31.07
-    TEST_ASSERT_EQUAL_UINT16(62,  units_speed_display(100, UNITS_MPH));   // 62.14
-    TEST_ASSERT_EQUAL_UINT16(75,  units_speed_display(120, UNITS_MPH));   // 74.56 → 75
-    TEST_ASSERT_EQUAL_UINT16(124, units_speed_display(200, UNITS_MPH));   // 124.27
+    TEST_ASSERT_EQUAL_UINT16(0, units_speed_display(0, UNITS_KPH));      // 0.00
+    TEST_ASSERT_EQUAL_UINT16(80, units_speed_display(50, UNITS_KPH));    // 80.47
+    TEST_ASSERT_EQUAL_UINT16(161, units_speed_display(100, UNITS_KPH));  // 160.93 → 161
+    TEST_ASSERT_EQUAL_UINT16(193, units_speed_display(120, UNITS_KPH));  // 193.12
+    TEST_ASSERT_EQUAL_UINT16(322, units_speed_display(200, UNITS_KPH));  // 321.87 → 322
 }
 
-// Crossing the .5 boundary should jump exactly once.
-static void test_speed_mph_round_boundary(void)
+// Rounds to nearest in both directions.
+static void test_speed_kph_round_boundary(void)
 {
-    // 119 km/h = 73.94 mph → 74
-    TEST_ASSERT_EQUAL_UINT16(74, units_speed_display(119, UNITS_MPH));
-    // 120 km/h = 74.56 mph → 75
-    TEST_ASSERT_EQUAL_UINT16(75, units_speed_display(120, UNITS_MPH));
+    // 45 mph = 72.42 km/h → 72 (rounds down)
+    TEST_ASSERT_EQUAL_UINT16(72, units_speed_display(45, UNITS_KPH));
+    // 78 mph = 125.53 km/h → 126 (rounds up)
+    TEST_ASSERT_EQUAL_UINT16(126, units_speed_display(78, UNITS_KPH));
 }
 
 // --- whole distance (odometer) -------------------------------------------
@@ -84,9 +85,9 @@ static void test_distance_labels(void)
 
 void RunTests(void)
 {
-    RUN_TEST(test_speed_kph_passthrough);
-    RUN_TEST(test_speed_mph_round_to_nearest);
-    RUN_TEST(test_speed_mph_round_boundary);
+    RUN_TEST(test_speed_mph_passthrough);
+    RUN_TEST(test_speed_kph_round_to_nearest);
+    RUN_TEST(test_speed_kph_round_boundary);
     RUN_TEST(test_distance_whole_km_truncated);
     RUN_TEST(test_distance_whole_mi_truncated);
     RUN_TEST(test_distance_tenths_km);

@@ -30,7 +30,7 @@ static gps_source_t make_fix(int32_t lat, int32_t lon, uint16_t heading)
     gps_source_t g = {
         .lat_e7      = lat,
         .lon_e7      = lon,
-        .speed_kmh   = 50,
+        .speed_mph   = 50,
         .heading_deg = heading,
         .fix_ok      = true,
         .time_ms     = 0,

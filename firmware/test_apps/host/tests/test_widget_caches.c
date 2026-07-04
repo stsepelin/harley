@@ -56,31 +56,32 @@ static void test_speed_cache_fires_on_change(void)
 }
 
 // Switching the displayed unit must repaint both the value digits and
-// the "km/h" / "mph" subtitle even when the underlying km/h value is
+// the "km/h" / "mph" subtitle even when the underlying mph value is
 // identical — same input, different output.
 static void test_speed_cache_fires_on_units_change(void)
 {
     lv_obj_t *w = speed_display_create(NULL);
-    speed_display_set_value(w, 50, UNITS_KPH);
+    speed_display_set_value(w, 40, UNITS_KPH);  // 40 mph shown as 64 km/h
     lv_stub_reset();
-    speed_display_set_value(w, 50, UNITS_MPH);
-    // 50 km/h -> 31 mph: both digit slots flip (5->3, 0->1) plus the subtitle,
-    // so three per-digit label writes. (Single-label era this was 2.)
+    speed_display_set_value(w, 40, UNITS_MPH);  // same 40 mph, shown as 40
+    // 64 -> 40: both digit slots flip (6->4, 4->0) plus the subtitle,
+    // so three per-digit label writes.
     TEST_ASSERT_EQUAL_INT(3, g_lv_label_set_text_calls);
 }
 
 // Shrinking digit count must hide the now-empty slot, and growing back must
 // re-show it: 100 -> 99 leaves the leading slot blank (2 digit rewrites),
-// 99 -> 100 repaints all three.
+// 99 -> 100 repaints all three. Uses mph (the canonical unit) so the shown
+// value equals the input with no conversion in the way.
 static void test_speed_digit_count_shrink_and_grow(void)
 {
     lv_obj_t *w = speed_display_create(NULL);
-    speed_display_set_value(w, 100, UNITS_KPH);
+    speed_display_set_value(w, 100, UNITS_MPH);
     lv_stub_reset();
-    speed_display_set_value(w, 99, UNITS_KPH);
+    speed_display_set_value(w, 99, UNITS_MPH);
     TEST_ASSERT_EQUAL_INT(2, g_lv_label_set_text_calls);  // slots: hide, '9', '9'
     lv_stub_reset();
-    speed_display_set_value(w, 100, UNITS_KPH);
+    speed_display_set_value(w, 100, UNITS_MPH);
     TEST_ASSERT_EQUAL_INT(3, g_lv_label_set_text_calls);  // '1' re-shown, '0', '0'
 }
 

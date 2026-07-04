@@ -9,7 +9,11 @@ typedef enum {
 } gear_t;
 
 typedef struct {
-    uint16_t speed_kmh;
+    // Canonical speed unit is mph: this is a US-market bike whose real source
+    // (the J1850 ECM) is mph-native, so mph is stored raw and the display
+    // converts to km/h only when the user selects metric. Distance stays in
+    // metres (odometer_m/trip_m) - metres is already unit-neutral.
+    uint16_t speed_mph;
     uint16_t rpm;
     gear_t   gear;
     int8_t   engine_temp_c;

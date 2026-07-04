@@ -35,7 +35,7 @@ static void gps_uart_task(void *arg)
             gps_source_t g = {
                 .lat_e7      = rmc.lat_e7,
                 .lon_e7      = rmc.lon_e7,
-                .speed_kmh   = rmc.speed_kmh,
+                .speed_mph   = rmc.speed_mph,
                 .heading_deg = rmc.heading_deg,
                 .fix_ok      = rmc.valid,
                 .time_ms     = rmc.time_utc_ms,

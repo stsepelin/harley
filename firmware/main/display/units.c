@@ -4,14 +4,15 @@
 // arithmetic preserves the .344 without floating-point.
 #define UM_PER_MILE  1609344u
 
-uint16_t units_speed_display(uint16_t kmh, display_units_t units)
+uint16_t units_speed_display(uint16_t mph, display_units_t units)
 {
-    if (units != UNITS_MPH) return kmh;
-    // mph = round(kmh × 1000 / 1609.344). Adding UM_PER_MILE/2 gives
-    // round-to-nearest before integer division. Worst-case input is a
-    // few hundred km/h, well clear of uint32 overflow.
-    uint32_t scaled = (uint32_t)kmh * 1000000u + (UM_PER_MILE / 2u);
-    return (uint16_t)(scaled / UM_PER_MILE);
+    if (units == UNITS_MPH)
+        return mph;
+    // km/h = round(mph × 1609.344 / 1000). Adding 500000 gives round-to-
+    // nearest before the /1000000. Worst-case input is a few hundred mph,
+    // well clear of uint32 overflow.
+    uint32_t scaled = (uint32_t)mph * UM_PER_MILE + 500000u;
+    return (uint16_t)(scaled / 1000000u);
 }
 
 uint32_t units_distance_whole(uint32_t meters, display_units_t units)

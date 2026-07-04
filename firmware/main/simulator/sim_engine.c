@@ -144,7 +144,9 @@ static void sim_task(void *arg)
 
         // 3) Stitch into the snapshot.
         bool blink_on = (((int)(cycle_t * 2.0f)) % 2 == 0);   // ~1 Hz
-        data.speed_kmh  = (uint16_t)(speed + 0.5f);
+        // speed stays km/h through the sim physics (gear table + distance
+        // integrator); convert to the mph-canonical field at the store.
+        data.speed_mph  = (uint16_t)(speed * 0.621371f + 0.5f);
         data.rpm        = (uint16_t)(rpm + 0.5f);
         data.gear       = gear;
         data.turn_left  = (hazard || left_signal) && blink_on;

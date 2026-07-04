@@ -9,12 +9,13 @@ typedef enum {
     UNITS_MPH = 1,
 } display_units_t;
 
-// Vehicle data is always published in metric (km/h, metres). These helpers
-// convert at the very last step, in the widget, so the producer side and
-// the cache logic stay unit-agnostic.
+// Vehicle data is published in mph (speed) and metres (distance). These
+// helpers convert at the very last step, in the widget, so the producer
+// side and the cache logic stay unit-agnostic.
 
-// Speed in km/h → displayed value. Rounded to the nearest whole.
-uint16_t units_speed_display(uint16_t kmh, display_units_t units);
+// Speed in mph → displayed value (mph, or km/h when metric). Rounded to
+// the nearest whole.
+uint16_t units_speed_display(uint16_t mph, display_units_t units);
 
 // Metres → whole displayed unit (km or mi), truncated. Used by the
 // odometer where we only render an integer.

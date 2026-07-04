@@ -178,7 +178,7 @@ void screen_ride_update(const vehicle_data_t *data, const settings_t *settings)
     display_units_t units = settings->units;
 
     tach_arc_set_value(s_tach, data->rpm);
-    speed_display_set_value(s_speed, data->speed_kmh, units);
+    speed_display_set_value(s_speed, data->speed_mph, units);
     gear_indicator_set(s_gear, data->gear);
     gear_indicator_set_warning(s_gear, data->rpm > TACH_REDLINE_RPM);
     fuel_arc_set_level(s_fuel, data->fuel_level);

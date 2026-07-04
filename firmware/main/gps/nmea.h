@@ -28,7 +28,7 @@ typedef struct {
     bool     valid;        // RMC status 'A' (fix); 'V' parses but stays false
     int32_t  lat_e7;       // signed 1e-7 deg
     int32_t  lon_e7;       // signed 1e-7 deg
-    uint16_t speed_kmh;    // rounded from knots
+    uint16_t speed_mph;    // rounded from knots (mph-canonical)
     uint16_t heading_deg;  // 0..359, rounded from course-over-ground
     uint32_t time_utc_ms;  // ms since UTC midnight
 } nmea_rmc_t;
