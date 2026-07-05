@@ -19,6 +19,7 @@ without any toolchain.
 | `j1850_rx.py/.svg` | Phase 3 Stage 1–2 | J1850 RX front end alone: 7.5V zener clamp + 10k/4.7k divider → sniffer GPIO. Correct and unchanged. Build this first — it can't disturb the bus. (The temporary GPIO 22 ADC amplitude probe is a second wire off node B — firmware `CONFIG_VROD_J1850_ADC_GPIO`; not drawn.) **Phase 6:** the permanent harness needs a **comparator / Schmitt** stage here for noise immunity — not the P4 glitch filter (it desyncs decode; see the master plan Phase 6 note + `../../firmware/docs/j1850-toggling-isr-candidate.md`). This bare-divider drawing is the bench build. |
 | `j1850_tx.py/.svg` | Phase 3 Stage 4 — **canonical TX (high-side)** | High-side PNP source: dominant = drive bus HIGH. Correct for standard VPW (idle LOW / dominant HIGH), now confirmed on the bike. 2N2907A needed. |
 | `discrete_divider.py/.svg` | Phase 6 | 12V discrete-signal divider (10k/2.7k + optional 3.3V zener), ×6 for turns/beam/neutral/oil/ignition. Sized for 14.4V charging voltage. |
+| `bike-power-chain.py/.svg` | Phase 6 (power) | Protected 12V→5V bike-power chain: fuse + reverse-polarity + load-dump TVS → mini560 → output reverse-block Schottky → board header 5V, with USB-C data coexisting via the board's own AO3401. Full parts list + bench test in `../../firmware/docs/bike-power-injection.md`. |
 
 ## Regenerate
 
