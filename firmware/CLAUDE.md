@@ -26,6 +26,9 @@ Background:
     (fuse / reverse-polarity / load-dump TVS / mini560 / output
     reverse-block) into the header 5V; parts list + bench test.
     Prerequisite for powering the cluster on the bike.
+  - `docs/live-gauge-bench-test.md` — build config (`CONFIG_VROD_J1850=y`)
+    + stationary checklist to show real bus data on the gauge, laptop USB
+    powered, before a ride.
 
 This file is for *how to work in the firmware code*, not what we're
 working toward or why each decision is the way it is. Path references
