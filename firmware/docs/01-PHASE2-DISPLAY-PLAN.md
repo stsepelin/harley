@@ -220,7 +220,7 @@ vrod_gauge/
 │   └── simulator/
 │       ├── sim_engine.h           # Phase 2 only — fake data
 │       └── sim_engine.c
-└── components/                     # Future: J1850, GPS, BLE
+└── components/                     # Future: J1850, BLE
 ```
 
 ### Update main/CMakeLists.txt

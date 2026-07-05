@@ -156,7 +156,7 @@ next gap. (Overrun counting stays as-is for health visibility.)
 ## Acceptance gate (must pass BEFORE any implementation)
 
 The alternation + re-sync is **pure logic**, so it lands in `vrod_pure`
-with host tests, same policy as `j1850_vpw.c` / `nmea.c` (100 % line +
+with host tests, same policy as `j1850_vpw.c` / `j1850_parse.c` (100 % line +
 branch on the tested scope). The state machine (level toggle + idle/SOF
 anchors) should be a free-function module separate from the LVGL/ISR glue
 so it is host-testable in isolation.

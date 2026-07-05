@@ -3,11 +3,18 @@
 > **Status: ✅ complete** (June 2026 — all 8 stages landed; loose ends
 > carried forward are listed at the bottom of this file)
 >
-> Inserted between Phase 2 (gauge UI, complete) and Phase 3 (J1850 + GPS,
+> **Historical record.** This documents what Phase 2.5 built at the time.
+> **Stage 7 (the speed-camera / POI alert framework) and its fake-GPS test
+> harness were REMOVED in July 2026** when onboard GPS was dropped — speed
+> comes from the J1850 bus and the camera feature depended on GPS position
+> (see the PROJECT-BRIEF changelog). The Stage 7 text below is kept for
+> history; that code no longer exists.
+>
+> Inserted between Phase 2 (gauge UI, complete) and Phase 3 (J1850 bus,
 > which was blocked on parts) to keep the project moving while hardware
 > shipped. All work in this phase ran on the Waveshare ESP32-P4 board we
-> already had — no bike harness, no GPS module needed. The parts have
-> since arrived; Phase 3 is the active phase.
+> already had — no bike harness needed. The parts have since arrived;
+> Phase 3 is the active phase.
 
 ## Goal
 

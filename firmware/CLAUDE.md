@@ -9,7 +9,7 @@ Background:
 - Cross-system docs at the monorepo root:
   - `../docs/PROJECT-BRIEF.md` — what we're building
   - `../docs/00-MASTER-PROJECT-PLAN.md` — phases / roadmap
-  - `../docs/03-PHASE3-J1850-GPS-PLAN.md` — current phase
+  - `../docs/03-PHASE3-J1850-PLAN.md` — current phase
 - Firmware-internal docs (here in `firmware/docs/`):
   - `docs/01-PHASE2-DISPLAY-PLAN.md` — Phase 2 plan (complete)
   - `docs/ARCHITECTURE.md` — threading, render pipeline, decision history
@@ -161,13 +161,13 @@ Full policy in `test_apps/host/README.md`. Short version:
 - **In scope (100 % line + branch required):** the pure-logic modules —
   `gear_table.c`, `sim_math.c`, `format.c`, `gesture.c`, `units.c`,
   `smooth.c`, `fuel_scale.c`, `phone_data.c`, `phone_protocol.c`,
-  `settings.c`, `vehicle_data.c`, `ble_visibility.c`, `poi_math.c`,
-  `poi_db.c`, `poi_alert.c`, `nmea.c`, `j1850_vpw.c` — **plus all the
-  widgets** (including `tach_arc.c`), which run against the LVGL stub
-  and sit inside the same gate.
+  `settings.c`, `vehicle_data.c`, `ble_visibility.c`, `j1850_vpw.c`,
+  `j1850_parse.c`, `j1850_driver.c`, `j1850_edge.c`, `j1850_tx_logic.c`,
+  `ride_log_format.c` — **plus all the widgets** (including `tach_arc.c`),
+  which run against the LVGL stub and sit inside the same gate.
 - **Out of scope:** fonts (generated), boot/screen wiring (BSP glue),
-  `sim_engine.c`'s task body, `gps_source.c` / `gps_sim.c` /
-  `gps_uart.c` / `j1850_sniffer.c` producers and capture glue.
+  `sim_engine.c`'s task body, and the `j1850_sniffer.c` / `j1850_tx.c` /
+  `ride_log.c` producers and capture/driver glue.
 
 When you add code:
 

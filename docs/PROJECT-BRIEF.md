@@ -2,6 +2,14 @@
 
 **For Claude Code session continuation.**
 
+> **Changelog (July 2026): onboard GPS and the speed-camera / POI
+> feature were dropped.** Speed comes from the J1850 bus, so onboard GPS
+> was a large separate effort (module, UART producer, NMEA parsing,
+> antenna) for little benefit, and the speed-camera alerts depended on
+> GPS position. Both were removed from the firmware and the plans. A
+> phone GPS over the existing BLE link could refine speed calibration
+> later if wanted, with no new hardware.
+
 ---
 
 ## Project Overview
@@ -11,7 +19,7 @@ Custom digital instrument cluster replacement for a **2009 Harley-Davidson VRSCF
 ## Hardware Status
 
 - ✅ **Display board acquired and working** — Waveshare ESP32-P4-WIFI6-Touch-LCD-3.4C
-- ✅ **Parts arrived** (June 2026, ~€230 from AliExpress): GPS module (NEO-6M/M8N), IRLZ44N MOSFETs, 2N2222 transistors, zener diodes, resistor kit, prototyping supplies, T-tap connectors, GT 12-pin connector, buck converter, etc. — Phase 3 is unblocked.
+- ✅ **Parts arrived** (June 2026, ~€230 from AliExpress): IRLZ44N MOSFETs, 2N2222 transistors, zener diodes, resistor kit, prototyping supplies, T-tap connectors, GT 12-pin connector, buck converter, etc. — Phase 3 is unblocked.
 - 🔧 **Local items needed**: Conformal coating spray, junction box
 
 ## Development Environment
@@ -30,8 +38,8 @@ harley/
 ├── docs/                              # Cross-system docs
 │   ├── PROJECT-BRIEF.md               # This file
 │   ├── 00-MASTER-PROJECT-PLAN.md      # Full v5 project plan + budget
-│   ├── 02-PHASE2.5-OFFBIKE-PLAN.md    # Phase 2.5 (✅ touch / settings / BLE / cameras)
-│   ├── 03-PHASE3-J1850-GPS-PLAN.md    # Phase 3 (active: J1850 + IM sim + GPS)
+│   ├── 02-PHASE2.5-OFFBIKE-PLAN.md    # Phase 2.5 (✅ touch / settings / BLE)
+│   ├── 03-PHASE3-J1850-PLAN.md    # Phase 3 (active: J1850 + IM sim)
 │   └── schematics/                    # schemdraw sources + rendered SVGs
 ├── firmware/                          # ESP-IDF cluster firmware
 │   ├── CLAUDE.md                      # Firmware-specific working notes
@@ -50,8 +58,6 @@ harley/
 │   │   ├── ble/                       # NimBLE peripheral over esp_hosted VHCI
 │   │   ├── phone/                     # Phone-payload protocol parser
 │   │   ├── vehicle/                   # Shared mutex-guarded state
-│   │   ├── gps/                       # gps_source_t store + fake-GPS producer
-│   │   ├── poi/                       # Speed-camera DB + alert engine (Stage 7)
 │   │   ├── simulator/                 # Sim engine + math + gear table
 │   │   ├── settings/                  # NVS-backed user settings
 │   │   ├── sound/                     # ES8311 audio + click samples
@@ -75,16 +81,16 @@ harley/
 - ✅ **Phase 2.5 — Off-bike feature work** complete (see
   `02-PHASE2.5-OFFBIKE-PLAN.md`): touch + screen switching, settings +
   units toggle, Android BLE phone integration with SC bonding +
-  directed advertising, host notification emulator, speed-camera
-  framework, no-sim build flag — plus the BMW-style gauge redesign
-  and the 100% host-test coverage gate. Loose ends are listed at the
-  bottom of the phase plan; media TX, companion auto-reconnect, and
-  the poi coverage-gate gap have since been closed. Still open: the
-  Stage 8 + reconnect on-hardware E2E record, and the iOS decision.
-- ⏳ **Phase 3 — J1850 bus + IM simulation + GPS** is active (see
-  `03-PHASE3-J1850-GPS-PLAN.md`). Parts arrived June 2026; the GPS
-  software half (NMEA parser + UART producer, `CONFIG_VROD_GPS_UART`)
-  landed at kickoff — Stage 5 is wiring + validation only.
+  directed advertising, host notification emulator, no-sim build flag
+  — plus the BMW-style gauge redesign and the 100% host-test coverage
+  gate. (A speed-camera framework was also built here and later removed
+  with GPS in July 2026 — see the changelog at the top.) Loose ends are
+  listed at the bottom of the phase plan; media TX and companion
+  auto-reconnect have since been closed. Still open: the Stage 8 +
+  reconnect on-hardware E2E record, and the iOS decision.
+- ⏳ **Phase 3 — J1850 bus + IM simulation** is active (see
+  `03-PHASE3-J1850-PLAN.md`). Parts arrived June 2026; work is the
+  J1850 transceiver bring-up, sniffing/decode, and IM replay.
 
 Phase 2 deliverable summary (as redesigned at the end of Phase 2.5,
 BMW-EfficientDynamics styling): working 800×800 round gauge running
@@ -104,21 +110,19 @@ BSP). Everything visual is pre-baked into ARGB sprites (see
 drives a desktop SDL2 simulator under `firmware/simulator/` for
 iteration without flashing.
 
-### Immediate next step: Phase 3 — J1850 + GPS bring-up
+### Immediate next step: Phase 3 — J1850 bring-up
 
-Full staged plan in `03-PHASE3-J1850-GPS-PLAN.md`. Short version:
+Full staged plan in `03-PHASE3-J1850-PLAN.md`. Short version:
 build the transceiver RX-only on a breadboard → passive J1850 sniff
 through the proxy-box T-taps (bike keeps its stock cluster) → decode
 against the HarleyDroid table → IM message replay via TX (verify no
-U1255 / TSSM lockout) → wire the NEO-6M and validate. The software
-consumer side is built and host-tested: `vehicle_data_t` means the
-sim → bus swap won't touch the UI, the NMEA parser + UART producer
-are already in (`CONFIG_VROD_GPS_UART`), and the speed-camera alert
-engine from Phase 2.5 Stage 7 just needs real fixes.
+U1255 / TSSM lockout). The software consumer side is built and
+host-tested: `vehicle_data_t` means the sim → bus swap won't touch
+the UI.
 
 ## Design Decisions Already Made
 
-- **Architecture**: ESP32-P4 reads V-Rod's J1850 VPW bus (Phase 3), drives 3.4" round display, BLE for phone integration (Phase 4), GPS for position + speed camera alerts (Phase 5)
+- **Architecture**: ESP32-P4 reads V-Rod's J1850 VPW bus (Phase 3), drives 3.4" round display, BLE for phone integration (Phase 4)
 - **Data abstraction**: `vehicle_data_t` struct as single source of truth — UI doesn't care if data comes from simulator, J1850 bus, or BLE
 - **Dual-core split**: Core 0 = J1850 + BLE + simulator, Core 1 = LVGL rendering at 30 FPS
 - **Cluster replacement strategy**: Build proxy box with T-taps for safe development; final install replaces stock cluster entirely
@@ -144,9 +148,9 @@ engine from Phase 2.5 Stage 7 just needs real fixes.
 
 ## Future Phases (not active yet)
 
-- **Phase 3**: J1850 bus integration + GPS
+- **Phase 3**: J1850 bus integration + IM simulation
 - **Phase 4**: BLE phone integration (iOS ANCS/AMS + Android companion app)
-- **Phase 5**: Speed camera database from SCDB.info / OpenStreetMap
+- **Phase 5**: (removed — GPS + speed cameras dropped July 2026; numbering kept)
 - **Phase 6**: Full cluster replacement + 3D-printed mounting bracket + conformal coating
 - **Phase 7**: Polish — auto-brightness, themes, handlebar button, ride logging, OTA updates with on-screen progress (USB flashing impractical once the cluster is housed)
 
@@ -165,5 +169,5 @@ automatically — it has the always-true conventions. For project history
 and roadmap context, point at this file plus `00-MASTER-PROJECT-PLAN.md`.
 
 If you're picking up at the current state (Phase 2.5 complete, parts
-in hand), the next step is **Phase 3 (J1850 bus + IM simulation +
-GPS)** — see the master plan.
+in hand), the next step is **Phase 3 (J1850 bus + IM simulation)** —
+see the master plan.

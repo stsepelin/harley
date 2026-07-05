@@ -48,12 +48,12 @@ command line if defaults don't match your setup.
 ## Status
 
 Phase 2 (gauge UI) and Phase 2.5 (off-bike work: touch + settings +
-BLE phone integration + speed-camera framework) are complete — a
-synthetic driving cycle drives the full widget set at 30 FPS on the
-round display. Phase 3 (J1850 bus + IM simulation + GPS) is active:
-the NMEA/GPS software half is in; the transceiver + sniffing work is
-next on the bench. See
-[`docs/03-PHASE3-J1850-GPS-PLAN.md`](docs/03-PHASE3-J1850-GPS-PLAN.md).
+BLE phone integration) are complete — a synthetic driving cycle drives
+the full widget set at 30 FPS on the round display. Phase 3 (J1850 bus
++ IM simulation) is active: the RX sniffer, decode → vehicle_data
+producer, and on-board ride log are in; the TX / IM replay + on-bike
+validation are next on the bench. See
+[`docs/03-PHASE3-J1850-PLAN.md`](docs/03-PHASE3-J1850-PLAN.md).
 
 See [`docs/00-MASTER-PROJECT-PLAN.md`](docs/00-MASTER-PROJECT-PLAN.md)
 for the full roadmap and [`docs/02-PHASE2.5-OFFBIKE-PLAN.md`](docs/02-PHASE2.5-OFFBIKE-PLAN.md)

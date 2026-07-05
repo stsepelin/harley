@@ -40,13 +40,15 @@ GND 47 52 48 32 51 24 GND 50  2  3 3V3 28 20 21 GND 29 SCL SDA 3V3
 | GPIO | Used by | Where set |
 |---|---|---|
 | 20 | J1850 RX (divider node) | `CONFIG_VROD_J1850_RX_GPIO` |
-| 21 | GPS NMEA in (module TX) | `CONFIG_VROD_GPS_RX_GPIO` |
 | **22** | **RESERVED: fuel-level sender ADC (Phase 6)** | — |
 
+GPIO 21 was the GPS NMEA input; **GPS was dropped, so 21 is free again**
+(and, being ADC-capable, is a spare analog pin if ever needed).
+
 Why 22 is reserved: P4 ADC1 channels sit on GPIO 16–23 *only*. 16–19
-are SDIO, 23 is touch reset — after 20/21 go to J1850/GPS, GPIO 22 is
-the last ADC-capable pin on the header. The fuel sender is the one
-analog signal in the plan; nothing digital gets to squat on 22.
+are SDIO, 23 is touch reset — with 20 on J1850 RX and 21 now free, GPIO
+22 is kept for the fuel sender, the one analog signal in the plan;
+nothing digital gets to squat on 22.
 (Note: the 2009 VRSC sender is **ultrasonic** — powered, but with an
 ohmic output emulating a resistive sender, so ADC remains the right
 interface; calibration/temp-comp/motion-gating must be reimplemented.
@@ -64,9 +66,10 @@ Details in the master plan's Phase 6 fuel-sender caveat.)
 
 ## Free on the header (Phase 6 discrete inputs, etc.)
 
-2, 3, 4, 5, 24, 25, 28, 29, 30, 31, 32, 34, 36, 46, 47, 48, 49, 50,
-51, 52 — plenty for the six 12V discrete dividers (turn L/R, high
-beam, neutral, oil, ignition) plus the VSS pulse input.
+2, 3, 4, 5, 21, 24, 25, 28, 29, 30, 31, 32, 34, 36, 46, 47, 48, 49, 50,
+51, 52 (21 freed when GPS was dropped) — plenty for the six 12V discrete
+dividers (turn L/R, high beam, neutral, oil, ignition) plus the VSS
+pulse input.
 
 ## Physically confirming a pin
 

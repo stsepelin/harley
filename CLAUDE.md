@@ -15,9 +15,9 @@ Cross-system docs live at the repo root in `docs/`:
 - `PROJECT-BRIEF.md` — what this project is, current status.
 - `00-MASTER-PROJECT-PLAN.md` — full build plan + phases + budget.
 - `02-PHASE2.5-OFFBIKE-PLAN.md` — completed phase (touch / settings /
-  BLE / camera framework).
-- `03-PHASE3-J1850-GPS-PLAN.md` — the active phase (J1850 bus + IM
-  simulation + GPS bring-up).
+  BLE / phone relay).
+- `03-PHASE3-J1850-PLAN.md` — the active phase (J1850 bus + IM
+  simulation).
 
 Firmware-internal docs are under `firmware/docs/`:
 - `01-PHASE2-DISPLAY-PLAN.md` — the (complete) gauge-UI phase.

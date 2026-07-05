@@ -3,10 +3,8 @@
 
 **Full custom gauge replacement with:**
 - 3.4" round 800×800 IPS touch display with toughened glass
-- GPS speed/position tracking
 - BLE phone integration (iOS ANCS/AMS + Android companion app)
 - Navigation, music, caller ID display
-- Speed camera & hazard alerts
 - J1850 bus reading + IM simulation
 - Proxy development harness for safe testing
 - Full reversibility (can return to stock anytime)
@@ -22,7 +20,6 @@
 | Item | Link | Price | Notes |
 |---|---|---|---|
 | **Waveshare ESP32-P4 3.4" WIFI6 IPS Round Touch LCD** | [AliExpress](https://www.aliexpress.com/item/1005009157965757.html) | ~€86 | The brain. ESP32-P4 360MHz RISC-V dual-core + ESP32-C6 for WiFi6/BLE5. 800×800 round display, optically bonded toughened glass, 32MB PSRAM, 16MB flash (the listing says 32MB; the module on our board is 16MB — see `firmware/sdkconfig.defaults`), dual mics, microSD slot. |
-| **GPS Module GY-NEO6MV2 (or M8N if available)** | [AliExpress](https://www.aliexpress.com/item/1005006740935763.html) | ~€7 | Position, speed, heading, time. **Pick NEO-M8N variant if available** — multi-constellation is much better in urban areas. |
 
 ### J1850 Bus Interface Components
 
@@ -64,7 +61,7 @@
 | **Heat shrink tubing kit assortment** | Local or AliExpress | ~€2 | If not in your existing supplies. |
 | **Waterproof junction box IP65 (120×80×50mm)** | Local or AliExpress | ~€3 | Houses the proxy box. |
 | **PG7 cable glands (10 pcs)** | Local or AliExpress | ~€1.50 | Seal cable entries on proxy box + final cluster housing. |
-| **32GB microSD card (Class 10)** | You probably have one | ~€4 | OSM data + speed camera DB + ride logs. |
+| **32GB microSD card (Class 10)** | You probably have one | ~€4 | Ride logs + future SD storage. |
 | **USB-C data cable** | You probably have one | ~€2 | Programming cable. **Must be DATA capable.** |
 
 **Other Total: ~€22**
@@ -122,12 +119,10 @@ Bike 12-pin                                                  │
        ├─ VSS ──► P4 GPIO (pulse counter)                    │
        └─ Ignition ──► voltage divider ──► P4 GPIO           │
                                                              │
-GPS (NEO-6M/M8N) ──► UART ──► P4 GPIO                       │
-                                                             │
 microSD (32GB) ◄── SDIO ── P4 ◄─────────────────────────────┘
   ├── OSM vector map data        ESP32-C6 co-processor (BLE radio only —
-  ├── Speed camera database        no Bluetooth Classic):
-  └── Ride data logs               WiFi 6 + BLE 5
+  └── Ride data logs               no Bluetooth Classic):
+                                   WiFi 6 + BLE 5
                                    Phone notifications + media metadata
                                    + transport commands via the companion
                                    app's GATT link (Android) or ANCS/AMS
@@ -365,10 +360,9 @@ J1850 VPW uses CRC-8 with polynomial 0x1D. Implement in firmware or use existing
 
 ### Display priority (highest to lowest)
 1. Incoming call overlay (auto-dismiss after call)
-2. Speed camera / hazard alert (10-15 sec hold)
-3. Navigation instruction (when nav active)
-4. Music now-playing (ticker bar)
-5. Gauges (always visible)
+2. Navigation instruction (when nav active)
+3. Music now-playing (ticker bar)
+4. Gauges (always visible)
 
 ---
 
@@ -398,7 +392,7 @@ J1850 VPW uses CRC-8 with polynomial 0x1D. Implement in firmware or use existing
 - See `firmware/docs/01-PHASE2-DISPLAY-PLAN.md` "Outcome" for the full delta
 
 ### Phase 2.5: Off-bike feature work — ✅ complete
-Filled the bench time while J1850 + GPS hardware shipped; everything below
+Filled the bench time while the J1850 hardware shipped; everything below
 landed on the board we already had (Waveshare ESP32-P4 with onboard
 ESP32-C6 BLE/WiFi). Capped off with the BMW-style gauge redesign and a
 CI-enforced 100% line/branch coverage gate over all host-testable firmware
@@ -412,19 +406,24 @@ code. Loose ends carried forward are listed at the bottom of
 - Units conversion threaded through every speed/distance widget
 - BLE phone integration (Android companion app + SC bonding +
   directed advertising; iOS ANCS/AMS deferred to Phase 4)
-- Speed-camera alert framework — data format + alert engine + fake
-  GPS test harness; end-to-end validation when GPS arrives
+
+> A speed-camera alert framework + fake-GPS test harness were also
+> built here, then removed in July 2026 when GPS and the speed-camera
+> feature were dropped (see the Phase 3 note below).
 
 See `02-PHASE2.5-OFFBIKE-PLAN.md` for the full plan + ordering.
 
-### Phase 3: IM Simulation + GPS (Weekends 5-6) — ⏳ active (see `03-PHASE3-J1850-GPS-PLAN.md`)
+### Phase 3: IM Simulation (Weekends 5-6) — ⏳ active (see `03-PHASE3-J1850-PLAN.md`)
 - Program IM message replay via IRLZ44N TX
 - Test: disconnect stock cluster, verify no U1255
-- Wire NEO-6M/M8N to P4 UART
-- ~~Parse NMEA sentences → position/speed/heading~~ ✅ landed at kickoff
-  (`nmea.c` host-tested at 100%, `gps_uart.c` producer behind
-  `CONFIG_VROD_GPS_UART`)
-- GPS speed as backup + position for alerts
+
+> **Dropped in July 2026: onboard GPS + the speed-camera feature.**
+> Speed now comes from the J1850 bus, so onboard GPS added a large
+> separate effort (module, UART producer, NMEA parsing, antenna
+> mounting) for little benefit. The speed-camera / POI alert feature
+> depended on GPS position, so it went with it. If speed calibration
+> ever needs refining, a phone GPS over the existing BLE link could
+> supply it later without any new hardware.
 
 ### Phase 4: BLE Phone Integration (Weekends 7-9) — Android half done in 2.5
 - iOS: ANCS + AMS via the C6 (cluster becomes a GATT client of the
@@ -437,18 +436,13 @@ See `02-PHASE2.5-OFFBIKE-PLAN.md` for the full plan + ordering.
   link loss)
 - Navigation banner (needs turn-by-turn intent from a phone app)
 
-### Phase 5: Speed Camera Database — on-bike validation (Weekend 10)
-- Download SCDB.info / OSM camera data for Estonia/Baltics
-- Import into the binary DB format defined in Phase 2.5 Stage 7
-- Store on microSD; the cluster mounts the card and loads the DB on boot
-- End-to-end validation on a moving bike: real GPS fix → real camera
-  detected by the alert engine (already built in Phase 2.5) → warning
-  popup + audio beep fire on the actual ride
+### Phase 5: (removed — GPS + speed cameras dropped)
 
-> The alert engine, DB binary format, warning popup widget, fake-GPS
-> producer, and host unit tests were front-loaded into Phase 2.5
-> Stage 7 because all of that is exercise-able off-bike. Phase 5 is
-> now scoped to "plug in real data + validate on the road".
+> Removed in July 2026. This phase was the on-bike validation of the
+> speed-camera database, which depended on onboard GPS. With GPS and the
+> speed-camera feature dropped (see the Phase 3 note), there is nothing
+> left to validate here. Phase 6/7 numbering is kept as-is to avoid
+> breaking cross-references.
 
 ### Phase 6: Full Cluster Replacement (Weekends 11-12)
 - Read all 12-pin discrete signals (turns, beam, oil, neutral, fuel)
@@ -571,7 +565,7 @@ A8 83 61 12 DX      DX           Fuel gauge 0-6 (0=empty, 6=full)
 ```
           ╭────────────────────────────╮
         ╱                                ╲
-      ╱   ⚠ SPEED CAMERA 800m ahead       ╲
+      ╱                                    ╲
      │                                      │
      │          ╭─────────╮                 │
      │         │  147     │    ┌───┐        │
@@ -603,7 +597,7 @@ IM simulation should prevent U1255. If TSSM security still fails, consider Screa
 - Stock VRSCF cluster housing provides good water resistance for the install
 
 ### Legal (Estonia / EU)
-A functioning speedometer is required for road use. GPS speed as backup adds redundancy. Run proxy + stock cluster during testing period.
+A functioning speedometer is required for road use. Speed comes from the J1850 bus; run proxy + stock cluster during testing period for redundancy.
 
 ### Power
 - Use keyed +12V (Pin 6) for on/off with ignition
@@ -647,8 +641,7 @@ A functioning speedometer is required for road use. GPS speed as backup adds red
 | ESP32 AMS library | https://github.com/marmotton/esp32-apple-media-service |
 | NimBLE (lightweight BLE) | https://github.com/h2zero/NimBLE-Arduino |
 | ESP32-A2DP (AVRCP) | https://github.com/pschatzmann/ESP32-A2DP |
-| **Alerts / Maps** | |
-| SCDB speed camera database | https://scdb.info |
+| **Maps** | |
 | OpenStreetMap | https://openstreetmap.org |
 
 ---
@@ -657,7 +650,7 @@ A functioning speedometer is required for road use. GPS speed as backup adds red
 
 | Solution | Cost | Capabilities |
 |---|---|---|
-| **This DIY build** | **€230** | 800×800 display, GPS, BLE phone integration, speed camera alerts, IM simulation, custom UI, ride logging, future expansion |
+| **This DIY build** | **€230** | 800×800 display, BLE phone integration, IM simulation, custom UI, ride logging, future expansion |
 | Motogadget Motoscope Pro + V-Rod adapter | ~€800-1000 | Premium dash, no fuel/gear/ABS |
 | Dakota Digital MCV-7000 | ~€500 | Digital gauge, no phone integration |
 | Exotic Choppers airbox kit | ~€500-600 | Same Dakota Digital in airbox |

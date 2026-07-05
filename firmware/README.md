@@ -34,8 +34,6 @@ firmware/
 │   ├── ble/                 NimBLE peripheral over esp_hosted VHCI
 │   ├── phone/               Phone-payload protocol parser
 │   ├── vehicle/             Mutex-guarded vehicle_data_t
-│   ├── gps/                 gps_source_t store + fake-GPS producer
-│   ├── poi/                 Speed-camera DB + alert engine
 │   ├── simulator/           Synthetic driving cycle producer
 │   ├── settings/            NVS-backed user settings
 │   ├── sound/               ES8311 audio + click samples

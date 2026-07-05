@@ -1,25 +1,25 @@
-# Phase 3: J1850 Bus + IM Simulation + GPS
+# Phase 3: J1850 Bus + IM Simulation
 
 > **Status: ⏳ active** (kicked off July 2026 — parts arrived June 2026)
 >
 > First phase that touches the bike. The gauge UI (Phase 2), all
 > off-bike features (Phase 2.5), and the loose ends from both are done;
-> everything below either runs on the bench transceiver + the bike's
-> 12-pin harness, or wires the NEO-6M GPS module to the board.
+> everything below runs on the bench transceiver + the bike's 12-pin
+> harness.
 >
-> Already landed at kickoff (off-bike software, host-tested at 100%):
-> the NMEA framer/RMC parser (`firmware/main/gps/nmea.c`) and the UART
-> producer (`gps_uart.c`, `CONFIG_VROD_GPS_UART`) — Stage 5 below is
-> wiring + validation, not new code.
+> **GPS was dropped (July 2026):** speed comes off the J1850 bus, so an
+> onboard GPS module added a large separate effort (module, antenna,
+> NMEA parser, enclosure space, power) for little benefit on a
+> gauge-cluster replacement. The NEO-6M path and the speed-camera / POI
+> feature that depended on GPS position were removed; a phone GPS over
+> the BLE link could refine the speed calibration later if ever wanted.
 
 ## Goal
 
-Replace the synthetic driving cycle with real bike data, keep the ECM
-happy without the stock instrument module, and get real GPS fixes into
-the speed-camera engine. End state: the cluster shows real speed / RPM
-/ gear / temp / indicators from the J1850 bus, sends the IM keep-alive
-messages itself (no U1255, no TSSM lockout), and the Stage 7 alert
-engine runs on live NMEA fixes.
+Replace the synthetic driving cycle with real bike data and keep the ECM
+happy without the stock instrument module. End state: the cluster shows
+real speed / RPM / gear / temp / indicators from the J1850 bus and sends
+the IM keep-alive messages itself (no U1255, no TSSM lockout).
 
 ## Order of attack
 
@@ -75,7 +75,7 @@ Phase 3 kickoff — the old drawing would jam the bus:
 > - Beam + neutral are **discrete wires** (pins 2/10), not on the bus.
 >
 > Still open in Stage 2 (all need the bike): a **riding capture** for road
-> speed (`48 29 10 02`, native mph vs GPS to fix DIV) + gears 1-6, and a
+> speed (`48 29 10 02`, native mph vs the stock speedo to fix DIV) + gears 1-6, and a
 > **two-point temperature capture** (`A8 49 10 10`, raw byte at cold ~ambient
 > and fully warm — the stock cluster shows no temp, so no dial reference).
 
@@ -99,10 +99,10 @@ Phase 3 kickoff — the old drawing would jam the bus:
   margin, fixed in `sdkconfig.defaults` — see the addendum in
   `firmware/docs/ble-bringup-bisect.md`. Phase 6's fuel ADC is
   unblocked by the same fix.)
-- **Pin choice resolved**: GPIO 20 (J1850) and GPIO 21 (GPS) are
-  confirmed broken out on the 40-pin header and unclaimed — full pin
-  budget, header silkscreen map, and the GPIO 22 = fuel-ADC
-  reservation live in `firmware/docs/PINS.md`. For physical
+- **Pin choice resolved**: GPIO 20 (J1850 RX) is confirmed broken out on
+  the 40-pin header and unclaimed (GPIO 21 was the GPS input and is now
+  free) — full pin budget, header silkscreen map, and the GPIO 22 =
+  fuel-ADC reservation live in `firmware/docs/PINS.md`. For physical
   confirmation, set `VROD_PIN_WIGGLE_GPIO` in menuconfig and DMM-probe
   the header (0V↔3.3V every 2.5 s).
 - Remaining in this stage: two-wire link (divider node → GPIO 20, GND
@@ -128,12 +128,11 @@ Phase 3 kickoff — the old drawing would jam the bus:
     provisional.** US-market bike → stock cluster reads miles → the ECM
     value is mph-based; km/h is a display-layer conversion, NOT decode
     (don't bake it into the parser). `vehicle_data.speed_mph` is now
-    mph-canonical throughout (the GPS/sim producers convert to mph, and
+    mph-canonical throughout (the sim producer converts to mph, and
     `units_speed_display` does mph→km/h only when the user selects metric),
     so the parser stores the raw value with no conversion. Only the `/DIV`
-    scale (128 guess) is open. Confirm on a ride: compare the logged native
-    speed DIRECTLY to GPS mph across 30/50/70; correct DIV if off by a clean
-    factor.
+    scale (128 guess) is open — see the **speed-calibration reference**
+    below for the method.
   - **Temp `A8 49 10 10` — FULLY PROVISIONAL.** The stock cluster shows
     NO temperature, so there is no dial to check against; the raw byte's
     meaning is unconfirmed. Candidates: raw°C / raw°F / `raw-40=°C`
@@ -143,7 +142,8 @@ Phase 3 kickoff — the old drawing would jam the bus:
   - Gear ladder (1-6) is also ride-confirmed but tracked separately.
 - `j1850_driver.c` glue: RMT RX → vpw decode → parse → `vehicle_data_set`.
   New Kconfig `VROD_J1850`, mutually exclusive producer with the sim
-  (same pattern as `VROD_GPS_UART` vs `gps_sim`).
+  (`sim_engine` is not started when `VROD_J1850` is on — both write
+  `vehicle_data`).
 - UI, tests, simulator all unchanged — that's what `vehicle_data_t`
   was for.
 
@@ -165,8 +165,8 @@ run headless.
 - **Format:** one line per frame, `<sec.ms> j1850: HH .. | CRC OK | <decoded>`
   — the same shape `tools/j1850_capture.py` / `j1850_report.py` parse, so
   the pulled file runs through the report tool unchanged. The decoded suffix
-  carries the three capture fields: **native speed** (mph, for GPS compare),
-  **raw temp byte** (units still provisional), and **gear raw+ladder**.
+  carries the three capture fields: **native speed** (mph, for the stock-speedo
+  compare), **raw temp byte** (units still provisional), and **gear raw+ladder**.
 - **Fault-tolerant:** writes are buffered and flushed in a low-priority task
   (off the decode path, off the LVGL core). No card / card full / write
   error stop logging cleanly and show on the indicator; the gauge is never
@@ -180,6 +180,18 @@ run headless.
 > sharing ground with the J1850 transceiver — NOT USB. The ride-log firmware
 > is useless without bike power. Wiring is a Phase 6 / bench-harness step;
 > flagged here so it isn't forgotten before a capture ride.
+
+#### Speed DIV (/128) calibration reference
+
+The reference is the **STOCK SPEEDOMETER**, which is mechanically driven by
+the J1850 bus (there is **no onboard GPS**). Method: ride at a steady speed
+and compare the logged native speed from `vehicle_data` (the `speed:` line /
+ride-log `speed=` field) against the stock speedo read **in its native
+MILES** — ignore the km/h sticker, the mechanism reads mph. Match across
+~30 / 50 / 70 and correct `J1850_SPEED_DIVISOR` if off by a clean factor.
+Note the stock speedo may read ~5-10% optimistic (typical), so this is a
+**coarse** calibration; a phone GPS (over the BLE link) could refine it
+later if ever desired.
 
 ### Stage 4 — IM simulation + TX
 
@@ -210,7 +222,7 @@ TX task loop:
    gate pulldown (Q1 gate → GND) backs it up.
 
 **TX GPIO: `CONFIG_VROD_J1850_TX_GPIO`, default 24** — the first free
-header pin (see `firmware/docs/PINS.md`), clear of RX (20) / GPS (21) /
+header pin (see `firmware/docs/PINS.md`), clear of RX (20) and
 fuel-ADC (22). Confirm the physical hole with `VROD_PIN_WIGGLE_GPIO`
 before soldering.
 
@@ -256,19 +268,6 @@ PASS before the bike.**
 - Fallback if TSSM security fails without the stock IM: keep the stock
   IM wired in parallel under the airbox (master plan option C).
 
-### Stage 5 — GPS bring-up (wiring + validation; code already in)
-
-- Wire the NEO-6M/M8N: VCC→5V (module has its own LDO), GND, module TX
-  → the GPIO set in `CONFIG_VROD_GPS_RX_GPIO` (default 21). Module RX
-  only if UBX config is wanted (`CONFIG_VROD_GPS_TX_GPIO`, default off).
-- `idf.py menuconfig` → V-Rod cluster → enable `VROD_GPS_UART`
-  (gps_sim automatically yields; both producers never run together).
-- Validate: serial log shows fixes near a window; lat/lon sane for
-  Tallinn (+59.4°, +24.7°); speed 0 when stationary.
-- Walk/ride past the `VROD_DEMO_POI` test camera location with the
-  demo DB enabled → the Stage 7 popup + chirp must fire on a real fix.
-  (Full SCDB import stays in Phase 5.)
-
 ### Carried-over hardware verification (from Phase 2.5)
 
 Run through once while the board is on the bench anyway:
@@ -284,9 +283,9 @@ Run through once while the board is on the bench anyway:
 
 ## Test policy
 
-Same as everywhere: pure logic (`j1850_vpw.c`, `j1850_parse.c`, done:
-`nmea.c`) goes in `vrod_pure` at 100% line/branch, with the lcov
-filters + policy table updated in the same commit. RMT/UART/task glue
+Same as everywhere: pure logic (`j1850_vpw.c`, `j1850_parse.c`,
+`ride_log_format.c`) goes in `vrod_pure` at 100% line/branch, with the
+lcov filters + policy table updated in the same commit. RMT/ISR/task glue
 is validated on hardware.
 
 ## Safety rails
