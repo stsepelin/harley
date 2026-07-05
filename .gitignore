@@ -20,3 +20,6 @@
 # simulator screenshot output (VROD_SHOT)
 firmware/simulator/*.png
 .venv/
+
+# enclosure STLs are generated from enclosure.scad (large binaries) — keep .scad + PNG renders, regenerate STLs on demand
+hardware/enclosure/*.stl

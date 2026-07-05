@@ -108,7 +108,7 @@ Bike 12-pin                                                  │
        │                                                     │
        ├─ J1850 Data ──► DIY transceiver ──► P4 GPIO         │
        │                  (IRLZ44N + 2N2907A + zener)        │
-       ├─ +12V ──► Mini560 buck ──► 5V ──► P4 USB-C          │
+       ├─ +12V(sw) ─► protected chain ─► Mini560 ─► hdr 5V   │
        ├─ Ground ──► common GND                              │
        ├─ Turn L ──► voltage divider ──► P4 GPIO             │
        ├─ Turn R ──► voltage divider ──► P4 GPIO             │
@@ -138,12 +138,12 @@ transceiver on a GPIO — the C6 is only the phone radio.)
 
 | Pin | Wire Color | Signal | Type | T-tap Color | ESP32-P4 Connection |
 |---|---|---|---|---|---|
-| 1 | R/O (Red/Orange) | +12V Battery (constant) | Power | **Blue** | → Mini560 buck → 5V → P4 USB-C |
+| 1 | R/O (Red/Orange) | +12V Battery (constant) | Power | **Blue** | NOT used for cluster power (constant → would drain the battery key-off); switched pin 6 is the source instead |
 | 2 | White | High Beam | 12V discrete | Red | → Voltage divider → GPIO input |
 | 3 | Violet | Left Turn signal | 12V discrete | Red | → Voltage divider → GPIO input |
 | 4 | Brown | Right Turn signal | 12V discrete | Red | → Voltage divider → GPIO input |
 | 5 | BK/GN (Black/Green) | Ground | Power | **Blue** | → Common GND |
-| 6 | Grey | +12V Ignition (switched) | Power | **Blue** | → Voltage divider → GPIO (on/off detect) |
+| 6 | Grey | +12V Ignition (switched) | Power | **Blue** | **cluster power source** → protected chain (fuse / reverse-polarity / load-dump TVS) → Mini560 → board 5V header. See `../firmware/docs/bike-power-injection.md`. (Powering off switched 12V also makes a separate ignition-detect GPIO redundant.) |
 | 7 | LGN/V (Light Green/Violet) | **J1850 Data Bus** | Digital bus | Red | → DIY transceiver (RX + TX) |
 | 8 | (3-pin sub-connector) | Vehicle Speed Sensor | Pulse | Red | → GPIO input (pulse counter) |
 | 9 | GN/Y (Green/Yellow) | Oil Pressure warning | 12V discrete | Red | → Voltage divider → GPIO input |
@@ -501,7 +501,16 @@ See `02-PHASE2.5-OFFBIKE-PLAN.md` for the full plan + ordering.
   (would let a conservative filter coexist):
   `firmware/docs/j1850-toggling-isr-candidate.md`.
 - Display all indicator icons on gauge
-- 3D print mounting bracket for 86mm display in 95mm bezel
+- 3D-print the enclosure — parametric OpenSCAD model in `hardware/enclosure/`
+  (`enclosure.scad`, tiers simple/robust/compromise). Round case for the Ø115
+  bonded glass+PCB block; **rear-bolt board fixation** (PCB bolted at its 4
+  mount holes on the 74.5 mm square to internal heat-set-insert standoffs, driven
+  from the rear through the removable cover), light-duty front bezel framing the
+  Ø87.6 active area, ~50 mm cavity for the breadboard + mini560. Every screw boss
+  is gusseted; overall ~Ø134 at the screw ears. Current cut is a **temp/test
+  build** — one bottom cable-exit hole instead of per-connector cutouts (microSD
+  via removing the cover); a dedicated SD slot + real cutouts come on the final
+  enclosure. Designed + rendered (all parts F6-manifold), not yet printed.
 - Conformal coat PCB
 - Final install: connect P4 directly to bike harness (bypass proxy)
 - Keep proxy box as backup in toolbox

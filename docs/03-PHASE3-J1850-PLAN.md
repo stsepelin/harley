@@ -73,6 +73,10 @@ Phase 3 kickoff — the old drawing would jam the bus:
 > - **IM keep-alive set identified** (`68 FF 40/60`, `29 FE 40/60`,
 >   steady ~2 s) — the Stage 4 replay targets.
 > - Beam + neutral are **discrete wires** (pins 2/10), not on the bus.
+>   Discrete-tap polarity (Phase 6): **neutral = active-LOW** (0V = N),
+>   **turns = active-HIGH**; high beam / oil / ignition are **TBD by
+>   measurement** — measure BOTH states, don't hard-code (see the master
+>   plan Phase 6 discrete table).
 >
 > Still open in Stage 2 (all need the bike): a **riding capture** for road
 > speed (`48 29 10 02`, native mph vs the stock speedo to fix DIV) + gears 1-6, and a

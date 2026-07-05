@@ -1,6 +1,6 @@
 # harley — monorepo
 
-Two top-level components, one git tree:
+Three top-level components, one git tree:
 
 - **`firmware/`** — ESP-IDF cluster firmware for the Waveshare
   ESP32-P4-WIFI6-Touch-LCD-3.4C. Drives the 800×800 round MIPI-DSI
@@ -10,6 +10,9 @@ Two top-level components, one git tree:
 - **`companion/`** — Android BLE-central app that pairs with the
   cluster's peripheral, relays phone notifications + media metadata
   over the GATT link. Build notes are in `companion/README.md`.
+- **`hardware/`** — physical build. `hardware/enclosure/` is the
+  parametric OpenSCAD case for the round display (Phase 6). Build/print
+  notes are in `hardware/enclosure/README.md`.
 
 Cross-system docs live at the repo root in `docs/`:
 - `PROJECT-BRIEF.md` — what this project is, current status.
@@ -47,6 +50,10 @@ cmake -B build -S . && cmake --build build && ./build/vrod_sim
 # Companion (Android)
 cd companion
 ./gradlew assembleDebug
+
+# Enclosure (OpenSCAD; macOS: brew install --cask openscad)
+cd hardware/enclosure
+openscad -o rear_case.stl -D 'part="rear_case"' enclosure.scad   # part = rear_case|bezel|rear_cover|calibration_base
 ```
 
 CI: `.github/workflows/firmware-build.yml` (`idf.py build` inside `firmware/`),

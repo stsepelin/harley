@@ -6,9 +6,11 @@
 > feature were dropped.** Speed comes from the J1850 bus, so onboard GPS
 > was a large separate effort (module, UART producer, NMEA parsing,
 > antenna) for little benefit, and the speed-camera alerts depended on
-> GPS position. Both were removed from the firmware and the plans. A
-> phone GPS over the existing BLE link could refine speed calibration
-> later if wanted, with no new hardware.
+> GPS position. Both were removed from the firmware and the plans. Speed
+> is calibrated against the **stock speedometer** — read in its native
+> MILES (it runs ~5-10% optimistic), mechanically driven off the same
+> J1850 bus (see `03-PHASE3-J1850-PLAN.md`). A phone GPS over the existing
+> BLE link is only an **optional later refinement**, no new hardware.
 
 ---
 
@@ -71,6 +73,13 @@ harley/
 │   ├── app/                           # Kotlin sources (ble/, media/, notif/, ui/)
 │   ├── build.gradle.kts
 │   └── gradlew
+├── hardware/                          # Physical build (Phase 6)
+│   └── enclosure/                     # Parametric OpenSCAD case for the round display
+│       ├── README.md                  # Architecture, tiers, assembly + print order
+│       ├── enclosure.scad             # part = rear_case|bezel|rear_cover|calibration_base
+│       ├── section_preview.scad       # Cross-section inspector
+│       ├── *.png                       # Committed preview / section renders
+│       └── *.stl                       # Generated from enclosure.scad — gitignored, regen on demand
 ├── .github/workflows/                 # firmware-build.yml + host-tests.yml + lint.yml
 └── LICENSE
 ```
@@ -127,7 +136,7 @@ the UI.
 - **Dual-core split**: Core 0 = J1850 + BLE + simulator, Core 1 = LVGL rendering at 30 FPS
 - **Cluster replacement strategy**: Build proxy box with T-taps for safe development; final install replaces stock cluster entirely
 - **IM simulation**: P4 must send periodic J1850 messages impersonating stock IM to avoid U1255 DTC and TSSM lockout
-- **Bidirectional J1850 circuit**: IRLZ44N MOSFET for TX + 2N2222 voltage divider for RX (replaces SwapSmart which was out of stock)
+- **Bidirectional J1850 circuit (resolved 2026-07)**: the bus is **standard VPW** — idle/recessive LOW, dominant HIGH. **RX** = passive 10k/4.7k divider + 7.5V zener clamp, **non-inverting** (no 2N2222). **TX** = **high-side** source: a PNP (2N2907A) drives the bus HIGH for dominant, sourced by an IRLZ44N low-side driver (not a lone low-side FET). See `03-PHASE3-J1850-PLAN.md` + `schematics/`. (The earlier "IRLZ44N TX + 2N2222 RX divider / SwapSmart" note was the pre-bring-up plan.)
 
 ## V-Rod 12-Pin Instrument Module Pinout (Pin 7 = J1850 Data Bus)
 
@@ -151,7 +160,7 @@ the UI.
 - **Phase 3**: J1850 bus integration + IM simulation
 - **Phase 4**: BLE phone integration (iOS ANCS/AMS + Android companion app)
 - **Phase 5**: (removed — GPS + speed cameras dropped July 2026; numbering kept)
-- **Phase 6**: Full cluster replacement + 3D-printed mounting bracket + conformal coating
+- **Phase 6**: Full cluster replacement + 3D-printed enclosure + conformal coating. Enclosure design started early (`hardware/enclosure/`): parametric OpenSCAD case, rear-bolt board fixation, gusseted bosses, single bottom cable exit for the temp/test build. Designed + rendered, not yet printed.
 - **Phase 7**: Polish — auto-brightness, themes, handlebar button, ride logging, OTA updates with on-screen progress (USB flashing impractical once the cluster is housed)
 
 ## Key References
