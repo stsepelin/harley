@@ -46,10 +46,6 @@ SCOPED=(
     '*/main/settings/settings.c'
     '*/main/vehicle/vehicle_data.c'
     '*/main/ble/ble_visibility.c'
-    '*/main/poi/poi_math.c'
-    '*/main/poi/poi_db.c'
-    '*/main/poi/poi_alert.c'
-    '*/main/gps/nmea.c'
     '*/main/j1850/j1850_vpw.c'
     '*/main/j1850/j1850_tx_logic.c'
     '*/main/j1850/j1850_parse.c'
@@ -70,7 +66,6 @@ SCOPED=(
     '*/main/display/widgets/odometer_display.c'
     '*/main/display/widgets/trip_display.c'
     '*/main/display/widgets/warning_lights.c'
-    '*/main/display/widgets/poi_alert_popup.c'
     '*/main/display/widgets/tach_arc.c'
 )
 

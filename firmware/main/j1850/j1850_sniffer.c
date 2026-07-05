@@ -133,8 +133,9 @@ static void log_frame(const j1850_frame_t *f)
 }
 
 // Capture-prep hints for the three fields still blocked on the bike. Speed:
-// emit the NATIVE decoded value (raw / DIV, mph-native) so it compares
-// DIRECTLY to GPS mph on a ride — DIV magnitude is provisional. Temp: emit
+// emit the NATIVE decoded value (raw / DIV, mph-native) so it compares to the
+// stock speedometer (native miles) on a ride — DIV magnitude is provisional.
+// Temp: emit
 // the RAW byte plus the three candidate scalings so a two-point capture
 // (cold ~ambient + fully warm) can solve the formula. Gear: emit the raw byte
 // + decoded ladder position so a shift through 1-6 confirms the table (only
@@ -146,8 +147,10 @@ static void log_hint(const j1850_frame_t *f)
     static const uint8_t GEAR[]  = {0xA8, 0x3B, 0x10, 0x03};
     if (f->len >= 7 && memcmp(f->data, SPEED, 4) == 0) {
         unsigned raw = ((unsigned)f->data[4] << 8) | f->data[5];
-        ESP_LOGI(TAG, "speed: raw=%u native=%u (raw/%d, mph-native; DIV provisional) vs GPS mph",
-                 raw, raw / J1850_SPEED_DIVISOR, J1850_SPEED_DIVISOR);
+        ESP_LOGI(
+            TAG,
+            "speed: raw=%u native=%u (raw/%d, mph-native; DIV provisional) vs stock speedo (miles)",
+            raw, raw / J1850_SPEED_DIVISOR, J1850_SPEED_DIVISOR);
     } else if (f->len >= 6 && memcmp(f->data, TEMP, 4) == 0) {
         unsigned r = f->data[4];
         ESP_LOGI(TAG, "temp: raw=0x%02X (%u) PROVISIONAL — C?=%u  F->C?=%d  (raw-40)C?=%d", r, r, r,

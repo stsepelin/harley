@@ -21,8 +21,3 @@ void sound_set_volume(uint8_t pct);
 // Drops the event if the queue is full (real relay clicks are short and
 // frequent; a brief overlap is fine to skip).
 void sound_play_turn_click(void);
-
-// Non-blocking — one short attention chirp on POI-alert state edge
-// (false → true). Distinct from the turn click so the rider can hear
-// which event just fired without looking at the screen.
-void sound_play_poi_alert(void);

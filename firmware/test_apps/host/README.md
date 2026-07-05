@@ -68,10 +68,6 @@ Today that's:
 | `main/settings/settings.c` | Defaults + validate for the persisted prefs struct |
 | `main/vehicle/vehicle_data.c` | Mutex-guarded latest-value store. Tested with a FreeRTOS stub. |
 | `main/ble/ble_visibility.c` | Pure decision: `(has_bond, override) → adv_mode`. Stage 8. |
-| `main/poi/poi_math.c` | Equirectangular distance + bearing + heading-delta (float-only, P4 has no double FPU) |
-| `main/poi/poi_db.c` | Binary camera-DB wrap + cone query + distance-sorted insert |
-| `main/poi/poi_alert.c` | Single-alert state machine with pass-by hysteresis |
-| `main/gps/nmea.c` | NMEA 0183 framer + RMC parser (checksum, ddmm.mmmm → 1e-7 deg, knots → km/h) |
 | `main/j1850/j1850_vpw.c` | J1850 VPW symbol codec: pulse-width decoder + encoder + CRC-8/SAE-J1850. Round-trip tested. |
 | `main/j1850/j1850_parse.c` | J1850 message decoder: frame -> vehicle_data (RPM/temp/gear/speed/turns/CEL), decode table bench-confirmed against real captures. |
 | `main/j1850/j1850_driver.c` | J1850 producer glue: decoded frame -> j1850_parse -> vehicle_data_set (running aggregate). |
@@ -79,7 +75,6 @@ Today that's:
 | `main/j1850/j1850_tx_logic.c` | J1850 TX pure logic: CRC frame build (round-tripped through encode→decode) + the watchdog dominant-length guard + on-air duration. |
 | `main/j1850/ride_log_format.c` | Ride-log line/header formatting: frame -> one plain-text line (sec.ms, hex, CRC, IFR, decoded speed/temp/gear suffix), capture.py-compatible. |
 
-The `main/gps/` producers (`gps_source.c`, `gps_sim.c`, `gps_uart.c`),
 `main/j1850/j1850_sniffer.c` (GPIO-ISR capture glue),
 `main/j1850/j1850_tx.c` (RMT/gptimer TX driver + watchdog), and
 `main/j1850/ride_log.c` (SD/FATFS mount + flush-task glue) are
@@ -90,7 +85,7 @@ FreeRTOS/driver glue and stay out of the gate.
 The widgets (`speed_display`, `gear_indicator`, `temp_display`,
 `turn_signals`, `clock_display`, `odometer_display`, `trip_display`,
 `warning_lights`, `fuel_arc`, `fuel_scale`, `notification_banner`,
-`media_banner`, `now_playing_display`, `poi_alert_popup`, `widget_util`,
+`media_banner`, `now_playing_display`, `widget_util`,
 plus the shared `sprite_raster.h` helpers) link against an LVGL stub in
 `test_widget_caches.c` / `test_sprite_raster.c` and are **inside the
 100 % line/branch gate** alongside the pure-logic modules. The stub fires

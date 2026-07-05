@@ -46,10 +46,6 @@ jobs:
                '*/firmware/main/settings/settings.c' \
                '*/firmware/main/vehicle/vehicle_data.c' \
                '*/firmware/main/ble/ble_visibility.c' \
-               '*/firmware/main/poi/poi_math.c' \
-               '*/firmware/main/poi/poi_db.c' \
-               '*/firmware/main/poi/poi_alert.c' \
-               '*/firmware/main/gps/nmea.c' \
                '*/firmware/main/j1850/j1850_vpw.c' \
                '*/firmware/main/j1850/j1850_tx_logic.c' \
                '*/firmware/main/j1850/j1850_parse.c' \
@@ -70,7 +66,6 @@ jobs:
                '*/firmware/main/display/widgets/odometer_display.c' \
                '*/firmware/main/display/widgets/trip_display.c' \
                '*/firmware/main/display/widgets/warning_lights.c' \
-               '*/firmware/main/display/widgets/poi_alert_popup.c' \
                '*/firmware/main/display/widgets/tach_arc.c' \
                --output-file coverage.tested.info \
                --rc branch_coverage=1

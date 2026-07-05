@@ -10,10 +10,6 @@ idf_component_register(
         sound/sound.c
         vehicle/vehicle_data.c
         simulator/gear_table.c
-        gps/gps_source.c
-        poi/poi_math.c
-        poi/poi_db.c
-        poi/poi_alert.c
         display/boot_screen.c
         display/screen_ride.c
         display/screen_settings.c
@@ -39,7 +35,6 @@ idf_component_register(
         display/widgets/notification_banner.c
         display/widgets/now_playing_display.c
         display/widgets/media_banner.c
-        display/widgets/poi_alert_popup.c
         display/fonts/emoji_font.c
         display/fonts/jbm_bold_26.c
         display/fonts/jbm_bold_33.c
@@ -58,8 +53,6 @@ idf_component_register(
         sound
         vehicle
         simulator
-        gps
-        poi
         j1850
         display
         display/widgets
@@ -71,7 +64,7 @@ idf_component_register(
     # pre-scheduler heap margin on rev<v3 silicon — fixed by the SDIO
     # queue sizing in sdkconfig.defaults; see ble-bringup-bisect.md).
     REQUIRES waveshare__esp32_p4_wifi6_touch_lcd_xc lvgl__lvgl nvs_flash
-             espressif__esp_codec_dev bt spi_flash esp_driver_uart esp_adc
+             espressif__esp_codec_dev bt spi_flash esp_adc
              esp_driver_rmt esp_driver_gptimer
              fatfs esp_driver_sdmmc sdmmc  # ride-log SD sink (CONFIG_VROD_RIDE_LOG)
     LDFRAGMENTS linker.lf
@@ -86,16 +79,6 @@ if(CONFIG_VROD_INCLUDE_SIM_ENGINE)
     target_sources(${COMPONENT_LIB} PRIVATE
         simulator/sim_engine.c
         simulator/sim_math.c
-        gps/gps_sim.c
-    )
-endif()
-
-# Real GPS producer (Phase 3). nmea.c is pure logic shared with the host
-# tests; gps_uart.c is the ESP-IDF glue that feeds it UART bytes.
-if(CONFIG_VROD_GPS_UART)
-    target_sources(${COMPONENT_LIB} PRIVATE
-        gps/nmea.c
-        gps/gps_uart.c
     )
 endif()
 

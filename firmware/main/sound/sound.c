@@ -1,7 +1,6 @@
 #include "sound.h"
 #include "bsp/esp32_p4_wifi6_touch_lcd_xc.h"
 #include "esp_codec_dev.h"
-#include "esp_heap_caps.h"
 #include "esp_log.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/queue.h"
@@ -23,12 +22,6 @@ static const char *TAG = "sound";
 #define CLICK_MS        30
 #define CLICK_SAMPLES   ((SAMPLE_RATE * CLICK_MS) / 1000)
 
-// POI alert chirp: 220 ms total — two 80 ms tones at different pitches
-// with a 60 ms gap. Distinct from a single click so a rider can ID it
-// without looking, but short enough to not be a nuisance.
-#define ALERT_MS        220
-#define ALERT_SAMPLES   ((SAMPLE_RATE * ALERT_MS) / 1000)
-
 // Worker task: pinned to core 0 alongside the sim. Sim wakes for ~5 ms
 // every 50 ms and is otherwise idle, so the audio task has a quiet
 // neighbour. The alternative — core 1 — has LVGL's render pthread on
@@ -41,19 +34,11 @@ static const char *TAG = "sound";
 
 typedef enum {
     SND_TURN_CLICK,
-    SND_POI_ALERT,
 } sound_event_t;
 
 static esp_codec_dev_handle_t s_codec;
 static QueueHandle_t          s_queue;
 static int16_t                s_click[CLICK_SAMPLES];
-// 9.7 KB alert chirp lives in PSRAM, not internal DRAM — at boot ESP-Hosted
-// + the early FreeRTOS heap already eat almost all of the first DRAM region,
-// and a 10 KB static was enough to push the main task TCB+stack allocation
-// over the edge (xTaskCreatePinnedToCore returns pdFAIL, app_startup.c:83
-// asserts before app_main runs). I2S DMA throttles codec writes by sample
-// rate, so PSRAM latency on the read side is invisible.
-static int16_t               *s_alert;
 static bool                   s_enabled = true;
 
 // Synthesise a short percussive click — two sinusoids (1200 + 2400 Hz)
@@ -77,50 +62,6 @@ static void synth_click(int16_t *out, size_t n)
     }
 }
 
-// Two-tone attention chirp. First note (880 Hz / A5) → silence → second
-// note (1175 Hz / D6). A short attack/release ramp on each tone avoids
-// the click that a hard-edged sine cut produces. Pitch interval (fourth
-// up) is high enough to stand out over road noise without sounding
-// alarming.
-static void synth_alert(int16_t *out, size_t n)
-{
-    const float two_pi    = 6.283185307f;
-    const float f1        = 880.0f;
-    const float f2        = 1175.0f;
-    const size_t tone_n   = (SAMPLE_RATE *  80) / 1000;
-    const size_t gap_n    = (SAMPLE_RATE *  60) / 1000;
-    const size_t ramp_n   = (SAMPLE_RATE *   8) / 1000;
-
-    for (size_t i = 0; i < n; i++) {
-        float s = 0.0f;
-        size_t tone_start = 0;
-        float  freq       = f1;
-        bool   in_tone    = false;
-
-        if (i < tone_n) {
-            in_tone   = true;
-            tone_start = 0;
-            freq      = f1;
-        } else if (i < tone_n + gap_n) {
-            in_tone = false;
-        } else if (i < 2 * tone_n + gap_n) {
-            in_tone    = true;
-            tone_start = tone_n + gap_n;
-            freq       = f2;
-        }
-
-        if (in_tone) {
-            size_t k = i - tone_start;
-            float env = 1.0f;
-            if (k < ramp_n)              env = (float)k / (float)ramp_n;
-            else if (k > tone_n - ramp_n) env = (float)(tone_n - k) / (float)ramp_n;
-            float t = (float)k / (float)SAMPLE_RATE;
-            s = env * sinf(two_pi * freq * t) * 0.7f;
-        }
-        out[i] = (int16_t)(s * 25000.0f);
-    }
-}
-
 static void audio_task(void *arg)
 {
     (void)arg;
@@ -130,12 +71,6 @@ static void audio_task(void *arg)
         switch (evt) {
         case SND_TURN_CLICK:
             esp_codec_dev_write(s_codec, s_click, sizeof(s_click));
-            break;
-        case SND_POI_ALERT:
-            if (s_alert) {
-                esp_codec_dev_write(s_codec, s_alert,
-                                    ALERT_SAMPLES * sizeof(*s_alert));
-            }
             break;
         }
     }
@@ -164,14 +99,6 @@ void sound_init(void)
     esp_codec_dev_set_out_vol(s_codec, 70);
 
     synth_click(s_click, CLICK_SAMPLES);
-
-    s_alert = heap_caps_malloc(ALERT_SAMPLES * sizeof(*s_alert),
-                               MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
-    if (s_alert) {
-        synth_alert(s_alert, ALERT_SAMPLES);
-    } else {
-        ESP_LOGW(TAG, "alert buffer alloc failed; POI chirp disabled");
-    }
 
     s_queue = xQueueCreate(AUDIO_QUEUE_DEPTH, sizeof(sound_event_t));
     if (!s_queue) {
@@ -202,12 +129,5 @@ void sound_play_turn_click(void)
     // Non-blocking enqueue — drop if queue is full so a rapid double-click
     // can't stall the caller (sim task). The next blink edge will get a
     // fresh chance.
-    xQueueSend(s_queue, &evt, 0);
-}
-
-void sound_play_poi_alert(void)
-{
-    if (!s_queue || !s_enabled) return;
-    sound_event_t evt = SND_POI_ALERT;
     xQueueSend(s_queue, &evt, 0);
 }

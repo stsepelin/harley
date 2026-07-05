@@ -18,11 +18,7 @@
 #include "settings_store.h"
 #include "ui_manager.h"
 #include "gesture.h"
-#include "gps_source.h"
-#include "gps_sim.h"
 #include "phone_data.h"
-#include "poi_alert.h"
-#include "poi_db.h"
 #include "test_bridge.h"
 #include "emoji_font.h"
 
@@ -35,14 +31,6 @@
 #define DISPLAY_W   800
 #define DISPLAY_H   800
 #define UI_TICK_MS  15      // ~66 FPS, matches firmware's LV_DEF_REFR_PERIOD
-
-// Bench-only demo POI DB — mirrors the firmware's app_main() copy. One
-// speed camera at the boot position of the gps_sim canned route, so the
-// alert engine has something to fire on at least once per orbit.
-static const poi_record_t s_demo_poi[] = {
-    { 594388000, 247536000, POI_KIND_SPEED, 50, 0xFFFF },
-};
-static poi_db_t s_demo_db;
 
 static void inv_log_cb(lv_event_t *e)
 {
@@ -206,9 +194,6 @@ int main(void)
     //    creation will fail seconds later.
     vehicle_data_init();
     phone_data_init();
-    gps_source_init();
-    poi_db_open(&s_demo_db, (const uint8_t *)s_demo_poi, sizeof(s_demo_poi));
-    poi_alert_init(&s_demo_db);
     test_bridge_start();       // localhost:7700 listener for ad-hoc payloads
 
     // 2) LVGL core + color-emoji fallback chain. emoji_font_init only
@@ -244,7 +229,6 @@ int main(void)
     //    producer here — push events from the test bridge (tools/notify.py)
     //    instead.
     sim_engine_start();
-    gps_sim_start();
 
     // 5) Init settings (desktop shim — defaults only) and build the ride
     //    screen against the running sim. The ui_manager shim caches both
@@ -267,10 +251,6 @@ int main(void)
         vehicle_data_t snapshot;
         vehicle_data_get(&snapshot);
         screen_ride_update(&snapshot, settings_store_current());
-
-        gps_source_t gps;
-        gps_source_get(&gps);
-        poi_alert_tick(&gps);
 
         lv_indev_t *indev   = lv_indev_get_next(NULL);
         bool        pressed = false;

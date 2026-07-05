@@ -1,8 +1,6 @@
 #include "ui_manager.h"
 #include "gesture.h"
-#include "gps_source.h"
 #include "phone_data.h"
-#include "poi_alert.h"
 #include "screen_ride.h"
 #include "screen_settings.h"
 #include "screen_settings_bluetooth.h"
@@ -35,24 +33,6 @@ static void ui_update_task(void *arg)
         vehicle_data_t d;
         vehicle_data_get(&d);
         const settings_t *s = settings_store_current();
-
-        // Run the POI alert state machine outside the LVGL lock — it
-        // only touches gps_source + the alert's own static state, and
-        // a no-op when poi_alert_init was never called (production
-        // build without a DB).
-        gps_source_t gps;
-        gps_source_get(&gps);
-        poi_alert_tick(&gps);
-
-        // Audio cue on the false → true edge. Screen popup is driven
-        // separately by the ride screen reading poi_alert_get(), but
-        // sound has to fire here because the rendering thread shouldn't
-        // own the audio queue.
-        static bool prev_alert = false;
-        poi_alert_t alert;
-        poi_alert_get(&alert);
-        if (alert.active && !prev_alert) sound_play_poi_alert();
-        prev_alert = alert.active;
 
         bsp_display_lock(-1);
         screen_ride_update(&d, s);

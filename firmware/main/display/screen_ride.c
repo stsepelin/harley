@@ -11,8 +11,6 @@
 #include "trip_display.h"
 #include "notification_banner.h"
 #include "media_banner.h"
-#include "poi_alert.h"
-#include "poi_alert_popup.h"
 #include "ble_peripheral.h"
 #include "phone_data.h"
 #include "theme.h"
@@ -41,7 +39,6 @@ static lv_obj_t *s_banner;
 static lv_obj_t *s_media_banner;
 static lv_obj_t *s_media_hint;
 static lv_obj_t *s_ble_dot;
-static lv_obj_t *s_poi_popup;
 
 // Long-press, turn-signal-edge detection, and now swipe-to-dismiss all
 // live in the 100 Hz event-watcher task (ui_manager.c). The UI side
@@ -161,13 +158,6 @@ lv_obj_t *screen_ride_create(void)
     lv_obj_remove_flag(s_ble_dot, LV_OBJ_FLAG_SCROLLABLE);
     lv_obj_add_flag(s_ble_dot, LV_OBJ_FLAG_HIDDEN);
 
-    // POI alert popup. Top-anchored just below the BLE dot — above the
-    // turn arrows / speed block and inside the round bezel (a 400-wide
-    // bar at y=85 has plenty of margin: the half-chord at y=85 is
-    // ~300 px from centre).
-    s_poi_popup = poi_alert_popup_create(s_screen);
-    lv_obj_align(s_poi_popup, LV_ALIGN_TOP_MID, 0, 85);
-
     return s_screen;
 }
 
@@ -223,14 +213,6 @@ void screen_ride_update(const vehicle_data_t *data, const settings_t *settings)
         else               lv_obj_add_flag   (s_ble_dot, LV_OBJ_FLAG_HIDDEN);
         prev_ble = (int)ble.connected;
     }
-
-    // POI alert popup. The state machine is ticked by the periodic
-    // driver (ui_update_task on firmware, the main loop on sim); we
-    // just snapshot the result here. The widget caches internally so
-    // calling every frame is cheap.
-    poi_alert_t alert;
-    poi_alert_get(&alert);
-    poi_alert_popup_update(s_poi_popup, &alert);
 
     // Rotating info slot: clock → odo → trip1 → trip2. Toggle HIDDEN
     // flags only on mode changes, otherwise every frame would

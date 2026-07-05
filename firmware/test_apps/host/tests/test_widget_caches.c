@@ -19,11 +19,9 @@
 #include "odometer_display.h"
 #include "trip_display.h"
 #include "warning_lights.h"
-#include "poi_alert_popup.h"
 #include "notification_banner.h"
 #include "media_banner.h"
 #include "now_playing_display.h"
-#include "poi_db.h"
 
 #include <string.h>
 
@@ -103,7 +101,6 @@ static void test_setters_guard_null_user_data(void)
 {
     lv_obj_t      *bare = lv_obj_create(NULL);
     vehicle_data_t d    = {0};
-    poi_alert_t    a    = {0};
     lv_stub_reset();
     speed_display_set_value(bare, 50, UNITS_KPH);
     gear_indicator_set(bare, GEAR_1);
@@ -115,8 +112,6 @@ static void test_setters_guard_null_user_data(void)
     odometer_display_set(bare, 1000, UNITS_KPH);
     trip_display_set(bare, 1000, UNITS_KPH);
     warning_lights_update(bare, &d);
-    poi_alert_popup_update(bare, &a);
-    poi_alert_popup_update(NULL, &a);
     notification_banner_update(bare, NULL);
     media_banner_update(bare, NULL, true);
     now_playing_display_set(bare, NULL);
@@ -127,12 +122,10 @@ static void test_setters_guard_null_user_data(void)
     lv_obj_t *nb = notification_banner_create(NULL, NULL);
     lv_obj_t *mb = media_banner_create(NULL, NULL);
     lv_obj_t *np = now_playing_display_create(NULL);
-    lv_obj_t *pp = poi_alert_popup_create(NULL);
     lv_stub_reset();
     notification_banner_update(nb, NULL);
     media_banner_update(mb, NULL, true);
     now_playing_display_set(np, NULL);
-    poi_alert_popup_update(pp, NULL);
     TEST_ASSERT_EQUAL_INT(0, g_lv_label_set_text_calls);
 }
 
@@ -884,105 +877,6 @@ static void test_warning_lights_layout_fallbacks(void)
     TEST_ASSERT_EQUAL_INT(1, g_lv_label_set_text_calls);  // only the oil lamp lit
 }
 
-// --- poi_alert_popup ------------------------------------------------------
-
-static void test_poi_popup_inactive_skips_label(void)
-{
-    lv_obj_t *w = poi_alert_popup_create(NULL);
-    poi_alert_t a = { .active = false };
-    poi_alert_popup_update(w, &a);
-    lv_stub_reset();
-    for (int i = 0; i < REPEAT; i++) poi_alert_popup_update(w, &a);
-    TEST_ASSERT_EQUAL_INT(0, g_lv_label_set_text_calls);
-}
-
-static void test_poi_popup_cache_skips_unchanged(void)
-{
-    static const poi_record_t cam = { 0, 0, POI_KIND_SPEED, 50, 0xFFFF };
-    lv_obj_t *w = poi_alert_popup_create(NULL);
-    poi_alert_t a = { .active = true, .cam = &cam, .distance_m = 100 };
-    poi_alert_popup_update(w, &a);
-    lv_stub_reset();
-    for (int i = 0; i < REPEAT; i++) poi_alert_popup_update(w, &a);
-    TEST_ASSERT_EQUAL_INT(0, g_lv_label_set_text_calls);
-}
-
-// Distances rounding into the same 10 m bucket render to the same text,
-// so the label must not be re-set. Burns a UI tick checking the rounding
-// only, no LVGL work.
-static void test_poi_popup_cache_skips_within_bucket(void)
-{
-    static const poi_record_t cam = { 0, 0, POI_KIND_SPEED, 50, 0xFFFF };
-    lv_obj_t *w = poi_alert_popup_create(NULL);
-    poi_alert_t a = { .active = true, .cam = &cam, .distance_m = 100 };
-    poi_alert_popup_update(w, &a);
-    lv_stub_reset();
-    a.distance_m = 104;
-    poi_alert_popup_update(w, &a);
-    TEST_ASSERT_EQUAL_INT(0, g_lv_label_set_text_calls);
-}
-
-static void test_poi_popup_cache_fires_on_bucket_change(void)
-{
-    static const poi_record_t cam = { 0, 0, POI_KIND_SPEED, 50, 0xFFFF };
-    lv_obj_t *w = poi_alert_popup_create(NULL);
-    poi_alert_t a = { .active = true, .cam = &cam, .distance_m = 100 };
-    poi_alert_popup_update(w, &a);
-    lv_stub_reset();
-    a.distance_m = 110;
-    poi_alert_popup_update(w, &a);
-    TEST_ASSERT_EQUAL_INT(1, g_lv_label_set_text_calls);
-}
-
-// Kind variants (RED / SECT / unmapped POI), the km distance format, a
-// speed camera without a posted limit, and limit/kind cache keys.
-static void test_poi_popup_kind_and_distance_variants(void)
-{
-    static const poi_record_t red   = {0, 0, POI_KIND_RED_LIGHT, 0, 0xFFFF};
-    static const poi_record_t sect  = {0, 0, POI_KIND_SECTION, 0, 0xFFFF};
-    static const poi_record_t other = {0, 0, 99, 0, 0xFFFF};
-    static const poi_record_t cam0  = {0, 0, POI_KIND_SPEED, 0, 0xFFFF};
-    static const poi_record_t cam60 = {0, 0, POI_KIND_SPEED, 60, 0xFFFF};
-
-    lv_obj_t   *w = poi_alert_popup_create(NULL);
-    poi_alert_t a = {.active = true, .cam = &red, .distance_m = 1500};  // "RED 1.5km"
-    lv_stub_reset();
-    poi_alert_popup_update(w, &a);
-    TEST_ASSERT_EQUAL_INT(1, g_lv_label_set_text_calls);
-
-    a.cam = &sect;  // kind change alone repaints
-    lv_stub_reset();
-    poi_alert_popup_update(w, &a);
-    TEST_ASSERT_EQUAL_INT(1, g_lv_label_set_text_calls);
-
-    a.cam = &other;  // unmapped kind tags as "POI"
-    poi_alert_popup_update(w, &a);
-
-    a.cam = &cam0;  // speed cam without a limit: no number
-    poi_alert_popup_update(w, &a);
-    a.cam = &cam60;  // limit change alone repaints
-    lv_stub_reset();
-    poi_alert_popup_update(w, &a);
-    TEST_ASSERT_EQUAL_INT(1, g_lv_label_set_text_calls);
-}
-
-// Dismissal hides the popup once, then stays quiet; a NULL cam while
-// "active" must be treated as inactive.
-static void test_poi_popup_dismiss_and_null_cam(void)
-{
-    static const poi_record_t cam = {0, 0, POI_KIND_SPEED, 50, 0xFFFF};
-    lv_obj_t                 *w   = poi_alert_popup_create(NULL);
-    poi_alert_t               a   = {.active = true, .cam = &cam, .distance_m = 100};
-    poi_alert_popup_update(w, &a);
-    a.cam = NULL;  // stale alert without a record
-    lv_stub_reset();
-    poi_alert_popup_update(w, &a);  // hide edge
-    poi_alert_popup_update(w, &a);  // already hidden: quiet
-    a.active = false;
-    poi_alert_popup_update(w, &a);
-    TEST_ASSERT_EQUAL_INT(0, g_lv_label_set_text_calls);
-}
-
 void RunTests(void)
 {
     RUN_TEST(test_speed_cache_skips_unchanged);
@@ -1042,10 +936,4 @@ void RunTests(void)
     RUN_TEST(test_trip_units_change_with_equal_value);
     RUN_TEST(test_warning_lights_cache_idle);
     RUN_TEST(test_warning_lights_only_changed_lamp_repaints);
-    RUN_TEST(test_poi_popup_inactive_skips_label);
-    RUN_TEST(test_poi_popup_cache_skips_unchanged);
-    RUN_TEST(test_poi_popup_cache_skips_within_bucket);
-    RUN_TEST(test_poi_popup_cache_fires_on_bucket_change);
-    RUN_TEST(test_poi_popup_kind_and_distance_variants);
-    RUN_TEST(test_poi_popup_dismiss_and_null_cam);
 }

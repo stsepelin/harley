@@ -9,7 +9,7 @@ menu "V-Rod cluster"
             with looping speed / RPM / gear / fuel updates. Useful on
             the bench (the gauge dial visibly swings during boot tests
             and notification work) and required while real bike data
-            sources (J1850, GPS, etc.) are still on the supply chain.
+            sources (J1850, etc.) are still on the supply chain.
 
             Disable for real-bike builds — once Phase 3 lands, the
             J1850 driver becomes the vehicle_data producer and the
@@ -19,67 +19,6 @@ menu "V-Rod cluster"
             has no other data source.
 
             Default y while the bike harness is still pending.
-
-    config VROD_DEMO_POI
-        bool "Open a tiny demo POI DB at boot"
-        depends on VROD_INCLUDE_SIM_ENGINE
-        default n
-        help
-            Opens a 1-record demo POI database (one omnidirectional
-            speed camera at the gps_sim orbit centre) so the POI alert
-            engine has something to fire on against the canned 200 m /
-            50 km/h orbit. Useful for visually verifying the popup +
-            chirp on the bench without a real SCDB import.
-
-            Off by default — even on bench builds the popup ends up
-            active for a large fraction of each 90 s orbit, which
-            re-blits a 400×70 alpha-cover region across the top of the
-            ride screen ~once a second and noticeably degrades
-            perceived smoothness. Turn on briefly to verify the alert
-            UX, then turn back off.
-
-    config VROD_GPS_UART
-        bool "Read a NEO-6M/M8N GPS module on a UART"
-        default n
-        help
-            Starts the NMEA reader task: RMC sentences from the module
-            are parsed and published into gps_source, which feeds the
-            speed-camera alert engine (and later GPS-backup speed).
-            Off by default until the module is physically wired to the
-            40-pin header. On bench builds gps_sim also writes
-            gps_source — run one producer or the other, not both.
-
-    config VROD_GPS_UART_NUM
-        int "UART number for the GPS module"
-        depends on VROD_GPS_UART
-        range 1 4
-        default 1
-        help
-            UART0 carries the console; pick any other. The GPIO matrix
-            routes any UART to any pin, so the number itself hardly
-            matters.
-
-    config VROD_GPS_RX_GPIO
-        int "GPIO wired to the module's TX pin"
-        depends on VROD_GPS_UART
-        default 21
-        help
-            Set to whatever header pin you actually soldered/jumpered.
-
-    config VROD_GPS_TX_GPIO
-        int "GPIO wired to the module's RX pin (-1 if not wired)"
-        depends on VROD_GPS_UART
-        default -1
-        help
-            Only needed to push UBX config (fix rate, constellations)
-            to the module. Receiving fixes works with RX alone.
-
-    config VROD_GPS_BAUD
-        int "GPS module baud rate"
-        depends on VROD_GPS_UART
-        default 9600
-        help
-            Factory default for both NEO-6M and NEO-M8N is 9600.
 
     config VROD_ADC_REPRO
         bool "esp_adc boot-crash repro instrumentation"
@@ -288,7 +227,7 @@ menu "V-Rod cluster"
         default 24
         help
             A free header pin (see firmware/docs/PINS.md — 24 is the first
-            unclaimed one, clear of RX/GPS/ADC). Confirm the physical hole
+            unclaimed one, clear of RX/ADC). Confirm the physical hole
             with VROD_PIN_WIGGLE_GPIO before soldering. Boots and idles LOW
             (recessive); only driven HIGH while emitting a dominant symbol.
 
@@ -302,7 +241,7 @@ menu "V-Rod cluster"
             each frame is logged PASS/FAIL with the decoded bytes + CRC
             verdict. Needs the TX output tied to the RX bus node with the
             bench recessive-LOW termination (see the Stage 4 section of
-            docs/03-PHASE3-J1850-GPS-PLAN.md). Bench only.
+            docs/03-PHASE3-J1850-PLAN.md). Bench only.
 
     config VROD_BLE_INSECURE
         bool "Skip BLE pairing — any central can connect"

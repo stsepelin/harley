@@ -77,7 +77,6 @@ add_executable(vrod_sim
     ${MAIN_DIR}/display/widgets/notification_banner.c
     ${MAIN_DIR}/display/widgets/now_playing_display.c
     ${MAIN_DIR}/display/widgets/media_banner.c
-    ${MAIN_DIR}/display/widgets/poi_alert_popup.c
     ${MAIN_DIR}/display/widgets/smooth.c
 
     ${MAIN_DIR}/phone/phone_data.c
@@ -86,13 +85,6 @@ add_executable(vrod_sim
     ${MAIN_DIR}/simulator/sim_engine.c
     ${MAIN_DIR}/simulator/gear_table.c
     ${MAIN_DIR}/simulator/sim_math.c
-
-    ${MAIN_DIR}/gps/gps_source.c
-    ${MAIN_DIR}/gps/gps_sim.c
-
-    ${MAIN_DIR}/poi/poi_math.c
-    ${MAIN_DIR}/poi/poi_db.c
-    ${MAIN_DIR}/poi/poi_alert.c
 
     ${MAIN_DIR}/vehicle/vehicle_data.c
 
@@ -105,9 +97,7 @@ target_include_directories(vrod_sim PRIVATE
     ${MAIN_DIR}/display
     ${MAIN_DIR}/display/widgets
     ${MAIN_DIR}/display/fonts
-    ${MAIN_DIR}/gps
     ${MAIN_DIR}/phone
-    ${MAIN_DIR}/poi
     ${MAIN_DIR}/settings
     ${MAIN_DIR}/simulator
     ${MAIN_DIR}/sound

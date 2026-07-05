@@ -39,10 +39,6 @@ add_library(vrod_pure STATIC
     ${MAIN_DIR}/phone/phone_protocol.c
     ${MAIN_DIR}/settings/settings.c
     ${MAIN_DIR}/vehicle/vehicle_data.c
-    ${MAIN_DIR}/poi/poi_math.c
-    ${MAIN_DIR}/poi/poi_db.c
-    ${MAIN_DIR}/poi/poi_alert.c
-    ${MAIN_DIR}/gps/nmea.c
     ${MAIN_DIR}/j1850/j1850_vpw.c
     ${MAIN_DIR}/j1850/j1850_tx_logic.c
     ${MAIN_DIR}/j1850/j1850_parse.c
@@ -60,14 +56,12 @@ target_include_directories(vrod_pure PUBLIC
     ${MAIN_DIR}/phone
     ${MAIN_DIR}/settings
     ${MAIN_DIR}/vehicle
-    ${MAIN_DIR}/poi
-    ${MAIN_DIR}/gps
     ${MAIN_DIR}/j1850
     ${MAIN_DIR}/ble
     external/freertos_stub
     external/lvgl_tick_stub
 )
-# poi_math uses libm (cos / sin / sqrt / atan2).
+# libm for the trig in the widget/geometry code that links on top.
 target_link_libraries(vrod_pure PUBLIC m)
 
 # --- Widget library --------------------------------------------------------
@@ -86,7 +80,6 @@ add_library(vrod_widgets STATIC
     ${MAIN_DIR}/display/widgets/odometer_display.c
     ${MAIN_DIR}/display/widgets/trip_display.c
     ${MAIN_DIR}/display/widgets/warning_lights.c
-    ${MAIN_DIR}/display/widgets/poi_alert_popup.c
     ${MAIN_DIR}/display/widgets/notification_banner.c
     ${MAIN_DIR}/display/widgets/media_banner.c
     ${MAIN_DIR}/display/widgets/now_playing_display.c
@@ -122,16 +115,12 @@ add_unit_test(test_settings)
 add_unit_test(test_phone_protocol)
 add_unit_test(test_phone_data)
 add_unit_test(test_gesture)
-add_unit_test(test_gps_format)
-add_unit_test(test_nmea)
 add_unit_test(test_j1850_vpw)
 add_unit_test(test_j1850_tx_logic)
 add_unit_test(test_j1850_parse)
 add_unit_test(test_j1850_driver)
 add_unit_test(test_j1850_edge)
 add_unit_test(test_ride_log_format)
-add_unit_test(test_poi_index)
-add_unit_test(test_alert_engine)
 add_unit_test(test_ble_visibility)
 
 # Widget cache-regression tests link against the LVGL stub.
