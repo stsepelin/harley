@@ -81,6 +81,30 @@ Confirmed by comparing our cluster to the stock one during the ride:
 | `48 3B 40` | 48 | neutral / clutch bits |
 | `C8 88 10`, `C8 89 60`, `E8 89 60`, `68 FF ..`, `29 FE ..` | — | inter-module (IM/ABS/BCM) broadcasts; mine for status bits later |
 
+## Undecoded-data audit
+Of 16,895 frames, **83.6% decode** to gauge signals. The other 16.4% is not
+lost data:
+- **~2.5% CRC-noise** — the long tail of single-count headers (`2A 1B 10`,
+  `28 1B 30`, `48 A9 10`, …) are bit-flipped copies of known frames, not real
+  message types.
+- **~14% static inter-module keep-alive/status** — `C8 88 10 0E`, `C8 89 60 03`,
+  `E8 89 60 0E`, `68 FF 10/40/60 03`, `29 FE 40/60 01`: each a single constant
+  payload for the whole ride → network housekeeping (IM/ABS/TSSM/BCM), no gauge
+  signal. Stage 4 replay candidates.
+
+**One real signal still unwired: FUEL (`A8 83 10`).** It varies across the ride
+(`0A 01 E0` → `0A 22 01`, 385 distinct values) — a cumulative fuel-*consumption*
+counter (like the odometer). Worth a fuel readout. Note this is consumption, not
+level; the fuel-*level* gauge was not seen under the expected id, so level is a
+separate question (sender may be analog/discrete, or a different frame).
+
+**Caveat:** the static keep-alive frames could hide an oil/battery/ABS status
+bit that simply never changed during an all-engine-running ride. A capture that
+includes ignition-on / cranking / a real fault would reveal it; until then the
+discrete-wire assumption stands.
+
+Reference capture committed at `firmware/docs/captures/2026-07-08-ride-1.log`.
+
 ## Fault codes (DTCs)
 The V-Rod stores per-module DTCs (`P/C/B/U####`, SAE-standard + H-D-proprietary)
 on this same bus. We already get the **MIL/CEL lamp bit** passively (`68 88 10`).
