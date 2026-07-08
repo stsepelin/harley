@@ -35,6 +35,17 @@ static lv_obj_t *s_clock;
 static lv_obj_t *s_odo;
 static lv_obj_t *s_trip1;
 static lv_obj_t *s_trip2;
+
+// Info slot: selected readout (0 clock, 1 odo, 2 trip1, 3 trip2), advanced by a
+// tap. Written by the input task (screen_ride_cycle_info), read by the LVGL
+// task (screen_ride_update); a single int, so the cross-task access is benign.
+#define INFO_SLOT_COUNT 4
+static volatile int s_info_mode;
+// Tap target for the info slot, in screen coords with touch padding. Refreshed
+// each frame from the visible widget's real bounds (LVGL task) and read by the
+// input task (screen_ride_info_hit).
+#define INFO_HIT_PAD 30
+static volatile int s_info_hit_x0, s_info_hit_y0, s_info_hit_x1, s_info_hit_y1;
 static lv_obj_t *s_banner;
 static lv_obj_t *s_media_banner;
 static lv_obj_t *s_media_hint;
@@ -94,8 +105,9 @@ lv_obj_t *screen_ride_create(void)
     lv_obj_align(s_warn_r, LV_ALIGN_RIGHT_MID, -156, 83);
 
     // Clock, odometer, and the two trip counters share one slot above the
-    // fuel bar — they cycle every few seconds (see screen_ride_update). All
-    // four widgets share the same alignment; three are always hidden.
+    // fuel bar — tap the slot to step through them (see screen_ride_update /
+    // screen_ride_cycle_info). All four share the same alignment; three are
+    // always hidden.
     s_clock = clock_display_create(s_screen);
     lv_obj_align(s_clock, LV_ALIGN_BOTTOM_MID, 0, -265);
     s_odo   = odometer_display_create(s_screen);
@@ -214,16 +226,13 @@ void screen_ride_update(const vehicle_data_t *data, const settings_t *settings)
         prev_ble = (int)ble.connected;
     }
 
-    // Rotating info slot: clock → odo → trip1 → trip2. Toggle HIDDEN
-    // flags only on mode changes, otherwise every frame would
-    // invalidate all four widgets.
-    enum { INFO_SLOT_FRAMES = 150, INFO_SLOT_COUNT = 4 };
-    static uint32_t info_tick = 0;
-    static int      prev_mode = -1;
-    info_tick++;
-    int mode = (info_tick / INFO_SLOT_FRAMES) % INFO_SLOT_COUNT;
+    // Info slot: clock / odo / trip1 / trip2, selected by tap (no auto-cycle).
+    // Toggle HIDDEN only on a mode change so we don't invalidate all four
+    // widgets every frame.
+    lv_obj_t  *slots[INFO_SLOT_COUNT] = {s_clock, s_odo, s_trip1, s_trip2};
+    int        mode                   = s_info_mode % INFO_SLOT_COUNT;
+    static int prev_mode              = -1;
     if (mode != prev_mode) {
-        lv_obj_t *slots[INFO_SLOT_COUNT] = { s_clock, s_odo, s_trip1, s_trip2 };
         for (int i = 0; i < INFO_SLOT_COUNT; i++) lv_obj_add_flag(slots[i], LV_OBJ_FLAG_HIDDEN);
         lv_obj_remove_flag(slots[mode], LV_OBJ_FLAG_HIDDEN);
         prev_mode = mode;
@@ -234,4 +243,23 @@ void screen_ride_update(const vehicle_data_t *data, const settings_t *settings)
         case 2: trip_display_set(s_trip1, data->trip1_m, units);                    break;
         case 3: trip_display_set(s_trip2, data->trip2_m, units);                    break;
     }
+
+    // Cache the visible slot's tap target (real bounds + padding) for the input
+    // task. lv_obj_get_coords is valid here (LVGL task, under the display lock).
+    lv_area_t a;
+    lv_obj_get_coords(slots[mode], &a);
+    s_info_hit_x0 = a.x1 - INFO_HIT_PAD;
+    s_info_hit_y0 = a.y1 - INFO_HIT_PAD;
+    s_info_hit_x1 = a.x2 + INFO_HIT_PAD;
+    s_info_hit_y1 = a.y2 + INFO_HIT_PAD;
+}
+
+bool screen_ride_info_hit(int x, int y)
+{
+    return x >= s_info_hit_x0 && x <= s_info_hit_x1 && y >= s_info_hit_y0 && y <= s_info_hit_y1;
+}
+
+void screen_ride_cycle_info(void)
+{
+    s_info_mode = (s_info_mode + 1) % INFO_SLOT_COUNT;
 }

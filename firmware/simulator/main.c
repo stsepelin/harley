@@ -265,6 +265,10 @@ int main(void)
         case GESTURE_SWIPE_RIGHT: phone_data_handle_swipe(PHONE_SWIPE_RIGHT); break;
         case GESTURE_SWIPE_UP:    phone_data_handle_swipe(PHONE_SWIPE_UP);    break;
         case GESTURE_SWIPE_DOWN:  phone_data_handle_swipe(PHONE_SWIPE_DOWN);  break;
+        case GESTURE_TAP:
+            if (screen_ride_info_hit(gesture.last_x, gesture.last_y))
+                screen_ride_cycle_info();
+            break;
         case GESTURE_NONE:        default:                                    break;
         }
 

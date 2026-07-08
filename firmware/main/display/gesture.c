@@ -62,6 +62,13 @@ gesture_event_t gesture_update(gesture_state_t *g,
     gesture_event_t out = GESTURE_NONE;
     if (g->pressing && !g->long_fired) {
         out = classify_swipe(g);
+        // Not a swipe and the finger stayed put (below the swipe distance on
+        // both axes) -> a tap. A large but non-clean drag (e.g. diagonal) is
+        // neither swipe nor tap, so it stays NONE.
+        if (out == GESTURE_NONE && abs(g->last_x - g->press_start_x) < g->swipe_dist_min &&
+            abs(g->last_y - g->press_start_y) < g->swipe_dist_min) {
+            out = GESTURE_TAP;
+        }
     }
     g->pressing   = false;
     g->long_fired = false;

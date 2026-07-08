@@ -56,7 +56,7 @@ static void ui_update_task(void *arg)
 // and only takes the LVGL lock for the brief screen swap.
 // Map a classified swipe back to phone_data's enum. Centralised so both
 // the firmware watcher and the desktop sim stay in lockstep.
-static void dispatch_gesture(gesture_event_t e)
+static void dispatch_gesture(gesture_event_t e, int x, int y)
 {
     switch (e) {
     case GESTURE_LONG_PRESS:
@@ -68,6 +68,12 @@ static void dispatch_gesture(gesture_event_t e)
     case GESTURE_SWIPE_RIGHT: phone_data_handle_swipe(PHONE_SWIPE_RIGHT); break;
     case GESTURE_SWIPE_UP:    phone_data_handle_swipe(PHONE_SWIPE_UP);    break;
     case GESTURE_SWIPE_DOWN:  phone_data_handle_swipe(PHONE_SWIPE_DOWN);  break;
+    case GESTURE_TAP:
+        // Tap on the info slot cycles clock/odo/trip1/trip2. Only flips an int,
+        // so no display lock is needed here.
+        if (screen_ride_info_hit(x, y))
+            screen_ride_cycle_info();
+        break;
     case GESTURE_NONE:
     default:                  break;
     }
@@ -103,7 +109,10 @@ static void event_watcher_task(void *arg)
             pressed = (lv_indev_get_state(indev) == LV_INDEV_STATE_PRESSED);
             if (pressed) lv_indev_get_point(indev, &pt);
         }
-        dispatch_gesture(gesture_update(&gesture, pressed, pt.x, pt.y, lv_tick_get()));
+        // Use the gesture's tracked point (valid at the release tick that
+        // classifies a tap; pt is only refreshed while pressed).
+        gesture_event_t ev = gesture_update(&gesture, pressed, pt.x, pt.y, lv_tick_get());
+        dispatch_gesture(ev, gesture.last_x, gesture.last_y);
 
         vTaskDelay(pdMS_TO_TICKS(EVENT_POLL_MS));
     }

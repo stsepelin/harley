@@ -18,6 +18,7 @@ typedef enum {
     GESTURE_SWIPE_RIGHT,
     GESTURE_SWIPE_UP,
     GESTURE_SWIPE_DOWN,
+    GESTURE_TAP,  // short press + release, no long-press, no swipe
 } gesture_event_t;
 
 typedef struct {

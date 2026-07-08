@@ -93,12 +93,20 @@ static void test_swipe_down(void)
 
 // --- swipe rejection -------------------------------------------------------
 
-static void test_too_short_motion_is_not_a_swipe(void)
+static void test_too_short_motion_is_a_tap(void)
 {
     gesture_state_t g; gesture_init(&g);
     tick(&g, true,  100, 100, 0);
-    tick(&g, true,  120, 100, 50);   // dx=20 < 60
-    TEST_ASSERT_EQUAL_INT(GESTURE_NONE, tick(&g, false, 120, 100, 100));
+    tick(&g, true, 120, 100, 50);  // dx=20 < 60 -> not a swipe, stayed put
+    TEST_ASSERT_EQUAL_INT(GESTURE_TAP, tick(&g, false, 120, 100, 100));
+}
+
+static void test_quick_press_release_is_a_tap(void)
+{
+    gesture_state_t g;
+    gesture_init(&g);
+    tick(&g, true, 200, 300, 0);
+    TEST_ASSERT_EQUAL_INT(GESTURE_TAP, tick(&g, false, 200, 300, 120));  // no move, < long-press
 }
 
 static void test_diagonal_motion_rejected_when_perp_too_large(void)
@@ -108,6 +116,19 @@ static void test_diagonal_motion_rejected_when_perp_too_large(void)
     tick(&g, true,  100, 100, 0);
     tick(&g, true,  200, 200, 50);
     TEST_ASSERT_EQUAL_INT(GESTURE_NONE, tick(&g, false, 200, 200, 100));
+}
+
+// Small dx but large dy, with a tightened perp so it's not a clean swipe:
+// the drift exceeds the tap distance on one axis, so it's neither swipe nor
+// tap -> NONE. (Guards the tap's per-axis distance check.)
+static void test_large_drift_one_axis_is_not_a_tap(void)
+{
+    gesture_state_t g;
+    gesture_init(&g);
+    g.swipe_perp_max = 20;  // tighter than swipe_dist_min (60)
+    tick(&g, true, 100, 100, 0);
+    tick(&g, true, 130, 250, 50);  // dx=30 (>perp, <dist), dy=150 (>=dist)
+    TEST_ASSERT_EQUAL_INT(GESTURE_NONE, tick(&g, false, 130, 250, 100));
 }
 
 static void test_slight_drift_during_swipe_is_tolerated(void)
@@ -182,8 +203,10 @@ void RunTests(void)
     RUN_TEST(test_swipe_left);
     RUN_TEST(test_swipe_up);
     RUN_TEST(test_swipe_down);
-    RUN_TEST(test_too_short_motion_is_not_a_swipe);
+    RUN_TEST(test_too_short_motion_is_a_tap);
+    RUN_TEST(test_quick_press_release_is_a_tap);
     RUN_TEST(test_diagonal_motion_rejected_when_perp_too_large);
+    RUN_TEST(test_large_drift_one_axis_is_not_a_tap);
     RUN_TEST(test_slight_drift_during_swipe_is_tolerated);
     RUN_TEST(test_release_without_prior_press_emits_nothing);
     RUN_TEST(test_consecutive_gestures_are_independent);
