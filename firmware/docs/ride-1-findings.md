@@ -92,11 +92,18 @@ lost data:
   payload for the whole ride → network housekeeping (IM/ABS/TSSM/BCM), no gauge
   signal. Stage 4 replay candidates.
 
-**One real signal still unwired: FUEL (`A8 83 10`).** It varies across the ride
-(`0A 01 E0` → `0A 22 01`, 385 distinct values) — a cumulative fuel-*consumption*
-counter (like the odometer). Worth a fuel readout. Note this is consumption, not
-level; the fuel-*level* gauge was not seen under the expected id, so level is a
-separate question (sender may be analog/discrete, or a different frame).
+**One real signal still unwired: FUEL (`A8 83 10`).** The 16-bit value climbs
+strictly monotonically (480 → 8705, +20/frame, zero resets) — a cumulative
+fuel-*consumption* counter (a "fuel odometer"), NOT a warning flag and NOT a
+level. Three separate fuel things, only the first available now:
+- **Consumption** (`A8 83 10`) — this counter; feeds economy/range and the
+  spec's countdown feature.
+- **Fuel level** (gauge) — not seen on the bus under the expected id; likely an
+  analog sender (discrete/ADC) or an uncaptured frame.
+- **Low-fuel warning** — a discrete flag that lights near ~1.9 L; the bit never
+  flipped this ride (never ran low), so it's unlocated. Find it with a capture
+  taken while the low-fuel lamp is ON, then diff the status frames (same method
+  as the neutral hunt).
 
 **Caveat:** the static keep-alive frames could hide an oil/battery/ABS status
 bit that simply never changed during an all-engine-running ride. A capture that
