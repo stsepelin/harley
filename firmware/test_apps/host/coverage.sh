@@ -46,6 +46,7 @@ SCOPED=(
     '*/main/settings/settings.c'
     '*/main/vehicle/vehicle_data.c'
     '*/main/vehicle/gear_calc.c'
+    '*/main/vehicle/trip_meter.c'
     '*/main/ble/ble_visibility.c'
     '*/main/j1850/j1850_vpw.c'
     '*/main/j1850/j1850_tx_logic.c'

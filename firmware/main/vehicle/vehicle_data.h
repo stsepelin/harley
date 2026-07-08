@@ -31,6 +31,10 @@ typedef struct {
     uint32_t odometer_m;
     uint32_t trip1_m;
     uint32_t trip2_m;
+    // Cumulative fuel-consumption ticks off the bus (A8 83 10). Raw units until
+    // a fill-up calibrates mL/tick (see firmware/docs/ride-1-findings.md);
+    // economy = fuel_ticks / distance is computed downstream, not here.
+    uint32_t fuel_ticks;
     // Mock time-of-day driven by the sim until we have an RTC/SNTP source.
     uint8_t  clock_hours;
     uint8_t  clock_minutes;

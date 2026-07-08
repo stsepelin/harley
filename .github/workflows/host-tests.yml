@@ -46,6 +46,7 @@ jobs:
                '*/firmware/main/settings/settings.c' \
                '*/firmware/main/vehicle/vehicle_data.c' \
                '*/firmware/main/vehicle/gear_calc.c' \
+               '*/firmware/main/vehicle/trip_meter.c' \
                '*/firmware/main/ble/ble_visibility.c' \
                '*/firmware/main/j1850/j1850_vpw.c' \
                '*/firmware/main/j1850/j1850_tx_logic.c' \
