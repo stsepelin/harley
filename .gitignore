@@ -23,3 +23,6 @@ firmware/simulator/*.png
 
 # enclosure STLs are generated from enclosure.scad (large binaries) — keep .scad + PNG renders, regenerate STLs on demand
 hardware/enclosure/*.stl
+
+# Pulled ride logs (raw capture data, not source)
+/rides/

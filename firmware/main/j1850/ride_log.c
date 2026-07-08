@@ -18,6 +18,11 @@
 #include <sys/statvfs.h>
 #include <unistd.h>  // fsync
 
+#if CONFIG_VROD_RIDE_LOG_DUMP
+#include "driver/uart_vfs.h"
+#include "esp_vfs_common.h"
+#endif
+
 static const char *TAG = "ridelog";
 
 // Board microSD wiring (Waveshare ESP32-P4-WIFI6-Touch-LCD-3.4C): the card sits
@@ -100,6 +105,48 @@ static void log_existing_sessions(void)
     closedir(d);
     ESP_LOGI(TAG, "existing sessions on card: %d", count);
 }
+
+#if CONFIG_VROD_RIDE_LOG_DUMP
+// Serial retrieval: print every ride_NNN.log to the console framed by markers,
+// so the files can be pulled over UART without removing the card. Silences the
+// async ESP_LOG stream and disables CR->CRLF expansion for the duration so the
+// bytes between the markers are an exact copy of each file. Reconstructed by
+// tools/ride_log_pull.py.
+static void ride_log_dump_all(void)
+{
+    esp_log_level_set("*", ESP_LOG_NONE);
+    uart_vfs_dev_port_set_tx_line_endings(CONFIG_ESP_CONSOLE_UART_NUM, ESP_LINE_ENDINGS_LF);
+
+    DIR *d = opendir(MOUNT_POINT);
+    if (!d)
+        return;
+    struct dirent *e;
+    while ((e = readdir(d)) != NULL) {
+        int n = -1;
+        if (sscanf(e->d_name, "ride_%d.log", &n) != 1)
+            continue;
+        char path[48];
+        snprintf(path, sizeof(path), MOUNT_POINT "/%s", e->d_name);
+        struct stat st;
+        if (stat(path, &st) != 0)
+            continue;
+        FILE *fp = fopen(path, "rb");
+        if (!fp)
+            continue;
+        printf("\n===RIDELOG BEGIN %s %ld===\n", e->d_name, (long)st.st_size);
+        char   buf[1024];
+        size_t got;
+        while ((got = fread(buf, 1, sizeof(buf), fp)) > 0)
+            fwrite(buf, 1, got, stdout);
+        fclose(fp);
+        printf("\n===RIDELOG END %s===\n", e->d_name);
+        fflush(stdout);
+    }
+    closedir(d);
+    printf("\n===RIDELOG DONE===\n");
+    fflush(stdout);
+}
+#endif
 
 static bool mount_card(void)
 {
@@ -280,6 +327,12 @@ void ride_log_init(void)
         return;
     }
     set_state(mount_card() ? RIDE_LOG_IDLE : RIDE_LOG_NO_CARD);
+#if CONFIG_VROD_RIDE_LOG_DUMP
+    // Retrieval build: stream the stored logs out the console, then leave the
+    // gauge running normally (recording still works if a REC is pressed).
+    if (s_card)
+        ride_log_dump_all();
+#endif
     // Low priority: SD writes must yield to the sniffer, producer, and audio.
     // Generous stack — FATFS fopen/fwrite/statvfs/opendir are stack-heavy.
     xTaskCreatePinnedToCore(flush_task, "ridelog", 8192, NULL, 3, NULL, 0);
