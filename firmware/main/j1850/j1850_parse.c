@@ -9,28 +9,6 @@ static bool msg(const j1850_frame_t *f, const uint8_t *id, size_t id_len, size_t
     return f->len >= min_len && memcmp(f->data, id, id_len) == 0;
 }
 
-static gear_t decode_gear(uint8_t x)
-{
-    switch (x) {
-    case 0x00:
-        return GEAR_NEUTRAL;
-    case 0x01:
-        return GEAR_1;
-    case 0x03:
-        return GEAR_2;
-    case 0x07:
-        return GEAR_3;
-    case 0x0F:
-        return GEAR_4;
-    case 0x1F:
-        return GEAR_5;
-    case 0x3F:
-        return GEAR_6;
-    default:
-        return GEAR_UNKNOWN;
-    }
-}
-
 bool j1850_parse(const j1850_frame_t *f, vehicle_data_t *vd)
 {
     if (!f->crc_ok)
@@ -38,7 +16,6 @@ bool j1850_parse(const j1850_frame_t *f, vehicle_data_t *vd)
 
     static const uint8_t RPM[]   = {0x28, 0x1B, 0x10, 0x02};
     static const uint8_t TEMP[]  = {0xA8, 0x49, 0x10, 0x10};
-    static const uint8_t GEAR[]  = {0xA8, 0x3B, 0x10, 0x03};
     static const uint8_t SPEED[] = {0x48, 0x29, 0x10, 0x02};
     static const uint8_t TURN[]  = {0x48, 0xDA, 0x40, 0x39};
     static const uint8_t CEL[]   = {0x68, 0x88, 0x10};
@@ -57,11 +34,11 @@ bool j1850_parse(const j1850_frame_t *f, vehicle_data_t *vd)
         vd->engine_temp_c = (int8_t)((int)f->data[4] - 40);
         return true;
     }
-    if (msg(f, GEAR, 4, 6)) {
-        vd->gear    = decode_gear(f->data[4]);
-        vd->neutral = (vd->gear == GEAR_NEUTRAL);
-        return true;
-    }
+    // NB: A8 3B 10 was previously decoded here as a gear ladder — that was
+    // wrong (this bike has no gear sensor; ride 1 showed A8 3B 10 is an
+    // engine-load/throttle value). Gear is now computed from the RPM:speed
+    // ratio in gear_calc (called by j1850_driver); neutral is a separate switch
+    // bit (48 3B 40), decoded once confirmed on the bike.
     if (msg(f, SPEED, 4, 7)) {
         vd->speed_mph = (uint16_t)(((f->data[4] << 8) | f->data[5]) / J1850_SPEED_DIVISOR);
         return true;

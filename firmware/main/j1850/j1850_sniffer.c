@@ -10,7 +10,7 @@
 #include "freertos/task.h"
 #include <string.h>
 #include "j1850_parse.h"      // J1850_SPEED_DIVISOR for the capture hint line
-#include "ride_log_format.h"  // ride_log_gear_label for the gear hint
+#include "ride_log_format.h"
 #if CONFIG_VROD_J1850
 #include "j1850_driver.h"
 #endif
@@ -144,7 +144,7 @@ static void log_hint(const j1850_frame_t *f)
 {
     static const uint8_t SPEED[] = {0x48, 0x29, 0x10, 0x02};
     static const uint8_t TEMP[]  = {0xA8, 0x49, 0x10, 0x10};
-    static const uint8_t GEAR[]  = {0xA8, 0x3B, 0x10, 0x03};
+    static const uint8_t LOAD[]  = {0xA8, 0x3B, 0x10, 0x03};
     if (f->len >= 7 && memcmp(f->data, SPEED, 4) == 0) {
         unsigned raw = ((unsigned)f->data[4] << 8) | f->data[5];
         ESP_LOGI(TAG,
@@ -154,9 +154,10 @@ static void log_hint(const j1850_frame_t *f)
         unsigned r = f->data[4];
         ESP_LOGI(TAG, "temp: raw=0x%02X (%u) -> %d C (raw-40, ride-1 confirmed)", r, r,
                  (int)r - 40);
-    } else if (f->len >= 6 && memcmp(f->data, GEAR, 4) == 0) {
-        ESP_LOGI(TAG, "gear: raw=0x%02X -> %s (ladder; shift 1-6 to confirm)", f->data[4],
-                 ride_log_gear_label(f->data[4]));
+    } else if (f->len >= 6 && memcmp(f->data, LOAD, 4) == 0) {
+        // A8 3B 10 is engine load/throttle, not gear (no gear sensor). Gear is
+        // computed from the RPM:speed ratio (gear_calc), not this frame.
+        ESP_LOGI(TAG, "load: raw=0x%02X (A8 3B 10 param; not gear)", f->data[4]);
     }
 }
 

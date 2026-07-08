@@ -9,6 +9,7 @@ idf_component_register(
         settings/settings_store.c
         sound/sound.c
         vehicle/vehicle_data.c
+        vehicle/gear_calc.c
         simulator/gear_table.c
         display/boot_screen.c
         display/screen_ride.c

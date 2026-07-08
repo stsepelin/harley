@@ -1,4 +1,5 @@
 #include "j1850_driver.h"
+#include "gear_calc.h"
 #include "j1850_parse.h"
 #include "vehicle_data.h"
 
@@ -15,6 +16,11 @@ void j1850_driver_init(void)
 
 void j1850_driver_feed(const j1850_frame_t *f)
 {
-    if (j1850_parse(f, &s_vd))
+    if (j1850_parse(f, &s_vd)) {
+        // The bus carries no gear position (no sensor on this bike), so derive
+        // it from the latest RPM:speed ratio. Recomputed on every republish;
+        // RPM/speed frames keep both inputs fresh.
+        s_vd.gear = gear_calc(s_vd.rpm, s_vd.speed_mph, s_vd.gear);
         vehicle_data_set(&s_vd);
+    }
 }

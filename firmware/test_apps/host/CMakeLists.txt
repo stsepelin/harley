@@ -39,6 +39,7 @@ add_library(vrod_pure STATIC
     ${MAIN_DIR}/phone/phone_protocol.c
     ${MAIN_DIR}/settings/settings.c
     ${MAIN_DIR}/vehicle/vehicle_data.c
+    ${MAIN_DIR}/vehicle/gear_calc.c
     ${MAIN_DIR}/j1850/j1850_vpw.c
     ${MAIN_DIR}/j1850/j1850_tx_logic.c
     ${MAIN_DIR}/j1850/j1850_parse.c
@@ -110,6 +111,7 @@ add_unit_test(test_format)
 add_unit_test(test_smooth)
 add_unit_test(test_fuel_scale)
 add_unit_test(test_vehicle_data)
+add_unit_test(test_gear_calc)
 add_unit_test(test_units)
 add_unit_test(test_settings)
 add_unit_test(test_phone_protocol)

@@ -67,9 +67,10 @@ Today that's:
 | `main/phone/phone_protocol.c` | Binary TLV parser for the companion-app BLE wire format |
 | `main/settings/settings.c` | Defaults + validate for the persisted prefs struct |
 | `main/vehicle/vehicle_data.c` | Mutex-guarded latest-value store. Tested with a FreeRTOS stub. |
+| `main/vehicle/gear_calc.c` | Gear from the RPM:speed ratio (no gear sensor on the bike): match to the spec's exact overall ratios + boundary hysteresis. |
 | `main/ble/ble_visibility.c` | Pure decision: `(has_bond, override) → adv_mode`. Stage 8. |
 | `main/j1850/j1850_vpw.c` | J1850 VPW symbol codec: pulse-width decoder + encoder + CRC-8/SAE-J1850. Round-trip tested. |
-| `main/j1850/j1850_parse.c` | J1850 message decoder: frame -> vehicle_data (RPM/temp/gear/speed/turns/CEL), decode table bench-confirmed against real captures. |
+| `main/j1850/j1850_parse.c` | J1850 message decoder: frame -> vehicle_data (RPM/temp/speed/turns/CEL), calibrated against real captures. Gear is not on the bus (see gear_calc). |
 | `main/j1850/j1850_driver.c` | J1850 producer glue: decoded frame -> j1850_parse -> vehicle_data_set (running aggregate). |
 | `main/j1850/j1850_edge.c` | Toggling edge->level tracker (no pin read): toggle + recessive-idle re-sync anchor; a missed/spurious edge self-limits to one frame. |
 | `main/j1850/j1850_tx_logic.c` | J1850 TX pure logic: CRC frame build (round-tripped through encode→decode) + the watchdog dominant-length guard + on-air duration. |

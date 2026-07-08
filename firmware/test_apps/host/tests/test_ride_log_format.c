@@ -33,13 +33,13 @@ static void test_temp_line_raw_byte(void)
     TEST_ASSERT_EQUAL_STRING("0.000 j1850: A8 49 10 10 40 11 | CRC OK | temp=0x40", out);
 }
 
-static void test_gear_line_raw_and_label(void)
+static void test_load_line_raw_byte(void)
 {
-    const uint8_t b[] = {0xA8, 0x3B, 0x10, 0x03, 0x03, 0x22};
+    const uint8_t b[] = {0xA8, 0x3B, 0x10, 0x03, 0x04, 0x74};  // A8 3B 10 = load, not gear
     j1850_frame_t f   = mk(b, sizeof(b), true);
     char          out[160];
     ride_log_format_line(&f, 12034, out, sizeof(out));
-    TEST_ASSERT_EQUAL_STRING("12.034 j1850: A8 3B 10 03 03 22 | CRC OK | gear=0x03->2", out);
+    TEST_ASSERT_EQUAL_STRING("12.034 j1850: A8 3B 10 03 04 74 | CRC OK | load=0x04", out);
 }
 
 // A recognized-but-not-capture header (RPM) gets no decoded suffix.
@@ -88,18 +88,6 @@ static void test_ifr_bytes_appended(void)
 
 // --- gear label table (every arm incl. the unknown fallback) -------------
 
-static void test_gear_label_full_ladder(void)
-{
-    TEST_ASSERT_EQUAL_STRING("N", ride_log_gear_label(0x00));
-    TEST_ASSERT_EQUAL_STRING("1", ride_log_gear_label(0x01));
-    TEST_ASSERT_EQUAL_STRING("2", ride_log_gear_label(0x03));
-    TEST_ASSERT_EQUAL_STRING("3", ride_log_gear_label(0x07));
-    TEST_ASSERT_EQUAL_STRING("4", ride_log_gear_label(0x0F));
-    TEST_ASSERT_EQUAL_STRING("5", ride_log_gear_label(0x1F));
-    TEST_ASSERT_EQUAL_STRING("6", ride_log_gear_label(0x3F));
-    TEST_ASSERT_EQUAL_STRING("?", ride_log_gear_label(0x05));
-}
-
 // --- header + edge cases -------------------------------------------------
 
 static void test_header_line(void)
@@ -133,12 +121,11 @@ void RunTests(void)
 {
     RUN_TEST(test_speed_line_raw_counts);
     RUN_TEST(test_temp_line_raw_byte);
-    RUN_TEST(test_gear_line_raw_and_label);
+    RUN_TEST(test_load_line_raw_byte);
     RUN_TEST(test_other_frame_has_no_suffix);
     RUN_TEST(test_short_header_no_suffix);
     RUN_TEST(test_bad_crc_no_decode);
     RUN_TEST(test_ifr_bytes_appended);
-    RUN_TEST(test_gear_label_full_ladder);
     RUN_TEST(test_header_line);
     RUN_TEST(test_truncation_reports_needed_length);
     RUN_TEST(test_zero_buffer_returns_zero);

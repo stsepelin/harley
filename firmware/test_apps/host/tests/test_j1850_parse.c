@@ -61,14 +61,17 @@ static void test_engine_temp_from_real_frame(void)
     TEST_ASSERT_EQUAL_INT8(24, vd.engine_temp_c);
 }
 
-static void test_gear_neutral_from_real_frame(void)
+static void test_a83b10_is_not_gear(void)
 {
-    vehicle_data_t vd  = {.gear = GEAR_6, .neutral = false};
+    // A8 3B 10 is engine-load/throttle, not a gear ladder (this bike has no
+    // gear sensor). The parser must not recognise it or touch gear/neutral;
+    // gear is computed from the RPM:speed ratio in gear_calc (the driver).
+    vehicle_data_t vd  = {.gear = GEAR_3, .neutral = false};
     const uint8_t  g[] = {0xA8, 0x3B, 0x10, 0x03, 0x00, 0x00};
     j1850_frame_t  f   = real(g, sizeof(g));
-    TEST_ASSERT_TRUE(j1850_parse(&f, &vd));
-    TEST_ASSERT_EQUAL(GEAR_NEUTRAL, vd.gear);
-    TEST_ASSERT_TRUE(vd.neutral);
+    TEST_ASSERT_FALSE(j1850_parse(&f, &vd));
+    TEST_ASSERT_EQUAL(GEAR_3, vd.gear);  // untouched
+    TEST_ASSERT_FALSE(vd.neutral);
 }
 
 static void test_turn_signals_from_real_frames(void)
@@ -127,26 +130,7 @@ static void test_speed_parked_is_zero(void)
     TEST_ASSERT_EQUAL_UINT16(0, vd.speed_mph);
 }
 
-// --- synthetic frames (gear ladder + speed math) ------------------------
-
-static void test_gear_ladder(void)
-{
-    const struct {
-        uint8_t raw;
-        gear_t  gear;
-    } cases[] = {
-        {0x00, GEAR_NEUTRAL}, {0x01, GEAR_1}, {0x03, GEAR_2}, {0x07, GEAR_3},
-        {0x0F, GEAR_4},       {0x1F, GEAR_5}, {0x3F, GEAR_6}, {0x05, GEAR_UNKNOWN},
-    };
-    for (size_t i = 0; i < sizeof(cases) / sizeof(cases[0]); i++) {
-        vehicle_data_t vd   = {0};
-        uint8_t        pl[] = {0xA8, 0x3B, 0x10, 0x03, cases[i].raw};
-        j1850_frame_t  f    = synth(pl, sizeof(pl));
-        TEST_ASSERT_TRUE(j1850_parse(&f, &vd));
-        TEST_ASSERT_EQUAL(cases[i].gear, vd.gear);
-        TEST_ASSERT_EQUAL(cases[i].gear == GEAR_NEUTRAL, vd.neutral);
-    }
-}
+// --- synthetic frames (speed math) --------------------------------------
 
 static void test_speed_math_nonzero(void)
 {
@@ -198,11 +182,10 @@ void RunTests(void)
 {
     RUN_TEST(test_rpm_from_real_frames);
     RUN_TEST(test_engine_temp_from_real_frame);
-    RUN_TEST(test_gear_neutral_from_real_frame);
+    RUN_TEST(test_a83b10_is_not_gear);
     RUN_TEST(test_turn_signals_from_real_frames);
     RUN_TEST(test_check_engine_from_real_frames);
     RUN_TEST(test_speed_parked_is_zero);
-    RUN_TEST(test_gear_ladder);
     RUN_TEST(test_speed_math_nonzero);
     RUN_TEST(test_unrecognised_frame_is_ignored);
     RUN_TEST(test_bad_crc_frame_is_ignored);
