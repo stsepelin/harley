@@ -44,9 +44,11 @@ sensor needed). Ride 1 confirms the 1st/2nd clusters. To build as pure
 ### Odometer / trip on the bus `A8 69 10`
 A rising 16-bit counter (`…06 00 64 → 06 00 C8 → 06 01 2C …`, +100 each frame)
 sent every ~40 m — i.e. **0.4 m per tick** (frame spacing tracks speed: ~4 s at
-pace, ~6.5 s slow). So odo/trip come straight from the bus — no speed
-integration. Accumulate ticks × 0.4 m; trips are deltas. (Exact tick size to be
-confirmed against GPS distance.)
+pace, ~6.5 s slow). **Confirmed to be distance, not fuel:** it advances only
+while moving and **freezes completely when stopped** (0 of the stopped intervals
+advanced). So odo/trip come straight from the bus — no speed integration.
+Accumulate ticks × 0.4 m; trips are deltas. (Exact tick size to be confirmed
+against GPS distance.)
 
 ## Not on the bus (discrete wires — Phase 6)
 Confirmed by comparing our cluster to the stock one during the ride:
@@ -74,7 +76,7 @@ Confirmed by comparing our cluster to the stock one during the ride:
 | `48 29 10` | 3041 | speed, km/h-native counts (÷~195 → mph) |
 | `A8 3B 10` | 1136 | engine load / throttle (NOT gear) |
 | `68 88 10` | 561 | check-engine/MIL bit (d3 & 0x80) |
-| `A8 83 10` | 391 | fuel-consumption ticks |
+| `A8 83 10` | 391 | fuel-consumption ticks (ticks at idle → fuel, not distance) |
 | `48 DA 40` | 271 | turn signals (bit1=L, bit0=R) |
 | `A8 49 10` | 116 | engine temp (°C = raw − 40) |
 | `A8 69 10` | 73 | odometer ticks (0.4 m) |
@@ -95,7 +97,10 @@ lost data:
 **One real signal still unwired: FUEL (`A8 83 10`).** The 16-bit value climbs
 strictly monotonically (480 → 8705, +20/frame, zero resets) — a cumulative
 fuel-*consumption* counter (a "fuel odometer"), NOT a warning flag and NOT a
-level. Three separate fuel things, only the first available now:
+level. **Confirmed fuel, not a trip:** it keeps ticking while stopped/idling
+(~6.7/s at 0 km/h), which a distance/trip counter cannot do — the engine burns
+fuel at 0 mph. (Distance lives on `A8 69 10`, which freezes when stopped.)
+Three separate fuel things, only the first available now:
 - **Consumption** (`A8 83 10`) — this counter; feeds economy/range and the
   spec's countdown feature.
 - **Fuel level** (gauge) — not seen on the bus under the expected id; likely an
