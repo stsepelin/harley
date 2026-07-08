@@ -14,14 +14,16 @@
 #include <dirent.h>
 #include <stdio.h>
 #include <string.h>
+#include <sys/stat.h>
 #include <sys/statvfs.h>
 #include <unistd.h>  // fsync
 
 static const char *TAG = "ridelog";
 
-// Board microSD wiring (Waveshare ESP32-P4-WIFI6-Touch-LCD-3.4C, from the
-// vendor 05_sdmmc example + docs/PINS.md): 4-bit SDMMC, power via the P4's
-// internal LDO channel 4. These are fixed board constants, not user pins.
+// Board microSD wiring (Waveshare ESP32-P4-WIFI6-Touch-LCD-3.4C): the card sits
+// on SDMMC slot 0 at the fixed IO_MUX pins CLK43/CMD44/D0-3=39..42 (4-bit),
+// powered from the P4's internal LDO channel 4. Slot 1 is the C6 radio's SDIO
+// link (see mount_card). These are fixed board constants, not user pins.
 #define MOUNT_POINT "/sdcard"
 #define SD_LDO_CHAN 4
 #define SD_PIN_CLK  43
@@ -60,6 +62,45 @@ static void set_state(ride_log_state_t st)
     portEXIT_CRITICAL(&s_mux);
 }
 
+#if CONFIG_ESP_HOSTED_SDIO_HOST_INTERFACE
+// The mount reuses the controller esp_hosted already created (see mount_card);
+// these stubs replace the driver's init/deinit so it does not try to create a
+// second one. Workaround for esp-idf#16233.
+static esp_err_t sdmmc_host_init_stub(void)
+{
+    return ESP_OK;
+}
+static esp_err_t sdmmc_host_deinit_stub(void)
+{
+    return ESP_OK;
+}
+#endif
+
+// Boot-time durability check: log every persisted ride_NNN.log with its byte
+// size so a bench power-off test can be verified from the serial log, without
+// pulling the card. Runs once, on the first successful mount.
+static void log_existing_sessions(void)
+{
+    DIR *d = opendir(MOUNT_POINT);
+    if (!d)
+        return;
+    int            count = 0;
+    struct dirent *e;
+    while ((e = readdir(d)) != NULL) {
+        int n = -1;
+        if (sscanf(e->d_name, "ride_%d.log", &n) != 1)
+            continue;
+        char path[48];
+        snprintf(path, sizeof(path), MOUNT_POINT "/%s", e->d_name);
+        struct stat st;
+        long        size = (stat(path, &st) == 0) ? (long)st.st_size : -1;
+        ESP_LOGI(TAG, "  session %s: %ld bytes", e->d_name, size);
+        count++;
+    }
+    closedir(d);
+    ESP_LOGI(TAG, "existing sessions on card: %d", count);
+}
+
 static bool mount_card(void)
 {
     if (s_card)
@@ -72,8 +113,20 @@ static bool mount_card(void)
         return false;
     }
 
+    // The P4 has ONE SD/MMC controller (SDMMC_LL_HOST_CTLR_NUMS == 1) shared by
+    // two slots: the C6 radio's SDIO link on slot 1 and this microSD on slot 0.
+    // esp_hosted creates and owns that controller very early at boot, and the
+    // IDF >= 6.0 driver refuses a second creation ("no available sd host
+    // controller"). Mounting on slot 0 with init/deinit stubbed makes the driver
+    // reuse the live controller and just attach slot 0, so the ride log and BLE
+    // coexist. Mirrors the esp_hosted host_sdcard_with_hosted example.
     sdmmc_host_t host    = SDMMC_HOST_DEFAULT();
+    host.slot            = SDMMC_HOST_SLOT_0;
     host.pwr_ctrl_handle = s_pwr;
+#if CONFIG_ESP_HOSTED_SDIO_HOST_INTERFACE
+    host.init   = sdmmc_host_init_stub;
+    host.deinit = sdmmc_host_deinit_stub;
+#endif
 
     sdmmc_slot_config_t slot = SDMMC_SLOT_CONFIG_DEFAULT();
     slot.width               = 4;
@@ -97,6 +150,7 @@ static bool mount_card(void)
         return false;
     }
     ESP_LOGI(TAG, "SD mounted at %s", MOUNT_POINT);
+    log_existing_sessions();
     return true;
 }
 

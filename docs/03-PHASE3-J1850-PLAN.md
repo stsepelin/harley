@@ -164,6 +164,15 @@ run headless.
   `firmware/docs/PINS.md`), FAT filesystem, mounted at `/sdcard`. A 7 MB
   `storage` SPIFFS partition also exists in `partitions.csv` as a card-free
   fallback, not currently wired.
+- **Coexists with BLE.** The P4 has one SDMMC controller with two slots; the
+  ESP32-C6 radio (esp_hosted) owns it on slot 1, and the microSD is on slot 0.
+  The card is mounted on slot 0 with `host.init`/`host.deinit` stubbed so the
+  driver reuses the controller esp_hosted already created instead of failing
+  with "no available sd host controller" (IDF>=6.0 allows one creation only —
+  esp-idf#16233; mirrors the `esp_hosted` `host_sdcard_with_hosted` example).
+  So the ride log records with the phone link still up — no radio-off build.
+  Verified on hardware: SD mounts + BLE advertises, and a session file
+  survives an abrupt power-off (FAT intact on the next boot).
 - **Control:** a REC/STOP toggle on the BENCH screen with a live indicator
   (state, frame count, dropped count, MB used/total). No laptop needed.
 - **Format:** one line per frame, `<sec.ms> j1850: HH .. | CRC OK | <decoded>`
