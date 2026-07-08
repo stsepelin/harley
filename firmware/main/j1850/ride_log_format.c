@@ -1,5 +1,4 @@
 #include "ride_log_format.h"
-#include "j1850_parse.h"  // J1850_SPEED_DIVISOR
 #include <stdarg.h>
 #include <stdio.h>
 #include <string.h>
@@ -52,9 +51,12 @@ static int append_decode(const j1850_frame_t *f, char *out, size_t out_sz, int p
 
     if (f->len >= 7 && memcmp(f->data, SPEED, 4) == 0) {
         unsigned raw = ((unsigned)f->data[4] << 8) | f->data[5];
-        APPEND(" | speed=%u", raw / J1850_SPEED_DIVISOR);  // native mph, DIV provisional
+        // Log the RAW km/h-native counts (~117-128 per km/h), not a divided
+        // value: it's unit-agnostic, so the speed divisor can be re-derived
+        // from any capture (e.g. GPS-correlated) without re-riding.
+        APPEND(" | speed_raw=%u", raw);
     } else if (f->len >= 6 && memcmp(f->data, TEMP, 4) == 0) {
-        APPEND(" | temp=0x%02X", f->data[4]);  // raw byte, units provisional
+        APPEND(" | temp=0x%02X", f->data[4]);  // raw byte; C = raw - 40 (ride-1 confirmed)
     } else if (f->len >= 6 && memcmp(f->data, GEAR, 4) == 0) {
         APPEND(" | gear=0x%02X->%s", f->data[4], ride_log_gear_label(f->data[4]));
     }

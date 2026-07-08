@@ -15,13 +15,13 @@ static j1850_frame_t mk(const uint8_t *bytes, size_t len, bool crc_ok)
 
 // --- decoded suffixes ----------------------------------------------------
 
-static void test_speed_line_native_mph(void)
+static void test_speed_line_raw_counts(void)
 {
-    const uint8_t b[] = {0x48, 0x29, 0x10, 0x02, 0x40, 0x00, 0x56};  // 0x4000/128 = 128
+    const uint8_t b[] = {0x48, 0x29, 0x10, 0x02, 0x40, 0x00, 0x56};  // raw 0x4000 = 16384 counts
     j1850_frame_t f   = mk(b, sizeof(b), true);
     char          out[160];
     ride_log_format_line(&f, 1500, out, sizeof(out));
-    TEST_ASSERT_EQUAL_STRING("1.500 j1850: 48 29 10 02 40 00 56 | CRC OK | speed=128", out);
+    TEST_ASSERT_EQUAL_STRING("1.500 j1850: 48 29 10 02 40 00 56 | CRC OK | speed_raw=16384", out);
 }
 
 static void test_temp_line_raw_byte(void)
@@ -131,7 +131,7 @@ static void test_zero_buffer_returns_zero(void)
 
 void RunTests(void)
 {
-    RUN_TEST(test_speed_line_native_mph);
+    RUN_TEST(test_speed_line_raw_counts);
     RUN_TEST(test_temp_line_raw_byte);
     RUN_TEST(test_gear_line_raw_and_label);
     RUN_TEST(test_other_frame_has_no_suffix);
