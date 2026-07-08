@@ -50,10 +50,17 @@ advanced). So odo/trip come straight from the bus — no speed integration.
 Accumulate ticks × 0.4 m; trips are deltas. (Exact tick size to be confirmed
 against GPS distance.)
 
-## Not on the bus (discrete wires — Phase 6)
-Confirmed by comparing our cluster to the stock one during the ride:
-- **Low oil pressure** lamp — stock lit it, we never saw it → discrete.
-- **Battery/charge** lamp — same → discrete (~70% sure).
+## Not on the bus (discrete wires — Phase 6) — oil still open
+Compared our cluster to the stock one during the ride:
+- **Low oil pressure** lamp — **status unresolved, not yet ruled discrete.** The
+  rider confirms it lights key-on/engine-off (oil pressure = 0). That state
+  differs from engine-running, so if it's on the bus a bit would flip — but the
+  only key-on/engine-off capture we have (`2026-07-04-ignition-on.log`) recorded
+  **0 frames** (bus quiet engine-off, or pre-dates the working RX). So it's
+  untestable from existing data. **TODO:** a fresh key-on/engine-off capture
+  (~30 s, oil lamp on) then start the engine, and diff for the oil bit. Only if
+  that's empty/unchanged is oil truly discrete.
+- **Battery/charge** lamp — same situation; resolve with the same capture.
 - **Low / high beam** — low not present; high via voltage rise → discrete/analog.
 - No ABS on this bike (ABS became standard on later V-Rods); ignore the lamp.
 
@@ -97,9 +104,15 @@ lost data:
 **One real signal still unwired: FUEL (`A8 83 10`).** The 16-bit value climbs
 strictly monotonically (480 → 8705, +20/frame, zero resets) — a cumulative
 fuel-*consumption* counter (a "fuel odometer"), NOT a warning flag and NOT a
-level. **Confirmed fuel, not a trip:** it keeps ticking while stopped/idling
-(~6.7/s at 0 km/h), which a distance/trip counter cannot do — the engine burns
-fuel at 0 mph. (Distance lives on `A8 69 10`, which freezes when stopped.)
+level. **Confirmed fuel — not distance, not revolutions, not run-time:**
+- ticks at idle while stopped (~6.7/s at 0 km/h) → not distance (distance
+  `A8 69 10` freezes when stopped);
+- rate varies with engine state (6.7/s idle vs 16.9/s moving) → not wall-clock
+  run-time (which would be constant per second);
+- **ticks-per-revolution rises with load** (0.38 at idle/zero-load → 0.47 under
+  load) → not a pure revolution counter (which would be flat); the load
+  dependence is the fuel-per-rev signature.
+
 Three separate fuel things, only the first available now:
 - **Consumption** (`A8 83 10`) — this counter; feeds economy/range and the
   spec's countdown feature.
