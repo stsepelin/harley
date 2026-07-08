@@ -92,6 +92,20 @@ menu "V-Rod cluster"
             slot (GPIO 39-45); needs bike power to ride (see the Phase 3
             plan's ride-log prerequisite). Off by default.
 
+    config VROD_RIDE_LOG_DUMP
+        bool "Dump ride logs to the console at boot (serial retrieval)"
+        depends on VROD_RIDE_LOG
+        default n
+        help
+            Retrieval helper: on boot, after the microSD mounts, print every
+            /sdcard/ride_NNN.log to the UART console wrapped in
+            "===RIDELOG BEGIN <name> <bytes>===" / "===RIDELOG END <name>==="
+            markers (all other console logging is silenced and CR/LF expansion
+            disabled for the duration so the stream is byte-exact). Lets the
+            logs be pulled over serial without removing the card;
+            tools/ride_log_pull.py reconstructs the files from a capture.
+            Bench / retrieval only - never enable in a real build.
+
     config VROD_J1850_RX_GPIO
         int "GPIO wired to the J1850 RX divider"
         depends on VROD_J1850_SNIFFER
