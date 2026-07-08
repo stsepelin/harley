@@ -46,12 +46,21 @@ keep-alive candidates for Stage 4 replay.
 - plus targeted ones: `turn-left.log`, `high-beam.log`, ... (flip one
   input at a time; the frames that change are the decode-table proof)
 
-## What Stage 2/3 needs from these
+## Road captures (Stage 3.5 ride log)
 
-- The **IM keep-alive set**: messages the stock cluster *sends*
-  (present with the cluster connected; these are what Stage 4 replays).
-- Decode-table confirmation against the stock gauge: especially the
-  speed divisor (`/128` — km/h or mph?) and engine temp units
-  (HarleyDroid says raw °C).
-- A CRC health baseline: bad-CRC per stats line should be ~0; a few
-  percent means wiring/threshold trouble to fix before trusting data.
+`2026-07-08-ride-1.log` is the first real road capture — pulled off the
+microSD (not the sniffer console), so it's in the **ride-log** line format
+(`<sec.ms> j1850: HH .. | CRC OK | <decoded>`), still `j1850_report.py`-
+parseable. It calibrated speed/temp and mapped the odometer / neutral / fuel
+frames; full analysis in `../ride-1-findings.md`.
+
+## What Stage 2/3 needed from these — resolved by ride 1
+
+- The **IM keep-alive set**: the steady-interval unknowns (`C8 88 10`,
+  `C8 89 60`, `E8 89 60`, `68 FF 10/40/60`, `29 FE 40/60`) — constant
+  payloads = inter-module housekeeping; Stage 4 replay candidates.
+- Decode-table confirmation: **speed is km/h-native** (`counts/~195` → mph,
+  not `/128`); **engine temp is `raw − 40 = °C`** (not raw °C). See
+  `../ride-1-findings.md`.
+- CRC health: ride 1 ran ~2.5% bad — RX noise, tolerable for calibration;
+  a hysteresis front end (Phase 6) tightens it.

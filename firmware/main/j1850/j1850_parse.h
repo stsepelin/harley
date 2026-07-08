@@ -7,21 +7,21 @@
 // Decode table is HarleyDroid-derived and bench-confirmed against the
 // 2026-07-04 on-bike capture (firmware/docs/captures/). Host-tested.
 
-// SPEED — units settled, magnitude provisional.
-// This is a US-market V-Rod: the stock cluster reads MILES, so the ECM's
-// bus value is mph-based ("native"). vehicle_data.speed_mph is now
-// mph-canonical (the sim producer converts to mph too), so the decoded
-// value is stored raw with no unit conversion here; the DISPLAY layer does
-// the mph->km/h conversion when the user selects metric.
+// SPEED — km/h-native on the bus, magnitude provisional.
+// Ride 1 (see firmware/docs/ride-1-findings.md) overturned the earlier
+// "mph-native" guess: the ECM speed value is KM/H-native, ~117-128 counts per
+// km/h. Fitting the logged RPM/speed pairs against the spec's exact gear
+// ratios gives ~117 counts/km-h; the stock speedo peak gives ~124; so true
+// km/h ~= counts/120. vehicle_data.speed_mph is mph-canonical, so the divisor
+// here converts counts -> mph directly: (counts/120 km/h)/1.609 ~= counts/193.
 //
-// Only the DIVISOR MAGNITUDE is still PROVISIONAL — 128 is a guess for
-// raw->mph. Confirm on a ride against the STOCK SPEEDOMETER, which is
-// mechanically driven off this same J1850 bus: the sniffer logs the decoded
-// speed ("speed:" line); read the stock dial in its native MILES (ignore
-// the km/h sticker — the mechanism reads mph) at steady 30/50/70 and match.
-// The stock speedo may read ~5-10% optimistic, so this is a coarse check;
-// correct DIV if off by a clean factor. (No onboard GPS.)
-#define J1850_SPEED_DIVISOR 128
+// Set to 195 PROVISIONALLY (the old 128 made the gauge read ~1.5x high, which
+// matched the ride: 30->40, 70->100+). Still +/-~5%: lock it with ONE
+// GPS-referenced point — planned via the companion app's phone GPS (auto-
+// correlate GPS speed with the logged raw counts), or a phone speedo held
+// steady. The ride log records the RAW counts (speed_raw=) so the divisor can
+// be re-derived from any capture without another ride.
+#define J1850_SPEED_DIVISOR 195
 
 // Decode one frame into *vd. Each broadcast is single-purpose, so this
 // updates only the field(s) that frame carries and leaves the rest of

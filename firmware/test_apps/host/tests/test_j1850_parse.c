@@ -55,10 +55,10 @@ static void test_rpm_from_real_frames(void)
 static void test_engine_temp_from_real_frame(void)
 {
     vehicle_data_t vd  = {0};
-    const uint8_t  t[] = {0xA8, 0x49, 0x10, 0x10, 0x40, 0xAF};  // 0x40 = 64 C
+    const uint8_t  t[] = {0xA8, 0x49, 0x10, 0x10, 0x40, 0xAF};  // raw 0x40=64 -> 64-40 = 24 C
     j1850_frame_t  f   = real(t, sizeof(t));
     TEST_ASSERT_TRUE(j1850_parse(&f, &vd));
-    TEST_ASSERT_EQUAL_INT8(64, vd.engine_temp_c);
+    TEST_ASSERT_EQUAL_INT8(24, vd.engine_temp_c);
 }
 
 static void test_gear_neutral_from_real_frame(void)
@@ -151,10 +151,10 @@ static void test_gear_ladder(void)
 static void test_speed_math_nonzero(void)
 {
     vehicle_data_t vd   = {0};
-    uint8_t        pl[] = {0x48, 0x29, 0x10, 0x02, 0x40, 0x00};  // 0x4000 / 128
+    uint8_t        pl[] = {0x48, 0x29, 0x10, 0x02, 0x40, 0x00};  // 0x4000=16384 / 195 = 84 mph
     j1850_frame_t  f    = synth(pl, sizeof(pl));
     TEST_ASSERT_TRUE(j1850_parse(&f, &vd));
-    TEST_ASSERT_EQUAL_UINT16(128, vd.speed_mph);
+    TEST_ASSERT_EQUAL_UINT16(84, vd.speed_mph);
 }
 
 // --- rejection paths ----------------------------------------------------

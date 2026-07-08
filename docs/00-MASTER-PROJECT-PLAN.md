@@ -435,6 +435,11 @@ See `02-PHASE2.5-OFFBIKE-PLAN.md` for the full plan + ordering.
   power cycle~~ ✅ landed at Phase 3 kickoff (background autoConnect on
   link loss)
 - Navigation banner (needs turn-by-turn intent from a phone app)
+- **Companion J1850 integration** (scoped in the Phase 3 plan, Stage 5,
+  after ride 1): live telemetry over BLE; **GPS speed calibration** (phone
+  GPS vs the logged `speed_raw` counts → exact speed divisor, replacing the
+  provisional value); config write-back to cluster NVS; **fault-code (DTC)
+  readout + clear** (needs the Stage 4 TX path)
 
 ### Phase 5: (removed — GPS + speed cameras dropped)
 

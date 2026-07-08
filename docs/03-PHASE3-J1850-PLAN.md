@@ -126,24 +126,25 @@ Phase 3 kickoff — the old drawing would jam the bus:
 - Pure-logic message parser (`j1850_parse.c`): decode table from the
   master plan (HarleyDroid-derived). Host tests against real captured
   frames from Stage 2 — same fixture pattern as `phone_protocol`.
-- **Two decode entries still blocked on the bike** (`j1850_parse.c` marks
-  both provisional; the sniffer logs raw hints for the capture):
-  - **Speed `48 29 10 02` — units SETTLED (mph-native), magnitude
-    provisional.** US-market bike → stock cluster reads miles → the ECM
-    value is mph-based; km/h is a display-layer conversion, NOT decode
-    (don't bake it into the parser). `vehicle_data.speed_mph` is now
-    mph-canonical throughout (the sim producer converts to mph, and
-    `units_speed_display` does mph→km/h only when the user selects metric),
-    so the parser stores the raw value with no conversion. Only the `/DIV`
-    scale (128 guess) is open — see the **speed-calibration reference**
-    below for the method.
-  - **Temp `A8 49 10 10` — FULLY PROVISIONAL.** The stock cluster shows
-    NO temperature, so there is no dial to check against; the raw byte's
-    meaning is unconfirmed. Candidates: raw°C / raw°F / `raw-40=°C`
-    (HarleyDroid's wiki documents `°C+40` = the offset form, but it's a
-    HINT — its turn bits were wrong). Resolve with a **two-point capture**:
-    raw byte cold (~ambient) + fully warm (~90-100°C) fixes scale+offset.
-  - Gear ladder (1-6) is also ride-confirmed but tracked separately.
+- **Decode calibrated on ride 1** (full analysis in
+  `firmware/docs/ride-1-findings.md`; `j1850_parse.c` updated):
+  - **Speed `48 29 10 02` — km/h-native (not mph), divisor provisional.**
+    Ride 1 overturned the mph-native guess: the ECM value is km/h-native,
+    ~117-128 counts per km/h (gear-ratio fit vs stock speedo). `speed_mph`
+    stays mph-canonical, so the parser divides counts→mph: **set to 195**
+    (was 128, which read ~1.5x high). Still ±~5% — lock with one GPS point
+    via the companion app; the ride log stores RAW counts (`speed_raw=`) so
+    it's re-derivable without another ride.
+  - **Temp `A8 49 10 10` — SETTLED: `°C = raw − 40`.** Cold-start raw 0x3F
+    at ~20-25°C ambient → 23°C, warm 0x81 → 89°C. Both correct.
+  - **Gear — no sensor; compute from RPM/speed ratio.** The V-Rod has no
+    gear-position sensor (stock shows only N). Match `rpm/speed` to the exact
+    overall ratios (1st 10.969 … 5th 4.563) → deterministic. To build as a
+    pure `gear_calc.c`. **`A8 3B 10` is NOT gear** (it's an engine-load /
+    throttle parameter) — the old gear-ladder decode is dropped.
+  - **Neutral `48 3B 40`** (bit5 candidate) and **odometer `A8 69 10`**
+    (0.4 m ticks — no speed-integration needed) were found in the ride and
+    are pending a short confirm capture + wiring.
 - `j1850_driver.c` glue: RMT RX → vpw decode → parse → `vehicle_data_set`.
   New Kconfig `VROD_J1850`, mutually exclusive producer with the sim
   (`sim_engine` is not started when `VROD_J1850` is on — both write
@@ -280,6 +281,34 @@ PASS before the bike.**
   and (2) gate the bike.
 - Fallback if TSSM security fails without the stock IM: keep the stock
   IM wired in parallel under the airbox (master plan option C).
+
+### Stage 5 — Companion app: telemetry, GPS calibration, fault codes
+
+Ride 1 (`firmware/docs/ride-1-findings.md`) showed the companion app is the
+right home for calibration and diagnostics — the phone already pairs over BLE
+and brings a GPS. Builds on the existing NimBLE peripheral + Android central.
+
+- **Telemetry (GATT notify).** Stream decoded `vehicle_data` (+ optional raw
+  frames) to the phone: live logging with no microSD needed. The SD ride log
+  stays for high-rate raw capture without a phone.
+- **GPS speed calibration.** The phone correlates its GPS speed with the logged
+  `speed_raw` counts and computes the exact speed divisor (replaces the
+  provisional 195 — no eyeballing, no gear-ratio inference). Result written back
+  via the config characteristic.
+- **Config (GATT write) → NVS.** Push calibration back to the cluster — speed
+  divisor, temp offset, gear ratios, unit prefs — persisted so it survives a
+  power cycle.
+- **Fault codes (DTCs).** Read stored `P/C/B/U####` codes per module and show
+  them on the phone, with a clear-codes action. Needs **TX** (Stage 4:
+  request/response), so it lands after the TX path is bench-validated. The MIL
+  lamp bit is already available passively (`68 88 10`).
+- **Fuel economy / range.** Both counters are on the bus — fuel consumed
+  (`A8 83 10`) and distance (`A8 69 10`) — so trip-computer metrics come out of
+  their ratio: instantaneous / trip-average economy, trip fuel, and
+  range-to-empty (tank 18.9 L − fuel-since-fill; no fuel-level sender needed).
+  Relative economy (ticks/km) works today; real L/100km / mpg needs a one-time
+  fill-up calibration of mL-per-fuel-tick, stored in the app with per-ride
+  history + fill logging. See `firmware/docs/ride-1-findings.md`.
 
 ### Carried-over hardware verification (from Phase 2.5)
 

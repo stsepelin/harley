@@ -22,13 +22,13 @@ import sys
 # (docs/00-MASTER-PROJECT-PLAN.md, HarleyDroid-derived).
 KNOWN = {
     "28 1B 10": "RPM = (HH<<8|LL)/4",
-    "48 29 10": "speed = (HH<<8|LL)/128 (units: verify!)",
-    "48 3B 40": "neutral/clutch bits",
-    "48 DA 40": "turn signals",
-    "68 88 10": "check engine on/off",
-    "A8 3B 10": "gear 1..6",
-    "A8 49 10": "engine temp (raw degC per HarleyDroid: verify!)",
-    "A8 69 10": "odometer ticks (0.4 m)",
+    "48 29 10": "speed = km/h-native counts (HH<<8|LL); /~195 -> mph (ride-1)",
+    "48 3B 40": "neutral/clutch bits (bit5=N, bit7=clutch; ride-1 tentative)",
+    "48 DA 40": "turn signals (bit1=L, bit0=R)",
+    "68 88 10": "check engine / MIL (d3 & 0x80)",
+    "A8 3B 10": "engine load / throttle (NOT gear on the V-Rod: no gear sensor)",
+    "A8 49 10": "engine temp: C = raw - 40 (ride-1 confirmed)",
+    "A8 69 10": "odometer ticks (~0.4 m each)",
     "A8 83 10": "fuel consumption ticks",
     "A8 83 61": "fuel gauge 0-6",
 }

@@ -48,18 +48,13 @@ bool j1850_parse(const j1850_frame_t *f, vehicle_data_t *vd)
         return true;
     }
     if (msg(f, TEMP, 4, 6)) {
-        // PROVISIONAL scaling — the stock cluster shows NO temperature, so
-        // there is no dial to validate against; the raw byte's meaning is
-        // unconfirmed. Three candidates fit the captured 0x3E..0x48 climb:
-        //   raw as C     -> 62..72 C
-        //   raw as F     -> ~17..22 C
-        //   raw - 40 = C -> 22..32 C  (GM/OBD-style offset; HarleyDroid's
-        //                              wiki documents "C + 40", i.e. this)
-        // HarleyDroid is only a HINT (its turn-signal bits were wrong too).
-        // Keep raw-as-C for now; resolve with a two-point capture (cold ~=
-        // ambient, fully warm ~= 90-100 C). The sniffer logs the raw byte
-        // ("temp:" line). Do NOT lock this until that capture.
-        vd->engine_temp_c = (int8_t)f->data[4];
+        // Confirmed on ride 1 (firmware/docs/ride-1-findings.md): the OBD-style
+        // offset. Cold-start raw 0x3F (63) at ~20-25 C ambient climbed to ~0x81
+        // (129) fully warm; raw-40 gives 23 C cold / 89 C hot, both correct.
+        // engine_temp_c is int8_t; the realistic bus range (0x00..~0xA7) maps
+        // to -40..+127 C, so no clamp is needed for any temperature the engine
+        // will show.
+        vd->engine_temp_c = (int8_t)((int)f->data[4] - 40);
         return true;
     }
     if (msg(f, GEAR, 4, 6)) {

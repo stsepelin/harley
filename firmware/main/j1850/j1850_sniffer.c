@@ -147,14 +147,13 @@ static void log_hint(const j1850_frame_t *f)
     static const uint8_t GEAR[]  = {0xA8, 0x3B, 0x10, 0x03};
     if (f->len >= 7 && memcmp(f->data, SPEED, 4) == 0) {
         unsigned raw = ((unsigned)f->data[4] << 8) | f->data[5];
-        ESP_LOGI(
-            TAG,
-            "speed: raw=%u native=%u (raw/%d, mph-native; DIV provisional) vs stock speedo (miles)",
-            raw, raw / J1850_SPEED_DIVISOR, J1850_SPEED_DIVISOR);
+        ESP_LOGI(TAG,
+                 "speed: raw=%u -> %u mph (counts/%d, km/h-native; DIV provisional, GPS to lock)",
+                 raw, raw / J1850_SPEED_DIVISOR, J1850_SPEED_DIVISOR);
     } else if (f->len >= 6 && memcmp(f->data, TEMP, 4) == 0) {
         unsigned r = f->data[4];
-        ESP_LOGI(TAG, "temp: raw=0x%02X (%u) PROVISIONAL — C?=%u  F->C?=%d  (raw-40)C?=%d", r, r, r,
-                 (int)(((int)r - 32) * 5 / 9), (int)r - 40);
+        ESP_LOGI(TAG, "temp: raw=0x%02X (%u) -> %d C (raw-40, ride-1 confirmed)", r, r,
+                 (int)r - 40);
     } else if (f->len >= 6 && memcmp(f->data, GEAR, 4) == 0) {
         ESP_LOGI(TAG, "gear: raw=0x%02X -> %s (ladder; shift 1-6 to confirm)", f->data[4],
                  ride_log_gear_label(f->data[4]));
