@@ -4,6 +4,9 @@
 #include "screen_ride.h"
 #include "screen_settings.h"
 #include "screen_settings_bluetooth.h"
+#include "screen_settings_general.h"
+#include "screen_settings_odoset.h"
+#include "screen_settings_trip.h"
 #include "settings_store.h"
 #include "sound.h"
 #include "vehicle_data.h"
@@ -18,9 +21,12 @@
 // widgets stay current because the update task keeps feeding them even
 // when they're not visible (their internal caches mean the work is
 // near-zero in that case).
-static lv_obj_t *s_ride          = NULL;
-static lv_obj_t *s_settings      = NULL;
-static lv_obj_t *s_settings_bt   = NULL;
+static lv_obj_t *s_ride             = NULL;
+static lv_obj_t *s_settings         = NULL;
+static lv_obj_t *s_settings_general = NULL;
+static lv_obj_t *s_settings_trip    = NULL;
+static lv_obj_t *s_settings_odoset  = NULL;
+static lv_obj_t *s_settings_bt      = NULL;
 static bool      s_ui_started    = false;
 static bool      s_event_started = false;
 
@@ -136,6 +142,30 @@ void ui_manager_show_settings(void)
 {
     if (!s_settings) s_settings = screen_settings_create();
     lv_screen_load(s_settings);
+}
+
+void ui_manager_show_settings_general(void)
+{
+    if (!s_settings_general)
+        s_settings_general = screen_settings_general_create();
+    lv_screen_load(s_settings_general);
+}
+
+void ui_manager_show_settings_trip(void)
+{
+    if (!s_settings_trip)
+        s_settings_trip = screen_settings_trip_create();
+    lv_screen_load(s_settings_trip);
+}
+
+void ui_manager_show_settings_odoset(void)
+{
+    // Recreate each entry so the editor starts from the current odometer.
+    // Safe to delete the cached instance: the menu is the active screen here.
+    if (s_settings_odoset)
+        lv_obj_delete(s_settings_odoset);
+    s_settings_odoset = screen_settings_odoset_create();
+    lv_screen_load(s_settings_odoset);
 }
 
 void ui_manager_show_settings_bluetooth(void)

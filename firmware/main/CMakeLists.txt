@@ -16,6 +16,9 @@ idf_component_register(
         display/boot_screen.c
         display/screen_ride.c
         display/screen_settings.c
+        display/screen_settings_general.c
+        display/screen_settings_trip.c
+        display/screen_settings_odoset.c
         display/screen_settings_bluetooth.c
         display/screen_pairing.c
         display/ui_manager.c
