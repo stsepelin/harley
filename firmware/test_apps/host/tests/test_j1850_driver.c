@@ -146,7 +146,7 @@ static void test_speed_divisor_runtime(void)
 {
     vehicle_data_init();
     j1850_driver_init();
-    TEST_ASSERT_EQUAL_UINT16(195, j1850_driver_speed_divisor());  // provisional default
+    TEST_ASSERT_EQUAL_UINT16(188, j1850_driver_speed_divisor());  // gear-ratio default
 
     uint8_t       speed[] = {0x48, 0x29, 0x10, 0x02, 0x4C, 0x2C};  // raw 19500
     j1850_frame_t f       = frame(speed, sizeof(speed));
@@ -155,7 +155,7 @@ static void test_speed_divisor_runtime(void)
     vehicle_data_t vd;
     vehicle_data_get(&vd);
     TEST_ASSERT_EQUAL_UINT16(19500, vd.speed_raw);
-    TEST_ASSERT_EQUAL_UINT16(100, vd.speed_mph);  // 19500 / 195
+    TEST_ASSERT_EQUAL_UINT16(103, vd.speed_mph);  // 19500 / 188
 
     // Calibrate: smaller divisor -> higher mph, applied to the last frame now.
     j1850_driver_set_speed_divisor(130);

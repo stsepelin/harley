@@ -87,6 +87,18 @@ void app_main(void)
     // Producer: the sniffer's decode feeds vehicle_data via the driver.
     // Init before the sniffer task so it can consume frames immediately.
     j1850_driver_init();
+    // Log the persisted divisor so a wrong speedo is diagnosable from the boot
+    // console (a stale bench value once shipped a whole ride reading ~45% high).
+    ESP_LOGI(TAG, "speed divisor (NVS) = %u", settings_store_current()->speed_divisor);
+#if CONFIG_VROD_RESET_CALIBRATION
+    if (settings_store_current()->speed_divisor != SETTINGS_SPEED_DIVISOR_DEFAULT) {
+        settings_t reset    = *settings_store_current();
+        uint16_t   was      = reset.speed_divisor;
+        reset.speed_divisor = SETTINGS_SPEED_DIVISOR_DEFAULT;
+        settings_store_apply(&reset);
+        ESP_LOGW(TAG, "RESET calibration: speed divisor %u -> %u", was, reset.speed_divisor);
+    }
+#endif
     // Restore the GPS-calibrated speed divisor persisted in settings.
     j1850_driver_set_speed_divisor(settings_store_current()->speed_divisor);
     // Restore the persisted odometer/trips into the driver, then keep them
