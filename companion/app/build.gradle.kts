@@ -5,11 +5,11 @@ plugins {
 }
 
 android {
-    namespace  = "com.vrodcluster.companion"
+    namespace  = "ee.zeppl.companion"
     compileSdk = 36
 
     defaultConfig {
-        applicationId = "com.vrodcluster.companion"
+        applicationId = "ee.zeppl.companion"
         // Android 16. Older devices would need a separate target since we
         // depend on permission models, foreground-service types, and BLE
         // permissioning that's only stable on this baseline.

@@ -99,6 +99,18 @@ phone_parse_result_t phone_protocol_parse(const uint8_t  *buf,
         return PHONE_PARSE_OK;
     }
 
+    case PHONE_EVT_CONFIG: {
+        // u16 speed_divisor (LE). Length-keyed so future fields can append.
+        if (payload_len < 2) {
+            *consumed = total_len;
+            return PHONE_PARSE_BAD_FIELD;
+        }
+        out->type                 = PHONE_EVT_CONFIG;
+        out->config.speed_divisor = rd_u16(p);
+        *consumed                 = total_len;
+        return PHONE_PARSE_OK;
+    }
+
     default:
         *consumed = total_len;
         return PHONE_PARSE_BAD_TYPE;

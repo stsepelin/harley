@@ -662,6 +662,26 @@ static void test_get_with_null_safe(void)
     phone_data_get(NULL);       // must not crash
 }
 
+// PHONE_EVT_CONFIG is cluster config, applied in ble_peripheral; phone_data
+// deliberately ignores it. Confirm it neither crashes nor disturbs state.
+static void test_config_event_is_noop_in_phone_data(void)
+{
+    fresh();
+    phone_event_t a = make_notif(1, NOTIF_KIND_SMS, "Alice");
+    phone_data_apply(&a);
+
+    phone_event_t cfg;
+    memset(&cfg, 0, sizeof(cfg));
+    cfg.type                 = PHONE_EVT_CONFIG;
+    cfg.config.speed_divisor = 188;
+    phone_data_apply(&cfg);
+
+    phone_state_t s;
+    phone_data_get(&s);
+    TEST_ASSERT_TRUE(s.notif.active);
+    TEST_ASSERT_EQUAL_UINT32(1, s.notif.id);
+}
+
 void RunTests(void)
 {
     RUN_TEST(test_first_notif_becomes_active);
@@ -698,6 +718,7 @@ void RunTests(void)
     RUN_TEST(test_media_action_does_not_crash);
     RUN_TEST(test_dismiss_unknown_id_with_populated_queue);
     RUN_TEST(test_unknown_event_type_is_safe_noop);
+    RUN_TEST(test_config_event_is_noop_in_phone_data);
     RUN_TEST(test_paused_media_keeps_banner_shown);
     RUN_TEST(test_dismiss_when_idle_is_noop);
     RUN_TEST(test_swipe_up_with_paused_media_shows_banner);

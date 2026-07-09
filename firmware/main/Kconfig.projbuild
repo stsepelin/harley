@@ -74,6 +74,20 @@ menu "V-Rod cluster"
             sim_engine is not started (both write vehicle_data). Off by
             default; this is the real-bike data source.
 
+    config VROD_J1850_BENCH_SPEED
+        bool "Bench: inject a synthetic SPEED/RPM frame (no live bus)"
+        depends on VROD_J1850
+        default n
+        help
+            Desk-bench validation without a J1850 bus: a low-rate task feeds
+            the producer a fixed SPEED frame (raw 19500) plus an RPM frame,
+            straight through j1850_driver_feed, so speed_raw / speed_mph / rpm
+            are non-zero on the gauge and in the phone telemetry stream. Lets
+            the companion telemetry + config write-back (speed divisor) be
+            exercised end to end before a ride - set a divisor and watch
+            speed_mph = raw / divisor recompute. Bench only; never on a bike
+            (it fabricates vehicle data).
+
     config VROD_RIDE_LOG
         bool "On-board ride log to microSD (laptop-free capture)"
         depends on VROD_J1850_SNIFFER

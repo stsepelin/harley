@@ -1,10 +1,11 @@
-# companion
+# Zeppl (companion)
 
-Android phone-side bridge for the [harley](../) cluster firmware.
+**Zeppl** is the Android phone-side bridge for the [harley](../) cluster
+firmware.
 
 Mirrors notifications and media state from the phone to the bike's
 gauge over a BLE GATT link, and accepts commands back (accept / reject
-calls, media transport). The firmware advertises as `V-Rod Cluster`
+calls, media transport). The firmware advertises as `Zeppl`
 and this app is the central that pairs with it.
 
 ## Status
@@ -44,7 +45,7 @@ firmware speak the same protocol on both platforms.
 ## UI architecture
 
 Material 3 **Expressive** (`MaterialExpressiveTheme` + the spring-based
-`MotionScheme`), branded V-Rod dark theme by default (orange-on-near-black,
+`MotionScheme`), branded Zeppl dark theme by default (orange-on-near-black,
 mirroring the cluster's own palette in `firmware/main/display/theme.h`;
 Material You dynamic color is an opt-in toggle under Settings). The theme
 lives in `ui/theme/` (`Color.kt` / `Type.kt` / `Theme.kt`).
@@ -83,7 +84,7 @@ gradle wrapper         # one-time, generates gradlew jar
 
 ## Wire format
 
-`app/src/main/java/com/vrodcluster/companion/ble/Protocol.kt` mirrors
+`app/src/main/java/ee/zeppl/companion/ble/Protocol.kt` mirrors
 [`firmware/main/phone/phone_protocol.c`](../firmware/main/phone/phone_protocol.c)
 byte-for-byte. The firmware's host tests
 (`firmware/test_apps/host/tests/test_phone_protocol.c`) are the
@@ -97,7 +98,7 @@ companion/
 ├── app/                          Main module
 │   ├── src/main/
 │   │   ├── AndroidManifest.xml
-│   │   ├── java/com/vrodcluster/companion/
+│   │   ├── java/ee/zeppl/companion/
 │   │   │   ├── MainActivity.kt
 │   │   │   ├── ble/              GATT client, protocol encoder, state, telemetry
 │   │   │   ├── media/            MediaSession watcher → wire format
@@ -111,7 +112,7 @@ companion/
 
 ## Roadmap
 
-- [x] BLE central: scan for `V-Rod Cluster`, bond, open the GATT
+- [x] BLE central: scan for `Zeppl`, bond, open the GATT
       service, hold the write characteristic, subscribe to the command
       notify characteristic.
 - [x] Foreground service hosting the BLE link

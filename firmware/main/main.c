@@ -25,6 +25,7 @@
 #endif
 #if CONFIG_VROD_J1850
 #include "j1850_driver.h"
+#include "j1850_bench_feed.h"
 #include "odo_store.h"
 #endif
 #if defined(CONFIG_VROD_J1850_ADC_GPIO) && CONFIG_VROD_J1850_ADC_GPIO >= 0
@@ -86,9 +87,14 @@ void app_main(void)
     // Producer: the sniffer's decode feeds vehicle_data via the driver.
     // Init before the sniffer task so it can consume frames immediately.
     j1850_driver_init();
+    // Restore the GPS-calibrated speed divisor persisted in settings.
+    j1850_driver_set_speed_divisor(settings_store_current()->speed_divisor);
     // Restore the persisted odometer/trips into the driver, then keep them
     // saved (periodic + on user reset). Must follow driver_init (it seeds it).
     odo_store_init();
+#if CONFIG_VROD_J1850_BENCH_SPEED
+    j1850_bench_feed_start();
+#endif
 #endif
 #if CONFIG_VROD_RIDE_LOG
     // Mount the SD sink + start its flush task before frames arrive; a missing

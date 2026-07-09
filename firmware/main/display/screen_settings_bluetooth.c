@@ -212,7 +212,7 @@ lv_obj_t *screen_settings_bluetooth_create(void)
 
     // VISIBILITY — toggle. ON forces undirected advertising so a new
     // phone can find the cluster; OFF (the default once bonded) uses
-    // directed advertising so strangers don't see "V-Rod Cluster" in
+    // directed advertising so strangers don't see "Zeppl" in
     // their scan results.
     lv_obj_t *vis_row = make_row(scr, 80, 270);
     lv_obj_add_flag(vis_row, LV_OBJ_FLAG_CLICKABLE);

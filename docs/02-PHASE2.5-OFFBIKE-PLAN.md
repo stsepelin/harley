@@ -173,7 +173,7 @@ commit message that closes the stage.
 3. **Install companion** — `cd companion && ./gradlew installDebug`.
    Open the app. First-run, you'll see two grant buttons:
    - **Grant notification access** → opens Android's Notification
-     Access screen; toggle V-Rod Companion on.
+     Access screen; toggle Zeppl on.
    - **Grant Bluetooth permissions** → grants `BLE_SCAN` +
      `BLE_CONNECT` + `POST_NOTIFICATIONS`.
 4. **Connect** — tap **Connect cluster**. The status line above the

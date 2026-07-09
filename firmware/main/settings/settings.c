@@ -8,6 +8,7 @@ void settings_default(settings_t *out)
     out->sound_enabled        = true;
     out->volume               = 70;
     out->ble_visible_override = false;
+    out->speed_divisor        = SETTINGS_SPEED_DIVISOR_DEFAULT;
 }
 
 void settings_validate(settings_t *out)
@@ -26,5 +27,9 @@ void settings_validate(settings_t *out)
     }
     if (out->volume > 100) {
         out->volume = 100;
+    }
+    if (out->speed_divisor < SETTINGS_SPEED_DIVISOR_MIN ||
+        out->speed_divisor > SETTINGS_SPEED_DIVISOR_MAX) {
+        out->speed_divisor = SETTINGS_SPEED_DIVISOR_DEFAULT;
     }
 }

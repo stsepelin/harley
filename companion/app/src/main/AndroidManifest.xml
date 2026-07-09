@@ -30,6 +30,13 @@
          buttons drive over the TX command channel. Runtime grant on A8+. -->
     <uses-permission android:name="android.permission.ANSWER_PHONE_CALLS" />
 
+    <!-- Fine location is the GPS speed source for the developer speed-calibration
+         wizard (Brick 2): we correlate Location.getSpeed() against the cluster's
+         raw ECM count to solve the speed divisor. Coarse location can't deliver
+         a usable speed. Not required to run the app - the wizard is the only
+         consumer and requests it at runtime. -->
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+
     <!-- Filter out devices without BLE. -->
     <uses-feature android:name="android.hardware.bluetooth_le" android:required="true" />
 
@@ -43,9 +50,11 @@
 
     <application
         android:allowBackup="false"
+        android:icon="@mipmap/ic_launcher"
+        android:roundIcon="@mipmap/ic_launcher_round"
         android:label="@string/app_name"
         android:supportsRtl="true"
-        android:theme="@style/Theme.VRodCompanion"
+        android:theme="@style/Theme.Zeppl"
         tools:targetApi="36">
 
         <!-- resizeableActivity + no orientation lock / no configChanges: let the
@@ -57,7 +66,7 @@
             android:exported="true"
             android:label="@string/app_name"
             android:resizeableActivity="true"
-            android:theme="@style/Theme.VRodCompanion">
+            android:theme="@style/Theme.Zeppl">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
@@ -68,7 +77,7 @@
              signature-level — only the system can bind, which it does
              after the user toggles access in Settings. -->
         <service
-            android:name=".notif.VrodNotifListener"
+            android:name=".notif.ZepplNotifListener"
             android:exported="false"
             android:label="@string/notif_listener_label"
             android:permission="android.permission.BIND_NOTIFICATION_LISTENER_SERVICE">

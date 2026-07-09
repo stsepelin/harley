@@ -3,7 +3,7 @@
 #include <stdint.h>
 
 // Bring up the BLE peripheral stack (NimBLE host, esp_hosted HCI to the
-// on-board ESP32-C6) and start advertising as "V-Rod Cluster". Writes
+// on-board ESP32-C6) and start advertising as "Zeppl". Writes
 // to the RX characteristic are parsed via phone_protocol_parse and
 // applied via phone_data_apply — same data path the simulator uses,
 // just driven by real bytes off the radio.

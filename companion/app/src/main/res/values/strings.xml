@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">V-Rod Companion</string>
+    <string name="app_name">Zeppl</string>
     <string name="status_idle">Idle — looking for cluster</string>
-    <string name="notif_listener_label">V-Rod notification bridge</string>
+    <string name="notif_listener_label">Zeppl notification bridge</string>
     <string name="notif_access_granted">Notification access granted</string>
     <string name="notif_access_missing">Notification access needed</string>
     <string name="grant_notif_access">Grant notification access</string>

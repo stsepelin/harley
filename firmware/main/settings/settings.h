@@ -8,6 +8,12 @@
 // Floor everything below this so the user can't lock themselves out.
 #define SETTINGS_BRIGHTNESS_MIN  30u
 
+// Speed calibration bounds. Raw ECM count / divisor = mph; 195 is provisional
+// pending a GPS calibration pushed from the companion app.
+#define SETTINGS_SPEED_DIVISOR_DEFAULT 195u
+#define SETTINGS_SPEED_DIVISOR_MIN     50u
+#define SETTINGS_SPEED_DIVISOR_MAX     400u
+
 // Persisted user preferences. Loaded once at boot, written by the
 // settings screen on change. Keep small — anything bigger than a few
 // bytes per field should probably be its own NVS namespace.
@@ -18,6 +24,7 @@ typedef struct {
     bool            sound_enabled;         // master mute / unmute
     uint8_t         volume;                // 0..100 (codec out_vol)
     bool            ble_visible_override;  // force undirected BLE adv even when bonded
+    uint16_t        speed_divisor;         // raw ECM count -> mph (GPS-calibrated)
 } settings_t;
 
 // Hardcoded fallback values. Used when NVS is empty or unreadable.

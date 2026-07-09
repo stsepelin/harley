@@ -136,6 +136,7 @@ if(CONFIG_VROD_J1850)
     target_sources(${COMPONENT_LIB} PRIVATE
         j1850/j1850_parse.c
         j1850/j1850_driver.c
+        j1850/j1850_bench_feed.c   # bench-only synthetic SPEED/RPM (self-guarded)
         vehicle/odo_store.c   # NVS persistence for the driver's odometer/trips
     )
 endif()

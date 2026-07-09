@@ -21,3 +21,8 @@ void j1850_driver_seed(const odo_meter_t *odo);   // restore saved totals at boo
 void j1850_driver_snapshot(odo_meter_t *out);     // read totals for persistence
 void j1850_driver_reset_trip(int idx);            // zero trip idx (0/1)
 void j1850_driver_set_odometer(uint32_t meters);  // one-time mileage set
+
+// Speed calibration: set/read the raw ECM count -> mph divisor at runtime
+// (config write-back from the companion's GPS calibration).
+void     j1850_driver_set_speed_divisor(uint16_t divisor);
+uint16_t j1850_driver_speed_divisor(void);

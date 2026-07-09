@@ -13,16 +13,33 @@ static void test_defaults_known_values(void)
     // Default is "invisible to strangers once bonded" — directed
     // advertising is the safer steady state. The override is opt-in.
     TEST_ASSERT_FALSE(s.ble_visible_override);
+    TEST_ASSERT_EQUAL_UINT16(SETTINGS_SPEED_DIVISOR_DEFAULT, s.speed_divisor);
 }
 
 static void test_validate_passes_valid_values(void)
 {
-    settings_t s = { .units = UNITS_MPH, .brightness = 50, .sound_enabled = false, .volume = 25 };
+    settings_t s = {.units         = UNITS_MPH,
+                    .brightness    = 50,
+                    .sound_enabled = false,
+                    .volume        = 25,
+                    .speed_divisor = 180};
     settings_validate(&s);
     TEST_ASSERT_EQUAL_UINT8(UNITS_MPH, s.units);
-    TEST_ASSERT_EQUAL_UINT8(50,        s.brightness);
-    TEST_ASSERT_FALSE      (           s.sound_enabled);
-    TEST_ASSERT_EQUAL_UINT8(25,        s.volume);
+    TEST_ASSERT_EQUAL_UINT8(50, s.brightness);
+    TEST_ASSERT_FALSE(s.sound_enabled);
+    TEST_ASSERT_EQUAL_UINT8(25, s.volume);
+    TEST_ASSERT_EQUAL_UINT16(180, s.speed_divisor);  // in range, kept
+}
+
+static void test_validate_clamps_speed_divisor_out_of_range(void)
+{
+    settings_t lo = {.brightness = 60, .volume = 50, .speed_divisor = 10};  // below min
+    settings_validate(&lo);
+    TEST_ASSERT_EQUAL_UINT16(SETTINGS_SPEED_DIVISOR_DEFAULT, lo.speed_divisor);
+
+    settings_t hi = {.brightness = 60, .volume = 50, .speed_divisor = 5000};  // above max
+    settings_validate(&hi);
+    TEST_ASSERT_EQUAL_UINT16(SETTINGS_SPEED_DIVISOR_DEFAULT, hi.speed_divisor);
 }
 
 static void test_validate_clamps_volume_over_max(void)
@@ -91,6 +108,7 @@ void RunTests(void)
     RUN_TEST(test_validate_clamps_brightness_over_max);
     RUN_TEST(test_validate_clamps_brightness_below_min);
     RUN_TEST(test_validate_clamps_volume_over_max);
+    RUN_TEST(test_validate_clamps_speed_divisor_out_of_range);
     RUN_TEST(test_validate_repairs_bad_units_enum);
     RUN_TEST(test_validate_repairs_bad_temp_units_enum);
     RUN_TEST(test_validate_is_idempotent);

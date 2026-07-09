@@ -20,5 +20,5 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "VRodCompanion"
+rootProject.name = "Zeppl"
 include(":app")

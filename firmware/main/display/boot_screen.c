@@ -61,7 +61,7 @@ static void show_text_fallback(lv_obj_t *scr)
     LV_FONT_DECLARE(jbm_bold_33);
 
     lv_obj_t *title = lv_label_create(scr);
-    lv_label_set_text(title, "V-ROD");
+    lv_label_set_text(title, "Zeppl");
     lv_obj_set_style_text_color(title, lv_color_hex(VROD_ORANGE), 0);
     lv_obj_set_style_text_font(title, &jbm_bold_45, 0);
     lv_obj_align(title, LV_ALIGN_CENTER, 0, -10);
