@@ -112,7 +112,7 @@ static void test_setters_guard_null_user_data(void)
     odometer_display_set(bare, 1000, UNITS_KPH);
     trip_display_set(bare, 1000, UNITS_KPH);
     warning_lights_update(bare, &d);
-    notification_banner_update(bare, NULL);
+    notification_banner_update(bare, NULL, NULL);
     media_banner_update(bare, NULL, true);
     now_playing_display_set(bare, NULL);
     TEST_ASSERT_EQUAL_INT(0, g_lv_label_set_text_calls);
@@ -123,7 +123,7 @@ static void test_setters_guard_null_user_data(void)
     lv_obj_t *mb = media_banner_create(NULL, NULL);
     lv_obj_t *np = now_playing_display_create(NULL);
     lv_stub_reset();
-    notification_banner_update(nb, NULL);
+    notification_banner_update(nb, NULL, NULL);
     media_banner_update(mb, NULL, true);
     now_playing_display_set(np, NULL);
     TEST_ASSERT_EQUAL_INT(0, g_lv_label_set_text_calls);
@@ -384,10 +384,10 @@ static void test_notif_banner_inactive_is_quiet(void)
 {
     lv_obj_t      *w = notification_banner_create(NULL, NULL);
     notification_t n = {0};
-    notification_banner_update(w, &n);
+    notification_banner_update(w, &n, NULL);
     lv_stub_reset();
     for (int i = 0; i < REPEAT; i++)
-        notification_banner_update(w, &n);
+        notification_banner_update(w, &n, NULL);
     TEST_ASSERT_EQUAL_INT(0, g_lv_label_set_text_calls);
 }
 
@@ -395,10 +395,10 @@ static void test_notif_banner_cache_skips_unchanged(void)
 {
     lv_obj_t      *w = notification_banner_create(NULL, NULL);
     notification_t n = make_sms();
-    notification_banner_update(w, &n);  // prime
+    notification_banner_update(w, &n, NULL);  // prime
     lv_stub_reset();
     for (int i = 0; i < REPEAT; i++)
-        notification_banner_update(w, &n);
+        notification_banner_update(w, &n, NULL);
     TEST_ASSERT_EQUAL_INT(0, g_lv_label_set_text_calls);
     TEST_ASSERT_EQUAL_INT(0, g_lv_obj_set_style_text_color_calls);
 }
@@ -407,10 +407,10 @@ static void test_notif_banner_message_change_repaints_once(void)
 {
     lv_obj_t      *w = notification_banner_create(NULL, NULL);
     notification_t n = make_sms();
-    notification_banner_update(w, &n);
+    notification_banner_update(w, &n, NULL);
     lv_stub_reset();
     strcpy(n.message, "actually make it seven");
-    notification_banner_update(w, &n);
+    notification_banner_update(w, &n, NULL);
     TEST_ASSERT_EQUAL_INT(1, g_lv_label_set_text_calls);  // message label only
 }
 
@@ -424,14 +424,14 @@ static void test_notif_banner_call_timer_per_second(void)
     n.kind             = NOTIF_KIND_CALL;
     n.call_in_progress = true;
     n.call_start_ms    = 10000;
-    notification_banner_update(w, &n);  // prime: IN CALL mode, 0:00
+    notification_banner_update(w, &n, NULL);  // prime: IN CALL mode, 0:00
     lv_stub_reset();
     lv_tick_stub_set(10500);  // same elapsed second
     for (int i = 0; i < REPEAT; i++)
-        notification_banner_update(w, &n);
+        notification_banner_update(w, &n, NULL);
     TEST_ASSERT_EQUAL_INT(0, g_lv_label_set_text_calls);
     lv_tick_stub_set(11000);  // 1 s elapsed
-    notification_banner_update(w, &n);
+    notification_banner_update(w, &n, NULL);
     TEST_ASSERT_EQUAL_INT(1, g_lv_label_set_text_calls);
 }
 
@@ -439,12 +439,12 @@ static void test_notif_banner_dismiss_hides_and_goes_quiet(void)
 {
     lv_obj_t      *w = notification_banner_create(NULL, NULL);
     notification_t n = make_sms();
-    notification_banner_update(w, &n);
+    notification_banner_update(w, &n, NULL);
     n.active = false;
     lv_stub_reset();
-    notification_banner_update(w, &n);  // hide edge
+    notification_banner_update(w, &n, NULL);  // hide edge
     for (int i = 0; i < REPEAT; i++)
-        notification_banner_update(w, &n);
+        notification_banner_update(w, &n, NULL);
     TEST_ASSERT_EQUAL_INT(0, g_lv_label_set_text_calls);
 }
 
@@ -454,23 +454,23 @@ static void test_notif_banner_kind_variants(void)
 {
     lv_obj_t      *w = notification_banner_create(NULL, NULL);
     notification_t n = make_sms();
-    notification_banner_update(w, &n);  // SMS -> orange tag
+    notification_banner_update(w, &n, NULL);  // SMS -> orange tag
 
     n.kind = NOTIF_KIND_APP;
     lv_stub_reset();
-    notification_banner_update(w, &n);  // MSG -> dim tag
+    notification_banner_update(w, &n, NULL);  // MSG -> dim tag
     TEST_ASSERT_EQUAL_HEX32(VROD_TEXT_DIM, g_lv_last_text_color);
 
     n.kind = NOTIF_KIND_CALL;  // incoming call
     lv_stub_reset();
-    notification_banner_update(w, &n);
+    notification_banner_update(w, &n, NULL);
     TEST_ASSERT_EQUAL_HEX32(VROD_GREEN_SIGNAL, g_lv_last_text_color);
 
     n.call_in_progress = true;  // accepted
     lv_tick_stub_set(0);
     n.call_start_ms = 0;
     lv_stub_reset();
-    notification_banner_update(w, &n);  // IN CALL tag + timer
+    notification_banner_update(w, &n, NULL);  // IN CALL tag + timer
     TEST_ASSERT_EQUAL_HEX32(VROD_GREEN_SIGNAL, g_lv_last_text_color);
 }
 
@@ -482,19 +482,48 @@ static void test_notif_banner_info_height_clamps(void)
     notification_t n = make_sms();
 
     g_lv_stub_obj_height = 30;  // 1-2 lines: within range
-    notification_banner_update(w, &n);
+    notification_banner_update(w, &n, NULL);
 
     strcpy(n.message, "a much longer message that needs more lines");
     g_lv_stub_obj_height = 200;  // wrapped taller than MAX -> clamps
-    notification_banner_update(w, &n);
+    notification_banner_update(w, &n, NULL);
 
     strcpy(n.message, "x");
     g_lv_stub_obj_height = 5;  // shorter than MIN -> clamps
-    notification_banner_update(w, &n);
+    notification_banner_update(w, &n, NULL);
 
     strcpy(n.message, "same-height edge");
     g_lv_stub_obj_height = 175;  // want clamps to MAX == reported height: no set
-    notification_banner_update(w, &n);
+    notification_banner_update(w, &n, NULL);
+}
+
+// App-icon path: an SMS/app banner shows the icon (kind tag hidden); no icon or
+// a call shows the tag. Exercises both branches + the new-notification re-apply.
+static void test_notif_banner_app_icon(void)
+{
+    lv_obj_t      *w       = notification_banner_create(NULL, NULL);
+    notification_t n       = make_sms();
+    uint8_t        icon[4] = {0};  // any non-NULL buffer; the stub doesn't read it
+
+    n.id = 1;
+    notification_banner_update(w, &n, icon);  // icon != sentinel -> show image
+    notification_banner_update(w, &n, icon);  // same id + ptr -> skip
+    n.id = 2;
+    notification_banner_update(w, &n, icon);  // new notif, same ptr -> re-apply
+    n.id = 3;
+    notification_banner_update(w, &n, NULL);  // no icon -> hide image, show tag
+
+    n.id   = 4;
+    n.kind = NOTIF_KIND_CALL;  // calls ignore the icon (gated to INFO)
+    notification_banner_update(w, &n, icon);
+
+    // Two consecutive no-icon INFO notifications: hits the
+    // (new_notif && icon != NULL) short-circuit with last_icon already NULL.
+    n.kind = NOTIF_KIND_SMS;
+    n.id   = 5;
+    notification_banner_update(w, &n, NULL);  // CALL->INFO, else-branch sets last_icon = NULL
+    n.id = 6;
+    notification_banner_update(w, &n, NULL);  // INFO->INFO, new notif, icon still NULL
 }
 
 // The call buttons must route their actions through the registered callback.
@@ -923,6 +952,7 @@ void RunTests(void)
     RUN_TEST(test_notif_banner_call_timer_per_second);
     RUN_TEST(test_notif_banner_dismiss_hides_and_goes_quiet);
     RUN_TEST(test_notif_banner_kind_variants);
+    RUN_TEST(test_notif_banner_app_icon);
     RUN_TEST(test_notif_banner_info_height_clamps);
     RUN_TEST(test_notif_banner_buttons_route_actions);
     RUN_TEST(test_media_banner_hidden_is_quiet);

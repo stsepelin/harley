@@ -5,6 +5,7 @@ idf_component_register(
         ble/ble_visibility.c
         phone/phone_data.c
         phone/phone_protocol.c
+        phone/icon_cache.c
         phone/telemetry_codec.c
         phone/telemetry_publisher.c
         settings/settings.c

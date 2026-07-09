@@ -20,6 +20,7 @@
 #include "phone.h"
 #include "phone_data.h"
 #include "phone_protocol.h"
+#include "icon_cache.h"
 #include "settings.h"
 #include "settings_store.h"
 #if CONFIG_VROD_J1850
@@ -151,6 +152,12 @@ static int access_rx_cb(uint16_t conn_handle, uint16_t attr_handle,
             apply_config(&evt.config);
             return 0;
         }
+        if (evt.type == PHONE_EVT_ICON) {
+            // App-icon chunk: reassemble into the cluster's icon cache (copied
+            // out of the parse buffer immediately). Not a phone_data event.
+            icon_cache_feed(&evt.icon);
+            return 0;
+        }
         switch (evt.type) {
         case PHONE_EVT_NOTIF:
             ESP_LOGI(TAG, "rx NOTIF id=%08lx kind=%d sender='%s' msg='%.40s'",
@@ -164,6 +171,7 @@ static int access_rx_cb(uint16_t conn_handle, uint16_t attr_handle,
             ESP_LOGI(TAG, "rx MEDIA state=%d", (int)evt.media.state);
             break;
         case PHONE_EVT_CONFIG:
+        case PHONE_EVT_ICON:
             break;  // handled above
         }
         phone_data_apply(&evt);

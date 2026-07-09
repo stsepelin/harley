@@ -96,6 +96,7 @@ typedef struct {
 
 #define LV_IMAGE_HEADER_MAGIC    0x19
 #define LV_COLOR_FORMAT_ARGB8888 0x10
+#define LV_COLOR_FORMAT_RGB565   0x12
 
 #define LV_PCT(x)              (x)
 #define LV_SIZE_CONTENT        (-1)
