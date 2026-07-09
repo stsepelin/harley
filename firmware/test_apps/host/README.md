@@ -120,6 +120,12 @@ Files **deliberately excluded** from the metric:
   (`vehicle/vehicle_data.c` used to sit in this list but has been in
   scope since it gained the FreeRTOS-stub test — see the table above.)
 - `assets/boot.gif`, `managed_components/**` — not source code we own.
+- `map/map_tile.c` — the vector-map tile parser. Regression-tested
+  (`test_map_tile`, compiled straight into the test, not `vrod_pure`) since it
+  decodes untrusted embedded/SD bytes, but it allocates (per-tile buffers), so
+  it can't reach the 100% branch bar the same way `phone/icon_cache.c` can't.
+  `map/map_render.c` (rasteriser) and `map/screen_map.c` (LVGL) are verified in
+  the simulator + on device.
 
 This list is on purpose. Adding a widget creation path to it would be a
 red flag — write a test for the *helper* the widget uses, not for the

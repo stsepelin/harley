@@ -141,3 +141,11 @@ endfunction()
 add_widget_test(test_widget_caches)
 add_widget_test(test_sprite_raster)
 add_widget_test(test_tach_arc)
+
+# Map tile parser: regression tests only (map_tile.c allocates, so it is not in
+# the 100% branch gate - it compiles straight into the test, not vrod_pure).
+add_executable(test_map_tile tests/test_map_tile.c tests/test_runner.c
+    ${MAIN_DIR}/map/map_tile.c)
+target_include_directories(test_map_tile PRIVATE ${MAIN_DIR}/map external/unity)
+target_link_libraries(test_map_tile PRIVATE unity m)
+add_test(NAME test_map_tile COMMAND test_map_tile)
