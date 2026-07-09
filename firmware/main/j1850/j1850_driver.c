@@ -80,7 +80,9 @@ void j1850_driver_feed(const j1850_frame_t *f)
     if (updated) {
         // Re-apply the runtime divisor to the raw ECM count (parse used the
         // provisional default); a calibrated divisor from the phone lands here.
-        s_vd.speed_mph = s_speed_divisor ? (uint16_t)(s_vd.speed_raw / s_speed_divisor) : 0;
+        // s_speed_divisor is never 0 (inits to J1850_SPEED_DIVISOR; the setter
+        // rejects 0), so no divide-by-zero guard is needed - same as the setter.
+        s_vd.speed_mph = (uint16_t)(s_vd.speed_raw / s_speed_divisor);
         // The bus carries no gear position (no sensor on this bike), so derive
         // it from the latest RPM:speed ratio. Recomputed on every republish;
         // RPM/speed frames keep both inputs fresh.
