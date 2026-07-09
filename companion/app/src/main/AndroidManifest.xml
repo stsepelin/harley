@@ -62,15 +62,18 @@
         android:theme="@style/Theme.Zeppl"
         tools:targetApi="36">
 
-        <!-- resizeableActivity + no orientation lock / no configChanges: let the
-             OS resize us on fold/unfold and split-screen, and let Compose
-             recompose (currentWindowAdaptiveInfo reacts to the new size).
-             Handling the config change ourselves would strand stale layouts. -->
+        <!-- Portrait-locked: the companion UI is designed for portrait only,
+             so we ignore the rotation sensor. resizeableActivity stays true /
+             no configChanges: the OS still resizes us on fold/unfold and
+             split-screen, and Compose recomposes (currentWindowAdaptiveInfo
+             reacts to the new size). Handling the config change ourselves
+             would strand stale layouts. -->
         <activity
             android:name=".MainActivity"
             android:exported="true"
             android:label="@string/app_name"
             android:resizeableActivity="true"
+            android:screenOrientation="portrait"
             android:theme="@style/Theme.Zeppl">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
