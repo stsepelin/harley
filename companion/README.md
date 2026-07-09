@@ -38,8 +38,34 @@ firmware speak the same protocol on both platforms.
 ## Requirements
 
 - Android 16 (API 36) device or emulator
-- Android Studio Ladybug or newer (AGP 8.7 + Kotlin 2.1)
-- JDK 17
+- Android Studio (AGP 9.2 + Kotlin 2.3)
+- JDK 17 (the Robolectric test task self-selects JDK 21 via the toolchain)
+
+## UI architecture
+
+Material 3 **Expressive** (`MaterialExpressiveTheme` + the spring-based
+`MotionScheme`), branded V-Rod dark theme by default (orange-on-near-black,
+mirroring the cluster's own palette in `firmware/main/display/theme.h`;
+Material You dynamic color is an opt-in toggle under Settings). The theme
+lives in `ui/theme/` (`Color.kt` / `Type.kt` / `Theme.kt`).
+
+Navigation is an adaptive `NavigationSuiteScaffold` (bottom bar on phones,
+rail on larger screens) over a type-safe `@Serializable`-route NavHost
+(`ui/Destinations.kt`, `ui/App.kt`), with a persistent connection-status
+strip (`ui/ConnectionStatusBar.kt`) visible on every tab. Four top-level
+destinations:
+
+- **Ride** — live telemetry dashboard (`ui/RideScreen.kt`), reading
+  `ble/TelemetryState`; offline empty-state until frames arrive.
+- **Cluster** — device hub: link, bond management, setup/maintenance
+  (`ui/ClusterScreen.kt`).
+- **Settings** — notification/media relay + appearance + cluster config
+  write-back (`ui/SettingsScreen.kt`).
+- **History** — trips + economy trends (`ui/HistoryScreen.kt`, placeholder).
+
+Version note: material3 is pinned to `1.5.0-alpha18` (newest Expressive
+alpha still on the Compose 1.11 line — 1.5.0-alpha20+ / Compose 1.12 need
+compileSdk 37; see `gradle/libs.versions.toml`).
 
 ## Build + run
 
@@ -73,10 +99,10 @@ companion/
 │   │   ├── AndroidManifest.xml
 │   │   ├── java/com/vrodcluster/companion/
 │   │   │   ├── MainActivity.kt
-│   │   │   ├── ble/              GATT client, protocol encoder, state
+│   │   │   ├── ble/              GATT client, protocol encoder, state, telemetry
 │   │   │   ├── media/            MediaSession watcher → wire format
 │   │   │   ├── notif/            NotificationListener bridge
-│   │   │   └── ui/               Compose status screens
+│   │   │   └── ui/               Compose app: theme/, nav shell, four tab screens
 │   │   └── res/
 │   └── src/test/                 JVM unit tests (Protocol, BleState, …)
 ├── build.gradle.kts
@@ -95,10 +121,17 @@ companion/
 - [x] Inbound command path → Telecom
       (`TelecomManager.acceptRingingCall`, `endCall`) and
       media key dispatch for prev/play/next.
-- [x] Status / pairing UI (`StatusScreen`, `ScanScreen`, device picker).
+- [x] Status / pairing UI (`ScanScreen`, device picker).
 - [x] Auto-reconnect when the bonded cluster reappears after a power
       cycle (background `connectGatt(autoConnect=true)` armed on link
       loss — works under directed advertising, unlike a rescan).
+- [x] Material 3 Expressive redesign: branded theme, adaptive
+      navigation hub (Ride / Cluster / Settings / History), persistent
+      connection status.
+- [ ] Live telemetry stream on the Ride dashboard (Brick 1).
+- [ ] GPS speed-calibration wizard (Brick 2).
+- [ ] Cluster config write-back with ack/read-back (Brick 3).
+- [ ] Trip history + fuel-economy trends (Brick 4).
 
 ## License
 
