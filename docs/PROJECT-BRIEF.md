@@ -1,6 +1,11 @@
-# VRSCF Digital Cluster — Project Brief
+# Zeppl — VRSCF Digital Cluster — Project Brief
 
 **For Claude Code session continuation.**
+
+> The project — cluster firmware + Android companion — is branded **Zeppl**
+> (companion package `ee.zeppl.companion`, firmware boot screen + BLE name
+> `Zeppl`, repo `github.com/stsepelin/zeppl`). Target: a 2009 Harley-Davidson
+> VRSCF Muscle. The on-disk working directory is still `harley/`.
 
 > **Changelog (July 2026): onboard GPS and the speed-camera / POI
 > feature were dropped.** Speed comes from the J1850 bus, so onboard GPS
@@ -9,8 +14,11 @@
 > GPS position. Both were removed from the firmware and the plans. Speed
 > is calibrated against the **stock speedometer** — read in its native
 > MILES (it runs ~5-10% optimistic), mechanically driven off the same
-> J1850 bus (see `03-PHASE3-J1850-PLAN.md`). A phone GPS over the existing
-> BLE link is only an **optional later refinement**, no new hardware.
+> J1850 bus (see `03-PHASE3-J1850-PLAN.md`). The **phone GPS over the
+> existing BLE link is now built** and is the primary way to lock the
+> divisor: the companion (Stage 5) correlates its GPS speed with the bus
+> `speed_raw` counts, solves the divisor, and writes it back to the
+> cluster's NVS — no new hardware. See `firmware/docs/ride-2-calibration-plan.md`.
 
 ---
 
@@ -50,6 +58,11 @@ harley/
 │   │   ├── ARCHITECTURE.md            # Threading, render pipeline, boot
 │   │   ├── DISPLAY-PERF-AND-MEMORY.md # Render/RAM rules — read before drawing
 │   │   ├── ble-bringup-bisect.md      # Resolution notes for the link trap
+│   │   ├── PINS.md                    # Header pin map / GPIO assignments
+│   │   ├── bike-power-injection.md    # Protected 12V→5V power chain (bike power)
+│   │   ├── live-gauge-bench-test.md   # Stationary bus→gauge validation
+│   │   ├── ride-1-findings.md         # Ride 1: J1850 decode calibration findings
+│   │   ├── ride-2-calibration-plan.md # Ride 2: GPS divisor lock + live-stack plan
 │   │   └── waveshare-reference/       # Vendor examples kept for reference
 │   ├── CMakeLists.txt                 # ESP-IDF project root
 │   ├── partitions.csv
@@ -68,9 +81,9 @@ harley/
 │   ├── managed_components/            # LVGL, ESP LCD/Touch, esp_hosted, etc. (gitignored)
 │   ├── simulator/                     # Desktop SDL2 + LVGL simulator
 │   └── test_apps/host/                # Unity + Linux-target unit tests
-├── companion/                         # Android BLE-central app
+├── companion/                         # Android BLE-central app (package ee.zeppl.companion)
 │   ├── README.md
-│   ├── app/                           # Kotlin sources (ble/, media/, notif/, ui/)
+│   ├── app/                           # Kotlin sources (ble/, cal/, media/, notif/, ui/)
 │   ├── build.gradle.kts
 │   └── gradlew
 ├── hardware/                          # Physical build (Phase 6)
@@ -98,8 +111,14 @@ harley/
   auto-reconnect have since been closed. Still open: the Stage 8 +
   reconnect on-hardware E2E record, and the iOS decision.
 - ⏳ **Phase 3 — J1850 bus + IM simulation** is active (see
-  `03-PHASE3-J1850-PLAN.md`). Parts arrived June 2026; work is the
-  J1850 transceiver bring-up, sniffing/decode, and IM replay.
+  `03-PHASE3-J1850-PLAN.md`). Done: RX transceiver + passive sniff (Ride 1,
+  `firmware/docs/ride-1-findings.md`), decode → `vehicle_data` producer,
+  on-board ride log, and **companion Stage 5** — telemetry stream, GPS speed
+  calibration wizard, config write-back to NVS, and fuel economy/range (the
+  four "bricks"), plus a per-cluster app restructure and the **Zeppl** rebrand.
+  Remaining: the on-bike **GPS calibration ride** to lock the speed divisor
+  (Ride 2, `firmware/docs/ride-2-calibration-plan.md`); **Stage 4 TX + IM
+  replay** (gated on the 2N2907A PNP); and DTC read/clear (needs TX).
 
 Phase 2 deliverable summary (as redesigned at the end of Phase 2.5,
 BMW-EfficientDynamics styling): working 800×800 round gauge running
@@ -177,6 +196,10 @@ When starting a new Claude Code session, the repo's `CLAUDE.md` is read
 automatically — it has the always-true conventions. For project history
 and roadmap context, point at this file plus `00-MASTER-PROJECT-PLAN.md`.
 
-If you're picking up at the current state (Phase 2.5 complete, parts
-in hand), the next step is **Phase 3 (J1850 bus + IM simulation)** —
-see the master plan.
+If you're picking up at the current state, Phase 3 is well along in
+software — RX sniff, decode → `vehicle_data`, ride log, and the whole
+companion Stage 5 (telemetry, GPS calibration, config write-back, fuel
+economy) are done and validated on the bench. The next steps are the
+on-bike **GPS calibration ride** (`firmware/docs/ride-2-calibration-plan.md`)
+to lock the speed divisor, then **Stage 4 TX + IM simulation** on the
+bench (gated on the 2N2907A PNP). See the master plan for the full roadmap.

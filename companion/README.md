@@ -1,7 +1,7 @@
 # Zeppl (companion)
 
-**Zeppl** is the Android phone-side bridge for the [harley](../) cluster
-firmware.
+**Zeppl** (package `ee.zeppl.companion`) is the Android phone-side bridge for
+the [Zeppl](../) cluster firmware.
 
 Mirrors notifications and media state from the phone to the bike's
 gauge over a BLE GATT link, and accepts commands back (accept / reject
@@ -10,15 +10,26 @@ and this app is the central that pairs with it.
 
 ## Status
 
-**Feature-complete for Phase 2.5.** BLE central with scan + device
-picker, LE Secure Connections bonding (numeric comparison), a
-foreground service (`FOREGROUND_SERVICE_CONNECTED_DEVICE`) hosting the
-GATT link, `NotificationListenerService` relay with a per-app
-allow-list, `MediaSessionManager` watcher for now-playing metadata,
-and a `CommandHandler` that dispatches cluster-issued commands (call
+**Phase 2.5 relay + Phase 3 Stage 5 companion, done.** The Material 3
+Expressive redesign (adaptive nav, per-cluster detail screens, Galaxy
+Fold 6 foldable support) is in.
+
+Relay (2.5): BLE central with scan + device picker, LE Secure Connections
+bonding (numeric comparison), a foreground service
+(`FOREGROUND_SERVICE_CONNECTED_DEVICE`) hosting the GATT link,
+`NotificationListenerService` relay with a per-app allow-list,
+`MediaSessionManager` watcher for now-playing metadata, and a
+`CommandHandler` that dispatches cluster-issued commands (call
 accept/reject/end, media prev/play/pause/next, notification dismiss)
-into `TelecomManager` / `MediaController`. The wire-format encoder is
-unit-tested against the firmware's C parser fixtures.
+into `TelecomManager` / `MediaController`.
+
+Cluster integration (Phase 3 Stage 5): a 4 Hz **telemetry** stream
+(`TelemetryCodec`), a **GPS speed-calibration** wizard (`SpeedCalibrator`
+least-squares-fits GPS speed vs the cluster's raw ECM count → speed
+divisor, written back over BLE), **config write-back** to cluster NVS,
+and **fuel economy / range** (`FuelEconomy`: fill-up mL/tick calibration →
+mpg / L/100km / range-to-empty). The wire-format encoder and the pure
+calibration modules are unit-tested against the firmware's C fixtures.
 
 Auto-reconnect: on link loss (`ReconnectPolicy` — supervision timeout,
 i.e. cluster power cycle or out-of-range) the client re-arms a

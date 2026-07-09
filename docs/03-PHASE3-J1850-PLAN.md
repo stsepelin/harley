@@ -1,18 +1,24 @@
 # Phase 3: J1850 Bus + IM Simulation
 
-> **Status: ⏳ active** (kicked off July 2026 — parts arrived June 2026)
+> **Status: ⏳ active** (kicked off July 2026 — parts arrived June 2026).
+> Stages 1-3 (RX transceiver, passive sniff, decode → `vehicle_data`), Stage
+> 3.5 (ride log), and **Stage 5** (companion telemetry / GPS calibration /
+> config write-back / fuel economy) are done and bench-validated. Remaining:
+> the on-bike **GPS calibration ride** to lock the divisor
+> (`firmware/docs/ride-2-calibration-plan.md`), **Stage 4** TX + IM replay
+> (gated on the 2N2907A PNP), and DTC read/clear (needs TX).
 >
 > First phase that touches the bike. The gauge UI (Phase 2), all
 > off-bike features (Phase 2.5), and the loose ends from both are done;
 > everything below runs on the bench transceiver + the bike's 12-pin
 > harness.
 >
-> **GPS was dropped (July 2026):** speed comes off the J1850 bus, so an
-> onboard GPS module added a large separate effort (module, antenna,
-> NMEA parser, enclosure space, power) for little benefit on a
-> gauge-cluster replacement. The NEO-6M path and the speed-camera / POI
-> feature that depended on GPS position were removed; a phone GPS over
-> the BLE link could refine the speed calibration later if ever wanted.
+> **GPS was dropped (July 2026):** an *onboard* GPS module added a large
+> separate effort (module, antenna, NMEA parser, enclosure space, power) for
+> little benefit; the NEO-6M path and the speed-camera / POI feature that
+> depended on GPS position were removed. The **phone** GPS over the BLE link
+> is now built and is the primary divisor-lock (Stage 5 / Ride 2) — no new
+> hardware.
 
 ## Goal
 
@@ -284,31 +290,43 @@ PASS before the bike.**
 
 ### Stage 5 — Companion app: telemetry, GPS calibration, fault codes
 
+> **Status: mostly done.** The four "bricks" (telemetry, GPS calibration,
+> config write-back, fuel economy) are built, host/JVM-tested, and validated
+> end-to-end on the bench (a synthetic-SPEED-frame firmware build drove the
+> divisor recompute + NVS persistence). Bench-verified, not yet ridden — the
+> on-bike lock is Ride 2 (`firmware/docs/ride-2-calibration-plan.md`). Only DTC
+> read/clear remains, gated on the Stage 4 TX path. The companion was also
+> restructured around per-cluster detail screens and rebranded to **Zeppl**
+> (`ee.zeppl.companion`).
+
 Ride 1 (`firmware/docs/ride-1-findings.md`) showed the companion app is the
 right home for calibration and diagnostics — the phone already pairs over BLE
 and brings a GPS. Builds on the existing NimBLE peripheral + Android central.
 
-- **Telemetry (GATT notify).** Stream decoded `vehicle_data` (+ optional raw
-  frames) to the phone: live logging with no microSD needed. The SD ride log
-  stays for high-rate raw capture without a phone.
-- **GPS speed calibration.** The phone correlates its GPS speed with the logged
-  `speed_raw` counts and computes the exact speed divisor (replaces the
-  provisional 195 — no eyeballing, no gear-ratio inference). Result written back
-  via the config characteristic.
-- **Config (GATT write) → NVS.** Push calibration back to the cluster — speed
-  divisor, temp offset, gear ratios, unit prefs — persisted so it survives a
-  power cycle.
-- **Fault codes (DTCs).** Read stored `P/C/B/U####` codes per module and show
-  them on the phone, with a clear-codes action. Needs **TX** (Stage 4:
-  request/response), so it lands after the TX path is bench-validated. The MIL
-  lamp bit is already available passively (`68 88 10`).
-- **Fuel economy / range.** Both counters are on the bus — fuel consumed
-  (`A8 83 10`) and distance (`A8 69 10`) — so trip-computer metrics come out of
-  their ratio: instantaneous / trip-average economy, trip fuel, and
-  range-to-empty (tank 18.9 L − fuel-since-fill; no fuel-level sender needed).
-  Relative economy (ticks/km) works today; real L/100km / mpg needs a one-time
-  fill-up calibration of mL-per-fuel-tick, stored in the app with per-ride
-  history + fill logging. See `firmware/docs/ride-1-findings.md`.
+- ✅ **Telemetry (GATT notify).** Brick 1 — decoded `vehicle_data` streams to
+  the phone at 4 Hz (TLV frame `0x40`, `TelemetryCodec` mirroring the C encoder
+  byte-for-byte), including `speed_raw` for calibration. The SD ride log stays
+  for high-rate raw capture without a phone.
+- ✅ **GPS speed calibration.** Brick 2 — the `SpeedCalibrator` (pure,
+  unit-tested) least-squares-fits the phone's GPS speed against `speed_raw` to
+  solve the divisor (replaces the provisional 195 — no eyeballing, no gear-ratio
+  inference). A Developer-screen wizard collects samples and writes the result
+  back. The on-bike lock is Ride 2.
+- ✅ **Config (GATT write) → NVS.** Brick 3 — `PHONE_EVT_CONFIG` (0x04) carries
+  the speed divisor; the cluster applies it live (`speed_mph = speed_raw /
+  divisor`) and persists it to NVS so it survives a power cycle. Bench-verified
+  live + across a reboot.
+- ⏳ **Fault codes (DTCs).** Read stored `P/C/B/U####` codes per module and show
+  them on the phone, with a clear-codes action. **Not built** — needs **TX**
+  (Stage 4: request/response), so it lands after the TX path is bench-validated.
+  The MIL lamp bit is already available passively (`68 88 10`). The app has a
+  per-cluster Diagnostics placeholder.
+- ✅ **Fuel economy / range.** Brick 4 — `FuelEconomy` (pure, unit-tested):
+  fill-up mL/tick calibration, trip economy (mpg / L/100km), and range-to-empty
+  (tank 18.9 L) from the per-trip fuel-tick counter. A Ride-screen Fuel card +
+  fill-up dialog drive it. Persistent per-ride history is deferred to its own
+  brick. Real L/100km / mpg still needs the one-time fill-up calibration — see
+  `firmware/docs/ride-2-calibration-plan.md`.
 
 ### Carried-over hardware verification (from Phase 2.5)
 

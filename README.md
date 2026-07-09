@@ -18,7 +18,7 @@ app for phone integration.
 | Path | What it is |
 |---|---|
 | [`firmware/`](firmware/) | ESP-IDF cluster firmware — gauge UI, sim engine, BLE peripheral, host tests, desktop simulator |
-| [`companion/`](companion/) | Android BLE-central app — notifications + media bridge to the cluster |
+| [`companion/`](companion/) | **Zeppl** Android BLE-central app — notifications + media bridge, live telemetry, and speed/fuel calibration for the cluster |
 | [`docs/`](docs/) | Cross-system docs (project brief, master plan, current phase) |
 | [`firmware/docs/`](firmware/docs/) | Firmware-internal docs (architecture, phase plans, bisect notes) |
 
@@ -50,9 +50,13 @@ command line if defaults don't match your setup.
 Phase 2 (gauge UI) and Phase 2.5 (off-bike work: touch + settings +
 BLE phone integration) are complete — a synthetic driving cycle drives
 the full widget set at 30 FPS on the round display. Phase 3 (J1850 bus
-+ IM simulation) is active: the RX sniffer, decode → vehicle_data
-producer, and on-board ride log are in; the TX / IM replay + on-bike
-validation are next on the bench. See
++ IM simulation) is well along: the RX sniffer, decode → vehicle_data
+producer, on-board ride log, and the full **companion Stage 5** (live
+telemetry, GPS speed calibration, config write-back to NVS, fuel
+economy/range) are in and bench-validated. Remaining: the on-bike GPS
+calibration ride to lock the speed divisor
+([`firmware/docs/ride-2-calibration-plan.md`](firmware/docs/ride-2-calibration-plan.md)),
+then TX / IM replay on the bench. See
 [`docs/03-PHASE3-J1850-PLAN.md`](docs/03-PHASE3-J1850-PLAN.md).
 
 See [`docs/00-MASTER-PROJECT-PLAN.md`](docs/00-MASTER-PROJECT-PLAN.md)

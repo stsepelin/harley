@@ -414,6 +414,11 @@ code. Loose ends carried forward are listed at the bottom of
 See `02-PHASE2.5-OFFBIKE-PLAN.md` for the full plan + ordering.
 
 ### Phase 3: IM Simulation (Weekends 5-6) — ⏳ active (see `03-PHASE3-J1850-PLAN.md`)
+> Software is well along: RX sniff, decode → `vehicle_data`, ride log, and the
+> whole companion **Stage 5** (telemetry, GPS calibration, config write-back,
+> fuel economy) are done and bench-validated. Remaining: the on-bike GPS
+> calibration ride (`firmware/docs/ride-2-calibration-plan.md`) and the TX/IM
+> replay below (Stage 4, gated on the 2N2907A PNP).
 - Program IM message replay via IRLZ44N TX
 - Test: disconnect stock cluster, verify no U1255
 
@@ -421,11 +426,11 @@ See `02-PHASE2.5-OFFBIKE-PLAN.md` for the full plan + ordering.
 > Speed now comes from the J1850 bus, so onboard GPS added a large
 > separate effort (module, UART producer, NMEA parsing, antenna
 > mounting) for little benefit. The speed-camera / POI alert feature
-> depended on GPS position, so it went with it. If speed calibration
-> ever needs refining, a phone GPS over the existing BLE link could
-> supply it later without any new hardware.
+> depended on GPS position, so it went with it. The **phone** GPS over the
+> existing BLE link is now built (companion Stage 5) and is the primary way
+> the speed divisor is locked — no new hardware.
 
-### Phase 4: BLE Phone Integration (Weekends 7-9) — Android half done in 2.5
+### Phase 4: BLE Phone Integration (Weekends 7-9) — Android done (2.5 relay + Phase 3 Stage 5); iOS deferred
 - iOS: ANCS + AMS via the C6 (cluster becomes a GATT client of the
   iPhone — needs peer GATT discovery + two new parsers; see the iOS
   scope decision in the Phase 2.5 plan)
@@ -435,11 +440,13 @@ See `02-PHASE2.5-OFFBIKE-PLAN.md` for the full plan + ordering.
   power cycle~~ ✅ landed at Phase 3 kickoff (background autoConnect on
   link loss)
 - Navigation banner (needs turn-by-turn intent from a phone app)
-- **Companion J1850 integration** (scoped in the Phase 3 plan, Stage 5,
-  after ride 1): live telemetry over BLE; **GPS speed calibration** (phone
-  GPS vs the logged `speed_raw` counts → exact speed divisor, replacing the
-  provisional value); config write-back to cluster NVS; **fault-code (DTC)
-  readout + clear** (needs the Stage 4 TX path)
+- **Companion J1850 integration** (Phase 3 plan, Stage 5): ✅ live telemetry
+  over BLE; ✅ **GPS speed calibration** (phone GPS vs `speed_raw` counts →
+  exact speed divisor, replacing the provisional value); ✅ config write-back
+  to cluster NVS; ✅ fuel economy / range — all built + bench-validated, on-bike
+  lock pending (Ride 2). ⏳ **fault-code (DTC) readout + clear** still needs the
+  Stage 4 TX path. The app was also restructured per-cluster and rebranded to
+  **Zeppl** (`ee.zeppl.companion`).
 
 ### Phase 5: (removed — GPS + speed cameras dropped)
 
