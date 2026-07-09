@@ -105,6 +105,8 @@ fun RideScreen(onSetUpLink: () -> Unit) {
             InfoRow("Trip 1", milesLabel(TelemetryState.trip1M, decimals = 1))
             InfoRow("Trip 2", milesLabel(TelemetryState.trip2M, decimals = 1))
         }
+
+        FuelEconomyCard()
     }
 }
 
