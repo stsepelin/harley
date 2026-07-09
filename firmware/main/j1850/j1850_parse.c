@@ -36,9 +36,11 @@ bool j1850_parse(const j1850_frame_t *f, vehicle_data_t *vd)
     }
     // NB: A8 3B 10 was previously decoded here as a gear ladder — that was
     // wrong (this bike has no gear sensor; ride 1 showed A8 3B 10 is an
-    // engine-load/throttle value). Gear is now computed from the RPM:speed
-    // ratio in gear_calc (called by j1850_driver); neutral is a separate switch
-    // bit (48 3B 40), decoded once confirmed on the bike.
+    // engine-load/throttle value). Gear is computed from the RPM:speed ratio in
+    // gear_calc (called by j1850_driver). Neutral is NOT on the bus: the
+    // once-suspected 48 3B 40 bit5 turned out to be a TSSM deceleration/brake
+    // event, not a neutral switch (ride-2-findings.md). Real neutral is the
+    // discrete pin-10 tap (Phase 6).
     if (msg(f, SPEED, 4, 7)) {
         uint16_t raw  = (uint16_t)((f->data[4] << 8) | f->data[5]);
         vd->speed_raw = raw;
