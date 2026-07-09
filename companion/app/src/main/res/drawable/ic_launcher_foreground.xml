@@ -1,0 +1,44 @@
+<!-- Tachometer glyph for the Zeppl launcher icon. Geometry lives inside the
+     66dp adaptive-icon safe zone (outer ring edge at r=30 of the 54,54 centre)
+     so no mask crops the ring or ticks. Colours track the concept SVG. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+
+    <!-- gauge ring -->
+    <path
+        android:pathData="M54,26 A28,28 0 1 1 54,82 A28,28 0 1 1 54,26 Z"
+        android:fillColor="#00000000"
+        android:strokeColor="#2e2e34"
+        android:strokeWidth="4" />
+
+    <!-- redline arc, lower-right of the sweep -->
+    <path
+        android:pathData="M73.8,73.8 A28,28 0 0 1 82,54"
+        android:fillColor="#00000000"
+        android:strokeColor="#E8641E"
+        android:strokeWidth="3.5"
+        android:strokeLineCap="round" />
+
+    <!-- tick marks: lower-left, left, upper-left, top, upper-right -->
+    <path android:pathData="M34.2,73.8 L37.74,70.26" android:fillColor="#00000000" android:strokeColor="#4a4a52" android:strokeWidth="2" android:strokeLineCap="round" />
+    <path android:pathData="M26,54 L31,54"           android:fillColor="#00000000" android:strokeColor="#4a4a52" android:strokeWidth="2" android:strokeLineCap="round" />
+    <path android:pathData="M34.2,34.2 L37.74,37.74" android:fillColor="#00000000" android:strokeColor="#4a4a52" android:strokeWidth="2" android:strokeLineCap="round" />
+    <path android:pathData="M54,26 L54,31"           android:fillColor="#00000000" android:strokeColor="#4a4a52" android:strokeWidth="2" android:strokeLineCap="round" />
+    <path android:pathData="M73.8,34.2 L70.26,37.74" android:fillColor="#00000000" android:strokeColor="#4a4a52" android:strokeWidth="2" android:strokeLineCap="round" />
+
+    <!-- needle, pointing upper-right -->
+    <path
+        android:pathData="M54,54 L64.3,39.0"
+        android:fillColor="#00000000"
+        android:strokeColor="#f4f4f6"
+        android:strokeWidth="3.5"
+        android:strokeLineCap="round" />
+
+    <!-- hub -->
+    <path
+        android:pathData="M49.8,54 A4.2,4.2 0 1 1 58.2,54 A4.2,4.2 0 1 1 49.8,54 Z"
+        android:fillColor="#f4f4f6" />
+</vector>
