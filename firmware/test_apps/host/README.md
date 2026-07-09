@@ -65,6 +65,7 @@ Today that's:
 | `main/display/widgets/fuel_scale.c` | Fuel band grid quantization + gap-split segments |
 | `main/phone/phone_data.c` | Mutex-guarded latest-value store + notification queue. FreeRTOS-stubbed. |
 | `main/phone/phone_protocol.c` | Binary TLV parser for the companion-app BLE wire format |
+| `main/phone/telemetry_codec.c` | Cluster -> phone telemetry frame encoder (vehicle_data -> TLV) |
 | `main/settings/settings.c` | Defaults + validate for the persisted prefs struct |
 | `main/vehicle/vehicle_data.c` | Mutex-guarded latest-value store. Tested with a FreeRTOS stub. |
 | `main/vehicle/gear_calc.c` | Gear from the RPM:speed ratio (no gear sensor on the bike): match to the spec's exact overall ratios + boundary hysteresis. |

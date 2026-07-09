@@ -43,6 +43,7 @@ jobs:
                '*/firmware/main/display/widgets/fuel_scale.c' \
                '*/firmware/main/phone/phone_data.c' \
                '*/firmware/main/phone/phone_protocol.c' \
+               '*/firmware/main/phone/telemetry_codec.c' \
                '*/firmware/main/settings/settings.c' \
                '*/firmware/main/vehicle/vehicle_data.c' \
                '*/firmware/main/vehicle/gear_calc.c' \

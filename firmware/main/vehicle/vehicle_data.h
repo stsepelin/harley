@@ -14,6 +14,10 @@ typedef struct {
     // converts to km/h only when the user selects metric. Distance stays in
     // metres (odometer_m/trip_m) - metres is already unit-neutral.
     uint16_t speed_mph;
+    // Raw 16-bit ECM speed count before the divisor, carried alongside the
+    // decoded mph so the companion app can correlate it with phone GPS speed
+    // and solve for the exact divisor (the ride log records the same count).
+    uint16_t speed_raw;
     uint16_t rpm;
     gear_t   gear;
     int8_t   engine_temp_c;

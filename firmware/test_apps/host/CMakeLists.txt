@@ -37,6 +37,7 @@ add_library(vrod_pure STATIC
     ${MAIN_DIR}/display/widgets/fuel_scale.c
     ${MAIN_DIR}/phone/phone_data.c
     ${MAIN_DIR}/phone/phone_protocol.c
+    ${MAIN_DIR}/phone/telemetry_codec.c
     ${MAIN_DIR}/settings/settings.c
     ${MAIN_DIR}/vehicle/vehicle_data.c
     ${MAIN_DIR}/vehicle/gear_calc.c
@@ -119,6 +120,7 @@ add_unit_test(test_odo_meter)
 add_unit_test(test_units)
 add_unit_test(test_settings)
 add_unit_test(test_phone_protocol)
+add_unit_test(test_telemetry_codec)
 add_unit_test(test_phone_data)
 add_unit_test(test_gesture)
 add_unit_test(test_j1850_vpw)

@@ -22,6 +22,7 @@ object TelemetryState {
     var gear:           Int? by mutableStateOf(null)   // 0 = N, 1..6, 7 = unknown
     var engineTempC:    Int? by mutableStateOf(null)
     var fuelLevel:      Int? by mutableStateOf(null)   // 0..6
+    var lamps:          Int? by mutableStateOf(null)   // bitfield, see TelemetryCodec.LAMP_*
     var odometerM:      Long? by mutableStateOf(null)
     var trip1M:         Long? by mutableStateOf(null)
     var trip2M:         Long? by mutableStateOf(null)
@@ -31,9 +32,19 @@ object TelemetryState {
     /** Uptime-millis of the last frame, or null if none received this session. */
     var lastFrameMs:    Long? by mutableStateOf(null)
 
+    /** Fold a decoded frame into the observable snapshot. `atMs` is the caller's
+     *  clock (SystemClock.uptimeMillis) so this stays free of android deps. */
+    fun apply(f: TelemetryFrame, atMs: Long) {
+        speedMph = f.speedMph; speedRaw = f.speedRaw; rpm = f.rpm; gear = f.gear
+        engineTempC = f.engineTempC; fuelLevel = f.fuelLevel; lamps = f.lamps
+        odometerM = f.odometerM; trip1M = f.trip1M; trip2M = f.trip2M
+        trip1FuelTicks = f.trip1FuelTicks; trip2FuelTicks = f.trip2FuelTicks
+        lastFrameMs = atMs
+    }
+
     fun clear() {
         speedMph = null; speedRaw = null; rpm = null; gear = null
-        engineTempC = null; fuelLevel = null
+        engineTempC = null; fuelLevel = null; lamps = null
         odometerM = null; trip1M = null; trip2M = null
         trip1FuelTicks = null; trip2FuelTicks = null
         lastFrameMs = null

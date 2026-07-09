@@ -11,6 +11,7 @@ import android.bluetooth.BluetoothProfile
 import android.bluetooth.le.ScanCallback
 import android.bluetooth.le.ScanFilter
 import android.bluetooth.le.ScanResult
+import android.os.SystemClock
 import android.bluetooth.le.ScanSettings
 import android.content.Context
 import android.os.ParcelUuid
@@ -172,6 +173,17 @@ class BleClient(
             value: ByteArray,
         ) {
             if (characteristic.uuid != Protocol.TX_UUID) return
+            // Telemetry frames share the TX channel with call/media commands,
+            // distinguished by the leading type byte.
+            if (value.isNotEmpty() && value[0] == TelemetryCodec.TYPE) {
+                val frame = TelemetryCodec.decode(value)
+                if (frame == null) {
+                    Log.w(TAG, "dropping unparseable telemetry, ${value.size} bytes")
+                } else {
+                    TelemetryState.apply(frame, SystemClock.uptimeMillis())
+                }
+                return
+            }
             val cmd = ClientProtocol.decode(value)
             if (cmd == null) {
                 Log.w(TAG, "dropping unparseable TX notify, ${value.size} bytes")

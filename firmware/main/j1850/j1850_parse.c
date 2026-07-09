@@ -40,7 +40,9 @@ bool j1850_parse(const j1850_frame_t *f, vehicle_data_t *vd)
     // ratio in gear_calc (called by j1850_driver); neutral is a separate switch
     // bit (48 3B 40), decoded once confirmed on the bike.
     if (msg(f, SPEED, 4, 7)) {
-        vd->speed_mph = (uint16_t)(((f->data[4] << 8) | f->data[5]) / J1850_SPEED_DIVISOR);
+        uint16_t raw  = (uint16_t)((f->data[4] << 8) | f->data[5]);
+        vd->speed_raw = raw;
+        vd->speed_mph = (uint16_t)(raw / J1850_SPEED_DIVISOR);
         return true;
     }
     if (msg(f, TURN, 4, 6)) {

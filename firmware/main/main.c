@@ -11,6 +11,7 @@
 #include "boot_screen.h"
 #include "emoji_font.h"
 #include "phone_data.h"
+#include "telemetry_publisher.h"
 #include "screen_pairing.h"
 #include "vehicle_data.h"
 #if CONFIG_VROD_INCLUDE_SIM_ENGINE
@@ -151,6 +152,7 @@ void app_main(void)
     // null callback during the SM exchange.
     ble_peripheral_pair_set_callback(screen_pairing_show);
     ble_peripheral_init();
+    telemetry_publisher_start();
 
     ESP_LOGI(TAG, "boot complete");
     // app_main can return — all the real work runs in the FreeRTOS tasks
