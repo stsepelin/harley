@@ -1,11 +1,7 @@
 package ee.zeppl.companion.ui
 
 import android.Manifest
-import android.content.Context
 import android.content.pm.PackageManager
-import android.location.Location
-import android.location.LocationListener
-import android.location.LocationManager
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
@@ -17,10 +13,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -28,35 +21,28 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
+import ee.zeppl.companion.ble.CalibrationSession
 import ee.zeppl.companion.ble.OutboundSink
 import ee.zeppl.companion.ble.Protocol
 import ee.zeppl.companion.ble.TelemetryState
 import ee.zeppl.companion.cal.SpeedCalibrator
-import kotlinx.coroutines.delay
-
-private const val MS_TO_MPH = 2.2369362920544
-
-private enum class CalPhase { IDLE, COLLECTING, DONE }
 
 /**
- * Speed-calibration wizard (Brick 2). Ride at a steady speed and this
- * correlates the phone's GPS speed against the cluster's raw ECM count
- * ([TelemetryState.speedRaw]) once a second, least-squares fits the divisor
- * ([SpeedCalibrator]), and writes it back over the link
- * ([Protocol.encodeConfig]). The cluster persists it to NVS.
+ * Speed-calibration wizard (Brick 2). Correlates the phone's GPS speed against
+ * the cluster's raw ECM count ([TelemetryState.speedRaw]), least-squares fits
+ * the divisor ([SpeedCalibrator]), and writes it back over the link
+ * ([Protocol.encodeConfig]).
  *
- * The math is pure and unit-tested; everything Android-specific (GPS, runtime
- * permission) lives here.
+ * Sample collection lives in the foreground [ee.zeppl.companion.ble.BleService]
+ * via [CalibrationSession], NOT in this Composable - so it keeps running while
+ * the ride screen is off. This card just starts/stops the run and shows it.
  */
 @Composable
 fun SpeedCalibrationCard() {
     val context = LocalContext.current
-
-    var phase by remember { mutableStateOf(CalPhase.IDLE) }
-    var gpsMph by remember { mutableStateOf<Double?>(null) }
-    val samples = remember { mutableStateListOf<SpeedCalibrator.Sample>() }
-    var result by remember { mutableStateOf<SpeedCalibrator.Result?>(null) }
     var appliedDivisor by remember { mutableStateOf<Int?>(null) }
+    // Local review step: the run is stopped, showing the result to apply/redo.
+    var reviewing by remember { mutableStateOf(false) }
 
     var hasLocation by remember {
         mutableStateOf(
@@ -68,43 +54,11 @@ fun SpeedCalibrationCard() {
         ActivityResultContracts.RequestPermission(),
     ) { granted ->
         hasLocation = granted
-        if (granted) phase = CalPhase.COLLECTING
+        if (granted) { reviewing = false; CalibrationSession.start() }
     }
 
-    // GPS updates only flow while collecting; released the moment we stop.
-    DisposableEffect(phase == CalPhase.COLLECTING, hasLocation) {
-        if (phase != CalPhase.COLLECTING || !hasLocation) {
-            onDispose {}
-        } else {
-            val lm = context.getSystemService(Context.LOCATION_SERVICE) as LocationManager
-            val listener = object : LocationListener {
-                override fun onLocationChanged(location: Location) {
-                    if (location.hasSpeed()) gpsMph = location.speed * MS_TO_MPH
-                }
-            }
-            try {
-                lm.requestLocationUpdates(LocationManager.GPS_PROVIDER, 1000L, 0f, listener)
-            } catch (_: SecurityException) {
-            }
-            onDispose { lm.removeUpdates(listener) }
-        }
-    }
-
-    // Sample once a second while collecting: pair the latest GPS speed with the
-    // latest raw count and re-fit. The calibrator drops sub-floor / zero-raw
-    // pairs itself.
-    LaunchedEffect(phase == CalPhase.COLLECTING) {
-        if (phase != CalPhase.COLLECTING) return@LaunchedEffect
-        while (true) {
-            delay(1000)
-            val mph = gpsMph
-            val raw = TelemetryState.speedRaw
-            if (mph != null && raw != null) {
-                samples.add(SpeedCalibrator.Sample(raw, mph))
-                result = SpeedCalibrator.compute(samples)
-            }
-        }
-    }
+    val active = CalibrationSession.active
+    val result = CalibrationSession.result
 
     SectionCard(title = "Speed calibration") {
         Text(
@@ -117,67 +71,67 @@ fun SpeedCalibrationCard() {
 
         appliedDivisor?.let { InfoRow("Active divisor", it.toString()) }
 
-        when (phase) {
-            CalPhase.IDLE -> {
-                FilledTonalButton(
-                    onClick = {
-                        samples.clear()
-                        result = null
-                        gpsMph = null
-                        if (hasLocation) {
-                            phase = CalPhase.COLLECTING
-                        } else {
-                            permLauncher.launch(Manifest.permission.ACCESS_FINE_LOCATION)
-                        }
-                    },
-                    modifier = Modifier.fillMaxWidth(),
-                ) { Text("Start calibration") }
+        when {
+            reviewing && result != null -> {
+                InfoRow("Solved divisor", result.divisor.toString())
+                InfoRow("Fit error", "%.1f mph".format(result.rmsErrorMph))
+                InfoRow("From samples", result.sampleCount.toString())
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    OutlinedButton(
+                        onClick = { reviewing = false; CalibrationSession.reset() },
+                        modifier = Modifier.weight(1f),
+                    ) { Text("Redo") }
+                    Button(
+                        onClick = {
+                            OutboundSink.send(Protocol.encodeConfig(result.divisor))
+                            appliedDivisor = result.divisor
+                            reviewing = false
+                            CalibrationSession.reset()
+                        },
+                        modifier = Modifier.weight(1f),
+                    ) { Text("Apply to cluster") }
+                }
             }
 
-            CalPhase.COLLECTING -> {
-                InfoRow("GPS speed", gpsMph?.let { "%.1f mph".format(it) } ?: "acquiring…")
+            active -> {
+                Text(
+                    "Collecting - keep riding. This continues in the background with the " +
+                        "screen off; you don't need to keep this open.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                InfoRow("GPS speed", CalibrationSession.gpsMph?.let { "%.1f mph".format(it) } ?: "acquiring…")
                 InfoRow("Raw count", TelemetryState.speedRaw?.toString() ?: "—")
-                InfoRow("Samples", "${samples.size} (need ${SpeedCalibrator.MIN_SAMPLES})")
+                InfoRow("Samples", "${CalibrationSession.samples.size} (need ${SpeedCalibrator.MIN_SAMPLES})")
                 result?.let {
                     InfoRow("Solved divisor", it.divisor.toString())
                     InfoRow("Fit error", "%.1f mph".format(it.rmsErrorMph))
                 }
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                     OutlinedButton(
-                        onClick = { phase = CalPhase.IDLE },
+                        onClick = { CalibrationSession.reset() },
                         modifier = Modifier.weight(1f),
                     ) { Text("Cancel") }
                     Button(
-                        onClick = { phase = CalPhase.DONE },
+                        onClick = { reviewing = true; CalibrationSession.stop() },
                         enabled = result != null,
                         modifier = Modifier.weight(1f),
                     ) { Text("Finish") }
                 }
             }
 
-            CalPhase.DONE -> {
-                val r = result
-                if (r == null) {
-                    phase = CalPhase.IDLE
-                } else {
-                    InfoRow("Solved divisor", r.divisor.toString())
-                    InfoRow("Fit error", "%.1f mph".format(r.rmsErrorMph))
-                    InfoRow("From samples", r.sampleCount.toString())
-                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                        OutlinedButton(
-                            onClick = { phase = CalPhase.IDLE },
-                            modifier = Modifier.weight(1f),
-                        ) { Text("Redo") }
-                        Button(
-                            onClick = {
-                                OutboundSink.send(Protocol.encodeConfig(r.divisor))
-                                appliedDivisor = r.divisor
-                                phase = CalPhase.IDLE
-                            },
-                            modifier = Modifier.weight(1f),
-                        ) { Text("Apply to cluster") }
-                    }
-                }
+            else -> {
+                FilledTonalButton(
+                    onClick = {
+                        reviewing = false
+                        if (hasLocation) {
+                            CalibrationSession.start()
+                        } else {
+                            permLauncher.launch(Manifest.permission.ACCESS_FINE_LOCATION)
+                        }
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                ) { Text("Start calibration") }
             }
         }
     }
