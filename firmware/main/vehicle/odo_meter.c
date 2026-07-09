@@ -3,6 +3,7 @@
 void odo_meter_add(odo_meter_t *m, uint32_t dist_m, uint32_t fuel_ticks)
 {
     m->odometer_m += dist_m;
+    m->fuel_total += fuel_ticks;  // lifetime, not reset by a trip
     for (int i = 0; i < ODO_TRIP_COUNT; i++) {
         m->trip_m[i] += dist_m;
         m->trip_fuel[i] += fuel_ticks;

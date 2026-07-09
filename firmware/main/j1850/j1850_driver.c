@@ -34,6 +34,7 @@ static void publish_odo(void)
     s_vd.trip2_m          = s_odo.trip_m[1];
     s_vd.trip1_fuel_ticks = s_odo.trip_fuel[0];
     s_vd.trip2_fuel_ticks = s_odo.trip_fuel[1];
+    s_vd.fuel_ticks_total = s_odo.fuel_total;
 }
 
 // Distance (A8 69 10 06) and fuel (A8 83 10 0A) are rolling 16-bit counters in

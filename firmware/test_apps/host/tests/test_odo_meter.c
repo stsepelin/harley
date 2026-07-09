@@ -13,6 +13,7 @@ static void test_add_advances_odometer_and_both_trips(void)
     TEST_ASSERT_EQUAL_UINT32(100, m.trip_m[1]);
     TEST_ASSERT_EQUAL_UINT32(5, m.trip_fuel[0]);
     TEST_ASSERT_EQUAL_UINT32(5, m.trip_fuel[1]);
+    TEST_ASSERT_EQUAL_UINT32(5, m.fuel_total);
 }
 
 static void test_reset_trip_zeros_only_that_trip(void)
@@ -25,6 +26,7 @@ static void test_reset_trip_zeros_only_that_trip(void)
     TEST_ASSERT_EQUAL_UINT32(100, m.trip_m[1]);  // other trip untouched
     TEST_ASSERT_EQUAL_UINT32(10, m.trip_fuel[1]);
     TEST_ASSERT_EQUAL_UINT32(100, m.odometer_m);  // odometer never reset
+    TEST_ASSERT_EQUAL_UINT32(10, m.fuel_total);   // lifetime fuel never reset
     // Accumulation continues independently after a reset.
     odo_meter_add(&m, 50, 5);
     TEST_ASSERT_EQUAL_UINT32(50, m.trip_m[0]);

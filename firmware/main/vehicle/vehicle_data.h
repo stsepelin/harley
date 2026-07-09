@@ -36,6 +36,9 @@ typedef struct {
     // firmware/docs/ride-1-findings.md); economy = trip_fuel / trip_m downstream.
     uint32_t trip1_fuel_ticks;
     uint32_t trip2_fuel_ticks;
+    // Lifetime fuel ticks, paired with odometer_m; the display derives current
+    // (windowed) economy from the two.
+    uint32_t fuel_ticks_total;
     // Mock time-of-day driven by the sim until we have an RTC/SNTP source.
     uint8_t  clock_hours;
     uint8_t  clock_minutes;

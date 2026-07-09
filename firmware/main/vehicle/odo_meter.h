@@ -11,6 +11,8 @@ typedef struct {
     uint32_t odometer_m;              // lifetime distance; only set_odometer changes it directly
     uint32_t trip_m[ODO_TRIP_COUNT];  // per-trip distance, user-resettable
     uint32_t trip_fuel[ODO_TRIP_COUNT];
+    uint32_t fuel_total;  // lifetime fuel ticks, never reset; paired with odometer_m so the
+                          // display can derive current (windowed) economy
 } odo_meter_t;
 
 // Add a frame's distance (metres) and fuel (ticks) to the odometer and to both

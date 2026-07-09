@@ -35,9 +35,17 @@ uint32_t units_distance_tenths(uint32_t meters, display_units_t units);
 // Engine temp in °C → displayed value (°C, or °F when imperial), rounded.
 int units_temp_display(int celsius, temp_units_t units);
 
+// Fuel economy from cumulative consumption ticks + distance, in the display
+// unit x10 (68 = 6.8 L/100km; 345 = 34.5 mpg). 0 when the distance is too
+// small to be meaningful. Uses a provisional mL/tick (ride 1) until a fill-up
+// calibration firms up the ticks->litres factor.
+uint32_t units_econ_x10(uint32_t fuel_ticks, uint32_t dist_m, display_units_t units);
+
 // Static suffix labels. The returned pointer has program lifetime, so
 // it's safe to hand directly to lv_label_set_text.
 const char *units_speed_label(display_units_t units);
 const char *units_distance_label(display_units_t units);
 // Temp scale letter, "C" or "F" (the degree glyph is drawn by the widget).
 const char *units_temp_label(temp_units_t units);
+// Economy suffix, "L/100km" or "mpg".
+const char *units_econ_label(display_units_t units);
