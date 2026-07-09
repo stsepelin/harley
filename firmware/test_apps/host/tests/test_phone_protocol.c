@@ -163,6 +163,23 @@ static void test_parse_icon_too_short_rejected(void)
     TEST_ASSERT_EQUAL_INT(PHONE_PARSE_BAD_FIELD, phone_protocol_parse(buf, 10, &consumed, &evt));
 }
 
+static void test_parse_call_active_and_end(void)
+{
+    uint8_t       buf[3];
+    size_t        consumed = 0;
+    phone_event_t evt;
+
+    buf[0] = PHONE_EVT_CALL_ACTIVE;
+    buf[1] = 0;
+    buf[2] = 0;
+    TEST_ASSERT_EQUAL_INT(PHONE_PARSE_OK, phone_protocol_parse(buf, 3, &consumed, &evt));
+    TEST_ASSERT_EQUAL_INT(PHONE_EVT_CALL_ACTIVE, evt.type);
+
+    buf[0] = PHONE_EVT_CALL_END;
+    TEST_ASSERT_EQUAL_INT(PHONE_PARSE_OK, phone_protocol_parse(buf, 3, &consumed, &evt));
+    TEST_ASSERT_EQUAL_INT(PHONE_EVT_CALL_END, evt.type);
+}
+
 static void test_parse_dismiss(void)
 {
     uint8_t       buf[16];
@@ -508,4 +525,5 @@ void RunTests(void)
     RUN_TEST(test_parse_notif_with_icon_id);
     RUN_TEST(test_parse_icon_chunk);
     RUN_TEST(test_parse_icon_too_short_rejected);
+    RUN_TEST(test_parse_call_active_and_end);
 }

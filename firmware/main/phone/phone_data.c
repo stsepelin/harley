@@ -98,11 +98,21 @@ void phone_data_apply(const phone_event_t *evt)
 
     switch (evt->type) {
     case PHONE_EVT_NOTIF:
-        // Don't overwrite an active notification — especially a ringing
-        // or in-progress call. Queue it; it'll surface when the user
-        // dismisses the current one.
         if (s_state.notif.active) {
-            enqueue_or_drop_locked(&evt->notif);
+            if (s_state.notif.id == evt->notif.id) {
+                // Same notification re-posted (a call going incoming->ongoing, or
+                // an app editing its own notification): update in place, keeping
+                // the call state, instead of queuing a stale duplicate.
+                bool     cip                   = s_state.notif.call_in_progress;
+                uint32_t cs                    = s_state.notif.call_start_ms;
+                s_state.notif                  = evt->notif;
+                s_state.notif.call_in_progress = cip;
+                s_state.notif.call_start_ms    = cs;
+            } else {
+                // A different notification while one is showing — queue it; it
+                // surfaces when the current one is dismissed.
+                enqueue_or_drop_locked(&evt->notif);
+            }
         } else {
             s_state.notif = evt->notif;
             s_shown_ms    = lv_tick_get();  // start the auto-dismiss clock
@@ -110,6 +120,22 @@ void phone_data_apply(const phone_event_t *evt)
         // A new notification (front or queued) hides the media banner so
         // it doesn't cover the overlay when promoted.
         s_state.media_banner_shown = false;
+        break;
+    case PHONE_EVT_CALL_ACTIVE:
+        // The rider answered on the phone: switch the active call banner to
+        // in-progress (END CALL + running timer), mirroring the cluster button.
+        if (s_state.notif.active && s_state.notif.kind == NOTIF_KIND_CALL &&
+            !s_state.notif.call_in_progress) {
+            s_state.notif.call_in_progress = true;
+            s_state.notif.call_start_ms    = lv_tick_get();
+        }
+        break;
+    case PHONE_EVT_CALL_END:
+        // The call ended on the phone (answered elsewhere, hung up, rejected):
+        // clear the active call banner and surface anything queued behind it.
+        if (s_state.notif.active && s_state.notif.kind == NOTIF_KIND_CALL) {
+            promote_next_locked();
+        }
         break;
     case PHONE_EVT_NOTIF_DISMISS:
         if (s_state.notif.active && s_state.notif.id == evt->dismiss_id) {

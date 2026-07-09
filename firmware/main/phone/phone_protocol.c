@@ -136,6 +136,13 @@ phone_parse_result_t phone_protocol_parse(const uint8_t  *buf,
         return PHONE_PARSE_OK;
     }
 
+    case PHONE_EVT_CALL_ACTIVE:
+    case PHONE_EVT_CALL_END:
+        // Payload-less phone-side call transitions.
+        out->type = (phone_event_type_t)type;
+        *consumed = total_len;
+        return PHONE_PARSE_OK;
+
     default:
         *consumed = total_len;
         return PHONE_PARSE_BAD_TYPE;

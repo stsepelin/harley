@@ -76,6 +76,10 @@ typedef enum {
     PHONE_EVT_MEDIA         = 0x03,
     PHONE_EVT_CONFIG        = 0x04,
     PHONE_EVT_ICON          = 0x05,
+    // Phone-side call transitions (the rider answered/ended on the phone, not
+    // via the cluster buttons). Payload-less.
+    PHONE_EVT_CALL_ACTIVE = 0x06,
+    PHONE_EVT_CALL_END    = 0x07,
 } phone_event_type_t;
 
 typedef struct {

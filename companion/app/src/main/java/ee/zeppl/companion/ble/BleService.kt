@@ -43,6 +43,7 @@ class BleService : Service() {
     private var client:           BleClient?     = null
     private var previousSinkSend: ((ByteArray) -> Unit)? = null
     private var calCollector:     SpeedCalCollector? = null
+    private var callTracker:      CallStateTracker?  = null
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
 
     override fun onCreate() {
@@ -91,6 +92,9 @@ class BleService : Service() {
                 collector.tick()
             }
         }
+        // Mirror the phone's own call state to the cluster (answer/hang up on
+        // the phone, not just via the cluster buttons).
+        callTracker = CallStateTracker(applicationContext).also { it.start() }
         Log.i(TAG, "service started")
     }
 
@@ -116,6 +120,8 @@ class BleService : Service() {
         scope.cancel()
         calCollector?.stop()
         calCollector = null
+        callTracker?.stop()
+        callTracker = null
         client?.stop()
         client = null
         previousSinkSend?.let { OutboundSink.send = it }

@@ -170,6 +170,10 @@ static int access_rx_cb(uint16_t conn_handle, uint16_t attr_handle,
         case PHONE_EVT_MEDIA:
             ESP_LOGI(TAG, "rx MEDIA state=%d", (int)evt.media.state);
             break;
+        case PHONE_EVT_CALL_ACTIVE:
+        case PHONE_EVT_CALL_END:
+            ESP_LOGI(TAG, "rx CALL %s", evt.type == PHONE_EVT_CALL_ACTIVE ? "ACTIVE" : "END");
+            break;
         case PHONE_EVT_CONFIG:
         case PHONE_EVT_ICON:
             break;  // handled above

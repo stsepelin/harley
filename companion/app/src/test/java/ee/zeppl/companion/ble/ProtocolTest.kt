@@ -44,6 +44,11 @@ class ProtocolTest {
         )
     }
 
+    @Test fun `encodes call active and end`() {
+        assertArrayEquals(byteArrayOf(0x06, 0x00, 0x00), Protocol.encodeCallActive())
+        assertArrayEquals(byteArrayOf(0x07, 0x00, 0x00), Protocol.encodeCallEnd())
+    }
+
     @Test fun `encodes an icon chunk`() {
         val out = Protocol.encodeIcon(0x87654321u, totalLen = 4608, offset = 64,
                                       chunk = byteArrayOf(0xAA.toByte(), 0xBB.toByte()))

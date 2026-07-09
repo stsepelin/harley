@@ -785,6 +785,105 @@ static void test_icon_event_is_noop_in_phone_data(void)
     TEST_ASSERT_EQUAL_UINT32(1, s.notif.id);
 }
 
+static phone_event_t make_evt(phone_event_type_t type)
+{
+    phone_event_t e;
+    memset(&e, 0, sizeof(e));
+    e.type = type;
+    return e;
+}
+
+// CALL_ACTIVE: rider answered on the phone -> banner goes in-progress; a repeat
+// keeps the original start tick.
+static void test_call_active_from_phone(void)
+{
+    fresh();
+    phone_event_t c = make_notif(1, NOTIF_KIND_CALL, "Mom");
+    phone_data_apply(&c);
+    lv_tick_stub_set(4000);
+    phone_event_t act = make_evt(PHONE_EVT_CALL_ACTIVE);
+    phone_data_apply(&act);
+    phone_state_t s;
+    phone_data_get(&s);
+    TEST_ASSERT_TRUE(s.notif.call_in_progress);
+    TEST_ASSERT_EQUAL_UINT32(4000, s.notif.call_start_ms);
+
+    lv_tick_stub_set(9000);
+    phone_data_apply(&act);  // already in progress -> unchanged
+    phone_data_get(&s);
+    TEST_ASSERT_EQUAL_UINT32(4000, s.notif.call_start_ms);
+}
+
+static void test_call_active_ignored_without_call(void)
+{
+    fresh();
+    phone_event_t act = make_evt(PHONE_EVT_CALL_ACTIVE);
+    phone_data_apply(&act);  // nothing active
+    phone_state_t s;
+    phone_data_get(&s);
+    TEST_ASSERT_FALSE(s.notif.active);
+
+    phone_event_t sms = make_notif(1, NOTIF_KIND_SMS, "Alice");
+    phone_data_apply(&sms);
+    phone_data_apply(&act);  // active is SMS, not a call
+    phone_data_get(&s);
+    TEST_ASSERT_FALSE(s.notif.call_in_progress);
+}
+
+static void test_call_end_from_phone_promotes_queue(void)
+{
+    fresh();
+    phone_event_t c = make_notif(1, NOTIF_KIND_CALL, "Mom");
+    phone_data_apply(&c);
+    phone_event_t q = make_notif(2, NOTIF_KIND_SMS, "Alice");
+    phone_data_apply(&q);  // queued behind the call
+    phone_event_t end = make_evt(PHONE_EVT_CALL_END);
+    phone_data_apply(&end);
+    phone_state_t s;
+    phone_data_get(&s);
+    TEST_ASSERT_TRUE(s.notif.active);
+    TEST_ASSERT_EQUAL_UINT32(2, s.notif.id);  // SMS promoted
+}
+
+static void test_call_end_ignored_when_inapplicable(void)
+{
+    fresh();
+    phone_event_t end = make_evt(PHONE_EVT_CALL_END);
+    phone_data_apply(&end);  // nothing active -> no-op
+    phone_state_t s;
+    phone_data_get(&s);
+    TEST_ASSERT_FALSE(s.notif.active);
+
+    phone_event_t sms = make_notif(1, NOTIF_KIND_SMS, "Alice");
+    phone_data_apply(&sms);
+    phone_data_apply(&end);  // active is SMS, not a call -> no-op
+    phone_data_get(&s);
+    TEST_ASSERT_TRUE(s.notif.active);
+    TEST_ASSERT_EQUAL_UINT32(1, s.notif.id);
+}
+
+// A re-posted notification with the same id updates the active one in place,
+// preserving call state, instead of queuing a stale duplicate.
+static void test_same_id_notif_updates_in_place(void)
+{
+    fresh();
+    phone_event_t c = make_notif(1, NOTIF_KIND_CALL, "Mom");
+    phone_data_apply(&c);
+    lv_tick_stub_set(5000);
+    phone_data_call_accept();  // sets call_in_progress + start tick
+
+    phone_event_t upd = make_notif(1, NOTIF_KIND_CALL, "Mom mobile");
+    phone_data_apply(&upd);
+
+    phone_state_t s;
+    phone_data_get(&s);
+    TEST_ASSERT_TRUE(s.notif.active);
+    TEST_ASSERT_EQUAL_UINT32(1, s.notif.id);
+    TEST_ASSERT_EQUAL_STRING("Mom mobile", s.notif.sender);  // content updated
+    TEST_ASSERT_TRUE(s.notif.call_in_progress);              // call state kept
+    TEST_ASSERT_EQUAL_UINT32(5000, s.notif.call_start_ms);
+}
+
 void RunTests(void)
 {
     RUN_TEST(test_first_notif_becomes_active);
@@ -823,6 +922,11 @@ void RunTests(void)
     RUN_TEST(test_unknown_event_type_is_safe_noop);
     RUN_TEST(test_config_event_is_noop_in_phone_data);
     RUN_TEST(test_icon_event_is_noop_in_phone_data);
+    RUN_TEST(test_call_active_from_phone);
+    RUN_TEST(test_call_active_ignored_without_call);
+    RUN_TEST(test_call_end_from_phone_promotes_queue);
+    RUN_TEST(test_call_end_ignored_when_inapplicable);
+    RUN_TEST(test_same_id_notif_updates_in_place);
     RUN_TEST(test_paused_media_keeps_banner_shown);
     RUN_TEST(test_dismiss_when_idle_is_noop);
     RUN_TEST(test_swipe_up_with_paused_media_shows_banner);

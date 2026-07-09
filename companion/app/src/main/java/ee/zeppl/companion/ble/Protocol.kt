@@ -42,6 +42,8 @@ object Protocol {
     private const val TYPE_MEDIA         : Byte = 0x03
     private const val TYPE_CONFIG        : Byte = 0x04
     private const val TYPE_ICON          : Byte = 0x05
+    private const val TYPE_CALL_ACTIVE   : Byte = 0x06
+    private const val TYPE_CALL_END      : Byte = 0x07
 
     // App-icon image geometry (mirrors the cluster): 48x48 RGB565, opaque.
     const val ICON_W = 48
@@ -100,6 +102,12 @@ object Protocol {
         buf.put(chunk)
         return buf.array()
     }
+
+    /** Phone-side call went active (rider answered on the phone). No payload. */
+    fun encodeCallActive(): ByteArray = byteArrayOf(TYPE_CALL_ACTIVE, 0x00, 0x00)
+
+    /** Phone-side call ended (answered elsewhere / hung up / rejected). No payload. */
+    fun encodeCallEnd(): ByteArray = byteArrayOf(TYPE_CALL_END, 0x00, 0x00)
 
     /** Dismiss a notification by id. The cluster ignores stale dismisses. */
     fun encodeDismiss(id: UInt): ByteArray {
