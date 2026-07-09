@@ -1,17 +1,17 @@
-# harley
+# Zeppl
 
-[![firmware build](https://github.com/stsepelin/harley/actions/workflows/firmware-build.yml/badge.svg)](https://github.com/stsepelin/harley/actions/workflows/firmware-build.yml)
-[![host tests](https://github.com/stsepelin/harley/actions/workflows/host-tests.yml/badge.svg)](https://github.com/stsepelin/harley/actions/workflows/host-tests.yml)
+[![firmware build](https://github.com/stsepelin/zeppl/actions/workflows/firmware-build.yml/badge.svg)](https://github.com/stsepelin/zeppl/actions/workflows/firmware-build.yml)
+[![host tests](https://github.com/stsepelin/zeppl/actions/workflows/host-tests.yml/badge.svg)](https://github.com/stsepelin/zeppl/actions/workflows/host-tests.yml)
 [![License: Apache 2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
 
-> DIY digital instrument cluster for a 2009 Harley-Davidson VRSCF Muscle —
-> an 800×800 round IPS gauge that drops into the stock dash, reads the
+> **Zeppl** — DIY digital instrument cluster for a 2009 Harley-Davidson VRSCF
+> Muscle: an 800×800 round IPS gauge that drops into the stock dash, reads the
 > bike's J1850 bus, and bridges phone notifications + media over BLE.
 
 Built on the Waveshare ESP32-P4-WIFI6-Touch-LCD-3.4C (ESP32-P4 dual-core
 RISC-V @ 360 MHz + ESP32-C6 BLE/WiFi coprocessor, 32 MB PSRAM, 16 MB flash).
-LVGL 9 over MIPI-DSI on ESP-IDF v6, paired with an Android companion app
-for phone integration.
+LVGL 9 over MIPI-DSI on ESP-IDF v6, paired with the Zeppl Android companion
+app for phone integration.
 
 ## What's in the repo
 
