@@ -6,46 +6,89 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import android.annotation.SuppressLint
+import android.content.Context
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.BluetoothDisabled
 import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
+import com.vrodcluster.companion.ble.BleAccess
 import com.vrodcluster.companion.ble.BleConnState
+import com.vrodcluster.companion.ble.BleService
 import com.vrodcluster.companion.ble.BleState
+import com.vrodcluster.companion.ble.BondedClusters
 import com.vrodcluster.companion.ble.TelemetryState
 import com.vrodcluster.companion.ui.theme.VRodType
 
 /**
- * The Ride dashboard - the home screen and the hero surface. Big glanceable
- * speed, a rpm/gear/temp strip, and odometer/trip cards. Renders live from
- * [TelemetryState] once frames arrive (Brick 1); shows an offline empty-state
- * before any link, and retains last-known values when a live link drops.
+ * The Ride dashboard - home screen and hero surface. A big glanceable speed,
+ * a rpm/gear/temp strip, and odometer/trip cards, stacked in one column so the
+ * speed stays the star. Live from [TelemetryState] (Brick 1); offline
+ * empty-state before any link; retains last-known values when a link drops.
+ * The shared ScreenColumn caps the width so the stack stays a tidy centered
+ * column on the unfolded Fold 6 inner screen rather than stretching.
  */
 @Composable
 fun RideScreen(onSetUpLink: () -> Unit) {
-    val hasData = TelemetryState.lastFrameMs != null
+    val context = LocalContext.current
+    val owner = LocalLifecycleOwner.current
+    // Bonds can change while backgrounded; refresh on resume so the offline
+    // action stays in sync with the Cluster page.
+    var bondedAddress by remember { mutableStateOf(bondedClusterAddress(context)) }
+    DisposableEffect(owner) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) bondedAddress = bondedClusterAddress(context)
+        }
+        owner.lifecycle.addObserver(observer)
+        onDispose { owner.lifecycle.removeObserver(observer) }
+    }
+
     val connected = BleState.conn == BleConnState.CONNECTED
 
-    if (!hasData && !connected) {
-        EmptyState(
+    // Only show live metrics while actually connected - no stale last-known
+    // values lingering after a disconnect / forget / dropped link.
+    if (!connected) {
+        // Mirror the Cluster page's primary action: reconnect to a known cluster
+        // (by address, autoConnect) if we have one, else send them to set one up.
+        val addr = bondedAddress
+        EmptyPage(
+            pageTitle = "Ride",
             icon = Icons.Filled.BluetoothDisabled,
-            title = "No live data yet",
-            body = "Connect your cluster to stream live speed, rpm, gear, and trip data here.",
-            action = { Button(onClick = onSetUpLink) { Text("Set up link") } },
+            title = if (addr != null) "Cluster offline" else "No live data yet",
+            body = if (addr != null) {
+                "Reconnect to your cluster to stream live speed, rpm, gear, and trip data."
+            } else {
+                "Connect your cluster to stream live speed, rpm, gear, and trip data here."
+            },
+            action = {
+                if (addr != null) {
+                    Button(onClick = {
+                        BleService.start(context, address = addr, autoConnect = true)
+                    }) { Text("Reconnect") }
+                } else {
+                    Button(onClick = onSetUpLink) { Text("Set up cluster") }
+                }
+            },
         )
         return
     }
 
-    ScreenColumn(
-        title = "Ride",
-        subtitle = if (connected) "Live from cluster" else "Offline — showing last known",
-    ) {
+    ScreenColumn(title = "Ride", subtitle = "Live from cluster") {
         HeroSpeed(TelemetryState.speedMph)
 
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -91,12 +134,23 @@ private fun MetricCard(label: String, value: String, modifier: Modifier = Modifi
             label,
             style = MaterialTheme.typography.labelMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
+            maxLines = 1,
         )
-        Text(value, style = VRodType.statDigits, color = MaterialTheme.colorScheme.onSurface)
+        Text(
+            value,
+            style = VRodType.statDigits,
+            color = MaterialTheme.colorScheme.onSurface,
+            maxLines = 1,
+            softWrap = false,
+        )
     }
 }
 
 private const val DASH = "—"
+
+@SuppressLint("MissingPermission")
+private fun bondedClusterAddress(context: Context): String? =
+    if (BleAccess.allGranted(context)) BondedClusters.list(context).firstOrNull()?.address else null
 
 private fun gearLabel(gear: Int?): String = when (gear) {
     null -> DASH

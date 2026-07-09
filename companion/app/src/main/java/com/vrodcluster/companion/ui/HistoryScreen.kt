@@ -12,7 +12,8 @@ import androidx.compose.runtime.Composable
  */
 @Composable
 fun HistoryScreen() {
-    EmptyState(
+    EmptyPage(
+        pageTitle = "History",
         icon = Icons.Filled.Timeline,
         title = "No rides logged yet",
         body = "Once live telemetry is streaming, your rides and fuel-economy trends will collect here.",

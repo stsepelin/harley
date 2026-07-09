@@ -17,6 +17,7 @@
     <string name="ble_state_idle">Not connected</string>
     <string name="ble_state_scanning">Scanning…</string>
     <string name="ble_state_connecting">Connecting to %1$s…</string>
+    <string name="ble_state_pairing">Pairing with %1$s… confirm the code on the cluster</string>
     <string name="ble_state_connected">Connected to %1$s</string>
     <string name="ble_state_disconnected">Disconnected</string>
     <string name="ble_state_waiting">Waiting for %1$s to reappear…</string>

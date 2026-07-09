@@ -1,6 +1,7 @@
 package com.vrodcluster.companion.ui
 
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.DeveloperMode
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Speed
 import androidx.compose.material.icons.filled.Tune
@@ -16,6 +17,8 @@ import kotlinx.serialization.Serializable
 @Serializable object Cluster    // device hub: connection, bonds, calibration, diagnostics
 @Serializable object Settings   // notification/media relay + config + appearance
 @Serializable object History    // trips + economy trends
+
+@Serializable object Developer  // gated dev tools (calibration, config), unlocked via Firmware taps
 
 @Serializable object Scan       // pushed from Cluster: pick a cluster to connect
 @Serializable object AppList    // pushed from Settings: choose forwarding apps
@@ -33,3 +36,6 @@ val TOP_LEVEL_DESTINATIONS = listOf(
     TopLevelDestination(Settings, "Settings", Icons.Filled.Tune),
     TopLevelDestination(History,  "History",  Icons.Filled.History),
 )
+
+/** Appended to the nav when developer mode is unlocked. */
+val DEV_DESTINATION = TopLevelDestination(Developer, "Dev", Icons.Filled.DeveloperMode)

@@ -48,6 +48,15 @@ class BleClient(
     private var gatt:       BluetoothGatt?               = null
     private var writeChar:  BluetoothGattCharacteristic? = null
     private var lastDevice: BluetoothDevice?             = null
+    // Held between "services discovered, pairing kicked off" and "bond
+    // completed" so we can finish TX subscription once the link is authenticated.
+    private var pendingTxChar: BluetoothGattCharacteristic? = null
+    private val mainHandler = android.os.Handler(android.os.Looper.getMainLooper())
+    private var bondPoll: Runnable? = null
+    // Auto-recovery of an asymmetric bond: `reachedServices` is per-attempt;
+    // `authRecoveryDone` guards to one removeBond+re-pair per connect sequence.
+    private var reachedServices = false
+    private var authRecoveryDone = false
 
     private val scanCallback = object : ScanCallback() {
         @SuppressLint("MissingPermission")
@@ -57,7 +66,9 @@ class BleClient(
             // they can disambiguate via deviceName later.
             adapter.bluetoothLeScanner?.stopScan(this)
             Log.i(TAG, "scan hit: ${result.device.address} (${result.device.name})")
-            connectTo(result.device)
+            // The device is actively advertising (we just saw it), so a direct
+            // connect is fast and appropriate here.
+            connectTo(result.device, autoConnect = false)
         }
 
         override fun onScanFailed(errorCode: Int) {
@@ -88,6 +99,22 @@ class BleClient(
                     g.close()
                     if (gatt === g) gatt = null
                     val dev = lastDevice
+                    // Stale/asymmetric bond: we connected to a device the phone
+                    // thinks is bonded but the link failed before we could even
+                    // resolve services (e.g. MTU rc=133 from a key mismatch).
+                    // Drop the phone-side bond and re-pair once - otherwise Android
+                    // churns (auth fail -> auto-unbond -> repair). Guarded to a
+                    // single attempt per sequence.
+                    if (dev != null && status != 0 && !reachedServices &&
+                        !authRecoveryDone && dev.bondState == BluetoothDevice.BOND_BONDED
+                    ) {
+                        authRecoveryDone = true
+                        Log.w(TAG, "stale bond suspected (status=$status); removing bond + re-pair")
+                        removeBond(dev)
+                        BleState.conn = BleConnState.CONNECTING
+                        repairAfterUnbond(dev)
+                        return
+                    }
                     if (dev != null && ReconnectPolicy.shouldReconnect(status)) {
                         // The cluster reboots on every ignition cycle;
                         // autoConnect=true parks its address on the
@@ -122,49 +149,27 @@ class BleClient(
                 return
             }
             writeChar = rxChr
+            pendingTxChar = txChr
+            reachedServices = true  // got far enough that a later drop isn't a bad bond
 
-            // Force SMP pairing if the link isn't authenticated yet. The
-            // cluster's RX characteristic is gated with WRITE_AUTHEN; our
-            // writes are WRITE_TYPE_NO_RESPONSE which would silently fail
-            // against an unbonded link (no Write Response to carry the
-            // insufficient-authentication error back to us), so we'd
-            // appear connected but every notification gets dropped at the
-            // peripheral. Explicit createBond() triggers numeric-
-            // comparison pairing with the cluster's screen_pairing UI.
+            // The cluster's RX characteristic is gated with WRITE_AUTHEN, so we
+            // must be bonded before writes (and TX CCCD) take. If not bonded
+            // yet, kick off numeric-comparison pairing and stay in PAIRING - we
+            // only advance to CONNECTED once the bond actually completes, so the
+            // UI never claims "connected" mid-pairing.
             val device = g.device
-            if (device.bondState != BluetoothDevice.BOND_BONDED) {
+            if (device.bondState == BluetoothDevice.BOND_BONDED) {
+                subscribeTx(g, txChr)
+                authRecoveryDone = false
+                BleState.conn = BleConnState.CONNECTED
+                Log.i(TAG, "ready; already bonded, RX resolved, TX subscribed")
+            } else {
                 Log.i(TAG, "no bond yet; createBond() to trigger SMP pairing")
+                BleState.conn = BleConnState.PAIRING
                 val ok = device.createBond()
                 Log.i(TAG, "createBond() returned $ok")
+                awaitBondThenFinish(device)
             }
-
-            // Subscribe to the TX (cluster → phone) notify channel. Two
-            // steps: tell Android to deliver notifications for this
-            // characteristic locally, then write the CCCD on the peer
-            // so the cluster will actually start sending them. Missing
-            // either half is a silent failure — the other side notifies
-            // into the void or our local pipe drops the bytes.
-            if (txChr != null) {
-                if (!g.setCharacteristicNotification(txChr, true)) {
-                    Log.w(TAG, "setCharacteristicNotification(TX) returned false")
-                }
-                val cccd = txChr.getDescriptor(CCCD_UUID)
-                if (cccd != null) {
-                    val rc = g.writeDescriptor(
-                        cccd, BluetoothGattDescriptor.ENABLE_NOTIFICATION_VALUE
-                    )
-                    if (rc != android.bluetooth.BluetoothStatusCodes.SUCCESS) {
-                        Log.w(TAG, "writeDescriptor(CCCD) rc=$rc")
-                    }
-                } else {
-                    Log.w(TAG, "TX characteristic has no CCCD — cluster won't notify")
-                }
-            } else {
-                Log.w(TAG, "TX characteristic not found — call/media commands won't work")
-            }
-
-            BleState.conn = BleConnState.CONNECTED
-            Log.i(TAG, "ready; RX handle resolved, TX subscribed")
         }
 
         override fun onCharacteristicChanged(
@@ -215,23 +220,34 @@ class BleClient(
     }
 
     /**
-     * Connect directly to a specific BLE peripheral by MAC, skipping
-     * the scan-and-pick path. Used by the in-app device picker so the
-     * user has explicit control over which cluster they're connecting
-     * to (and the connect path works even when the radio's adv mode
-     * makes the cluster invisible to a generic scan filter).
+     * Connect directly to a specific peripheral by MAC, skipping the scan.
+     * Used both by the in-app picker (a device the user just saw advertising:
+     * autoConnect=false, fast) and by Reconnect to a bonded cluster whose
+     * visibility may be off (autoConnect=true parks the address on the
+     * controller accept list, so the link forms whenever it advertises -
+     * including directed advertising a scan filter never matches). Any in-flight
+     * attempt is torn down first so this always makes progress.
      */
     @SuppressLint("MissingPermission")
-    fun startWithAddress(address: String) {
-        if (BleState.conn != BleConnState.IDLE && BleState.conn != BleConnState.DISCONNECTED) return
+    fun connectAddress(address: String, autoConnect: Boolean) {
         val adp = adapter ?: run {
             Log.w(TAG, "no adapter — bluetooth probably off")
             BleState.conn = BleConnState.IDLE
             return
         }
-        val device = adp.getRemoteDevice(address)
-        Log.i(TAG, "direct connect to $address")
-        connectTo(device)
+        adapter?.bluetoothLeScanner?.stopScan(scanCallback)
+        gatt?.close()       // close() (not disconnect) so no re-arm callback fires
+        gatt = null
+        writeChar = null
+        // Prefer the bonded device object: it carries the correct address type
+        // and IRK, so autoConnect matches the accept list for the cluster's
+        // directed advertising (visibility off). getRemoteDevice(mac) defaults to
+        // a PUBLIC address type, which won't match a random-identity bond. Fall
+        // back to the raw MAC for a not-yet-bonded target from the scanner.
+        val device = adp.bondedDevices?.firstOrNull { it.address == address }
+            ?: adp.getRemoteDevice(address)
+        Log.i(TAG, "connect to $address (autoConnect=$autoConnect, bonded=${device.bondState == BluetoothDevice.BOND_BONDED})")
+        connectTo(device, autoConnect)
     }
 
     @SuppressLint("MissingPermission")
@@ -239,6 +255,8 @@ class BleClient(
         // User-initiated teardown: clear lastDevice FIRST so the
         // disconnect callback that follows can't re-arm a reconnect.
         lastDevice = null
+        cancelBondPoll()
+        pendingTxChar = null
         adapter?.bluetoothLeScanner?.stopScan(scanCallback)
         gatt?.disconnect()
         gatt?.close()
@@ -246,6 +264,9 @@ class BleClient(
         writeChar = null
         BleState.deviceName = null
         BleState.conn = BleConnState.IDLE
+        // Deliberate disconnect: drop last-known telemetry so Ride shows the
+        // clean offline state (a link-drop keeps it for the reconnect window).
+        TelemetryState.clear()
     }
 
     @SuppressLint("MissingPermission")
@@ -268,11 +289,108 @@ class BleClient(
     // --- internals -----------------------------------------------------
 
     @SuppressLint("MissingPermission")
-    private fun connectTo(device: BluetoothDevice) {
+    private fun connectTo(device: BluetoothDevice, autoConnect: Boolean) {
         lastDevice = device
+        reachedServices = false
         BleState.deviceName = device.name ?: device.address
         BleState.conn = BleConnState.CONNECTING
-        gatt = device.connectGatt(appContext, /*autoConnect=*/false, gattCallback)
+        gatt = device.connectGatt(appContext, autoConnect, gattCallback)
+    }
+
+    // Reflection: BluetoothDevice.removeBond() is @hide but stable since API 1.
+    @SuppressLint("MissingPermission")
+    private fun removeBond(device: BluetoothDevice): Boolean = try {
+        (device.javaClass.getMethod("removeBond").invoke(device) as? Boolean) ?: false
+    } catch (t: Throwable) {
+        Log.w(TAG, "removeBond reflection failed: $t")
+        false
+    }
+
+    // After removeBond() (async), wait for the bond to actually clear, then do a
+    // fresh direct connect so onServicesDiscovered re-pairs from scratch.
+    @SuppressLint("MissingPermission")
+    private fun repairAfterUnbond(device: BluetoothDevice) {
+        val poll = object : Runnable {
+            private var tries = 0
+            override fun run() {
+                if (device.bondState == BluetoothDevice.BOND_NONE || tries++ > 25) {
+                    Log.i(TAG, "re-pairing after unbond")
+                    connectTo(device, autoConnect = false)
+                } else {
+                    mainHandler.postDelayed(this, 200)
+                }
+            }
+        }
+        mainHandler.postDelayed(poll, 200)
+    }
+
+    // Enable the TX (cluster → phone) notify channel: tell Android to deliver
+    // notifications locally, then write the CCCD on the peer so it starts
+    // sending. Missing either half is a silent failure.
+    @SuppressLint("MissingPermission")
+    private fun subscribeTx(g: BluetoothGatt, txChr: BluetoothGattCharacteristic?) {
+        if (txChr == null) {
+            Log.w(TAG, "TX characteristic not found — call/media commands won't work")
+            return
+        }
+        if (!g.setCharacteristicNotification(txChr, true)) {
+            Log.w(TAG, "setCharacteristicNotification(TX) returned false")
+        }
+        val cccd = txChr.getDescriptor(CCCD_UUID)
+        if (cccd != null) {
+            val rc = g.writeDescriptor(cccd, BluetoothGattDescriptor.ENABLE_NOTIFICATION_VALUE)
+            if (rc != android.bluetooth.BluetoothStatusCodes.SUCCESS) {
+                Log.w(TAG, "writeDescriptor(CCCD) rc=$rc")
+            }
+        } else {
+            Log.w(TAG, "TX characteristic has no CCCD — cluster won't notify")
+        }
+    }
+
+    // Poll the OS bond state after createBond() until it settles, then finish:
+    // BONDED -> subscribe TX + CONNECTED; a decline (BONDING then back to NONE)
+    // or a long timeout -> DISCONNECTED. Polling is deterministic and avoids the
+    // broadcast-delivery quirks that left the state stuck at PAIRING.
+    @SuppressLint("MissingPermission")
+    private fun awaitBondThenFinish(device: BluetoothDevice) {
+        cancelBondPoll()
+        val deadline = SystemClock.uptimeMillis() + 60_000  // time to confirm the code
+        var sawBonding = false
+        val poll = object : Runnable {
+            override fun run() {
+                if (BleState.conn != BleConnState.PAIRING) { bondPoll = null; return }
+                when (device.bondState) {
+                    BluetoothDevice.BOND_BONDED -> {
+                        Log.i(TAG, "bond confirmed; finishing TX subscription")
+                        gatt?.let { subscribeTx(it, pendingTxChar) }
+                        authRecoveryDone = false
+                        BleState.conn = BleConnState.CONNECTED
+                        bondPoll = null
+                    }
+                    BluetoothDevice.BOND_BONDING -> {
+                        sawBonding = true
+                        if (SystemClock.uptimeMillis() > deadline) giveUp() else repost()
+                    }
+                    else -> {  // BOND_NONE: declined if we'd started bonding, else keep waiting
+                        if (sawBonding || SystemClock.uptimeMillis() > deadline) giveUp() else repost()
+                    }
+                }
+            }
+            private fun repost() = mainHandler.postDelayed(this, 400)
+            private fun giveUp() {
+                Log.w(TAG, "pairing not completed; disconnecting")
+                gatt?.disconnect()
+                BleState.conn = BleConnState.DISCONNECTED
+                bondPoll = null
+            }
+        }
+        bondPoll = poll
+        mainHandler.postDelayed(poll, 400)
+    }
+
+    private fun cancelBondPoll() {
+        bondPoll?.let { mainHandler.removeCallbacks(it) }
+        bondPoll = null
     }
 
     private companion object {

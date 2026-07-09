@@ -13,4 +13,8 @@ import androidx.compose.runtime.setValue
 object AppPrefs {
     /** Use Material You wallpaper colors instead of the branded V-Rod palette. */
     var dynamicColor: Boolean by mutableStateOf(false)
+
+    /** Unlocked by tapping the Firmware row (Cluster page) seven times. Adds a
+     *  Developer tab with calibration / cluster-config tools. */
+    var developerMode: Boolean by mutableStateOf(false)
 }

@@ -130,9 +130,41 @@ static void visible_row_clicked_cb(lv_event_t *e)
 
 // --- FORGET ALL DEVICES --------------------------------------------------
 
+// Two-tap confirm: the first tap arms and relabels the button; a second tap
+// within the window actually wipes the bonds. Avoids a stray touch clearing
+// every paired phone. A timer disarms it if the second tap never comes.
+static lv_obj_t   *s_forget_lbl;
+static bool        s_forget_armed;
+static lv_timer_t *s_forget_revert_timer;
+
+static void forget_disarm(void)
+{
+    s_forget_armed = false;
+    if (s_forget_lbl)
+        lv_label_set_text(s_forget_lbl, "FORGET ALL DEVICES");
+    if (s_forget_revert_timer) {
+        lv_timer_del(s_forget_revert_timer);
+        s_forget_revert_timer = NULL;
+    }
+}
+
+static void forget_revert_cb(lv_timer_t *t)
+{
+    (void)t;
+    forget_disarm();
+}
+
 static void forget_button_clicked_cb(lv_event_t *e)
 {
     (void)e;
+    if (!s_forget_armed) {
+        s_forget_armed = true;
+        if (s_forget_lbl)
+            lv_label_set_text(s_forget_lbl, "TAP AGAIN TO CONFIRM");
+        s_forget_revert_timer = lv_timer_create(forget_revert_cb, 4000, NULL);
+        return;
+    }
+    forget_disarm();
     ble_peripheral_disconnect_active();
     ble_peripheral_forget_all_bonds();
     refresh_status_row();
@@ -214,11 +246,13 @@ lv_obj_t *screen_settings_bluetooth_create(void)
     lv_obj_set_style_border_width(forget, 1, 0);
     lv_obj_set_style_radius(forget, 12, 0);
     lv_obj_add_event_cb(forget, forget_button_clicked_cb, LV_EVENT_CLICKED, NULL);
-    lv_obj_t *forget_lbl = lv_label_create(forget);
-    lv_label_set_text(forget_lbl, "FORGET ALL DEVICES");
-    lv_obj_set_style_text_color(forget_lbl, lv_color_hex(VROD_RED), 0);
-    lv_obj_set_style_text_font(forget_lbl, &jbm_bold_33, 0);
-    lv_obj_center(forget_lbl);
+    s_forget_armed        = false;
+    s_forget_revert_timer = NULL;
+    s_forget_lbl          = lv_label_create(forget);
+    lv_label_set_text(s_forget_lbl, "FORGET ALL DEVICES");
+    lv_obj_set_style_text_color(s_forget_lbl, lv_color_hex(VROD_RED), 0);
+    lv_obj_set_style_text_font(s_forget_lbl, &jbm_bold_33, 0);
+    lv_obj_center(s_forget_lbl);
 
     // Force the first paint before the timer fires so the status row
     // isn't blank for up to a second after opening the page.

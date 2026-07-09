@@ -22,7 +22,7 @@ static void test_no_bond_with_override_is_undirected(void)
 static void test_bond_no_override_is_directed(void)
 {
     // Default steady state once the rider has paired one phone.
-    TEST_ASSERT_EQUAL_INT(BLE_ADV_MODE_DIRECTED, ble_visibility_decide(true, false));
+    TEST_ASSERT_EQUAL_INT(BLE_ADV_MODE_HIDDEN, ble_visibility_decide(true, false));
 }
 
 static void test_bond_with_override_is_undirected(void)

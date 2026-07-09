@@ -4,9 +4,9 @@ import android.os.Build
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.MaterialExpressiveTheme
-import androidx.compose.material3.dynamicDarkColorScheme
 import androidx.compose.material3.dynamicLightColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 
 /**
@@ -28,8 +28,21 @@ fun VRodTheme(
 ) {
     val context = LocalContext.current
     val colorScheme = when {
+        // "Match device colors": keep the wallpaper-derived accents but force a
+        // clean light scheme with white surfaces - the raw dynamic neutrals came
+        // out muddy/tinted, so we override the backgrounds to white.
         dynamicColor && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S ->
-            if (darkTheme) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
+            dynamicLightColorScheme(context).copy(
+                background = Color.White,
+                surface = Color.White,
+                surfaceContainerLowest = Color.White,
+                surfaceContainerLow = Color(0xFFF7F7F7),
+                surfaceContainer = Color(0xFFF2F2F2),
+                surfaceContainerHigh = Color(0xFFECECEC),
+                surfaceContainerHighest = Color(0xFFE6E6E6),
+                onBackground = Color(0xFF1B1B1B),
+                onSurface = Color(0xFF1B1B1B),
+            )
         darkTheme -> VRodDarkColors
         else      -> VRodLightColors
     }

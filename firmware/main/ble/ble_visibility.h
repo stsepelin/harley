@@ -11,8 +11,14 @@
 // pair with the cluster.
 
 typedef enum {
-    BLE_ADV_MODE_UNDIRECTED = 0,  // BLE_GAP_CONN_MODE_UND — anyone can scan + connect
-    BLE_ADV_MODE_DIRECTED   = 1,  // BLE_GAP_CONN_MODE_DIR — only bonded peer responds
+    // Discoverable: connectable + named, anyone can scan and pair.
+    BLE_ADV_MODE_UNDIRECTED = 0,
+    // Hidden: connectable but non-discoverable and nameless. The bonded phone
+    // reconnects by address (autoConnect / accept list, reliable); strangers see
+    // only an anonymous device whose write characteristic is auth-gated. We use
+    // this rather than true directed advertising because Android's autoConnect
+    // catches directed adv unreliably.
+    BLE_ADV_MODE_HIDDEN = 1,
 } ble_adv_mode_t;
 
 ble_adv_mode_t ble_visibility_decide(bool has_bond, bool visible_override);

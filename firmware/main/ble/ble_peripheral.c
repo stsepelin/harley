@@ -229,26 +229,33 @@ static void start_advertising(void)
     bool           override_on = settings_store_current()->ble_visible_override;
     ble_adv_mode_t mode        = ble_visibility_decide(has_bond, override_on);
 
-    if (mode == BLE_ADV_MODE_DIRECTED) {
-        // Directed advertising — only the bonded peer's connect request
-        // is accepted; strangers scanning don't see "V-Rod Cluster" in
-        // the result list. Low-duty cycle (high_duty_cycle = 0) so the
-        // adv window is the standard ~10s, not the legacy 1.28s high-duty
-        // limit. NimBLE re-arms on its own under BLE_HS_FOREVER for
-        // low-duty directed; the BLE_GAP_EVENT_ADV_COMPLETE path below
-        // covers any controller that does report timeouts.
-        struct ble_gap_adv_params params = {0};
-        params.conn_mode                 = BLE_GAP_CONN_MODE_DIR;
-        params.disc_mode                 = BLE_GAP_DISC_MODE_NON;
-        params.high_duty_cycle           = 0;
-        int rc =
-            ble_gap_adv_start(s_own_addr_type, &peer, BLE_HS_FOREVER, &params, gap_event_cb, NULL);
+    if (mode == BLE_ADV_MODE_HIDDEN) {
+        // Hidden: undirected + CONNECTABLE, but non-discoverable and nameless.
+        // The bonded phone reconnects by address via autoConnect (accept list),
+        // which is reliable - unlike true directed advertising, which Android's
+        // autoConnect catches only intermittently (parked, it misses the
+        // low-duty directed windows, so Reconnect never fires). Strangers doing
+        // a general/limited scan ignore a non-discoverable advert, and there's
+        // no name or service UUID to identify it; the RX write is auth-gated
+        // regardless. `peer` is unused in this mode.
+        (void)peer;
+        struct ble_hs_adv_fields fields = {0};
+        fields.flags = BLE_HS_ADV_F_BREDR_UNSUP;  // no DISC flag => non-discoverable
+        int rc       = ble_gap_adv_set_fields(&fields);
         if (rc != 0) {
-            ESP_LOGE(TAG, "ble_gap_adv_start(directed) rc=%d", rc);
+            ESP_LOGE(TAG, "ble_gap_adv_set_fields(hidden) rc=%d", rc);
+            return;
+        }
+        struct ble_gap_adv_params params = {0};
+        params.conn_mode                 = BLE_GAP_CONN_MODE_UND;
+        params.disc_mode                 = BLE_GAP_DISC_MODE_NON;
+        rc = ble_gap_adv_start(s_own_addr_type, NULL, BLE_HS_FOREVER, &params, gap_event_cb, NULL);
+        if (rc != 0) {
+            ESP_LOGE(TAG, "ble_gap_adv_start(hidden) rc=%d", rc);
             return;
         }
         state_set_advertising(true);
-        ESP_LOGI(TAG, "advertising (directed) to bonded peer");
+        ESP_LOGI(TAG, "advertising (hidden connectable) for bonded peer");
         return;
     }
 
@@ -311,6 +318,19 @@ static int gap_event_cb(struct ble_gap_event *event, void *arg)
                 state_set_connected((const uint8_t[6]){0});
             }
             ESP_LOGI(TAG, "central connected; handle=%u", event->connect.conn_handle);
+            // Ask for a generous supervision timeout so a brief esp_hosted / RF
+            // stall doesn't drop the link (we were seeing status=8/19 churn with
+            // whatever short timeout the phone negotiated). 30-50 ms interval,
+            // no slave latency, 6 s timeout (units: interval 1.25 ms, timeout 10 ms).
+            struct ble_gap_upd_params upd = {
+                .itvl_min            = 24,
+                .itvl_max            = 40,
+                .latency             = 0,
+                .supervision_timeout = 600,
+            };
+            int urc = ble_gap_update_params(event->connect.conn_handle, &upd);
+            if (urc != 0)
+                ESP_LOGW(TAG, "ble_gap_update_params rc=%d", urc);
         } else {
             ESP_LOGW(TAG, "connect failed; status=%d", event->connect.status);
             start_advertising();
