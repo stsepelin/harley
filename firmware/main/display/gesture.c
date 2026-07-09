@@ -4,17 +4,22 @@
 #define DEFAULT_LONG_PRESS_MS   600
 #define DEFAULT_SWIPE_DIST_MIN  60
 #define DEFAULT_SWIPE_PERP_MAX  60
+#define DEFAULT_DOUBLE_TAP_MS   300
 
 void gesture_init(gesture_state_t *g)
 {
     g->long_press_ms    = DEFAULT_LONG_PRESS_MS;
     g->swipe_dist_min   = DEFAULT_SWIPE_DIST_MIN;
     g->swipe_perp_max   = DEFAULT_SWIPE_PERP_MAX;
+    g->double_tap_ms    = DEFAULT_DOUBLE_TAP_MS;
     g->pressing         = false;
     g->long_fired       = false;
     g->press_start_tick = 0;
     g->press_start_x = g->press_start_y = 0;
     g->last_x        = g->last_y        = 0;
+    g->pending_tap                      = false;
+    g->pending_tap_tick                 = 0;
+    g->pending_tap_x = g->pending_tap_y = 0;
 }
 
 static gesture_event_t classify_swipe(const gesture_state_t *g)
@@ -72,5 +77,21 @@ gesture_event_t gesture_update(gesture_state_t *g,
     }
     g->pressing   = false;
     g->long_fired = false;
+
+    if (out == GESTURE_TAP) {
+        // A second tap close in time and space to the previous one upgrades to
+        // a double-tap. The single TAP still fires immediately (keeps taps
+        // responsive); consumers that care about double-tap act on the second.
+        if (g->pending_tap && (uint32_t)(now_ms - g->pending_tap_tick) < g->double_tap_ms &&
+            abs(g->last_x - g->pending_tap_x) <= g->swipe_dist_min &&
+            abs(g->last_y - g->pending_tap_y) <= g->swipe_dist_min) {
+            g->pending_tap = false;  // consumed; the next tap starts a fresh pair
+            return GESTURE_DOUBLE_TAP;
+        }
+        g->pending_tap      = true;
+        g->pending_tap_tick = now_ms;
+        g->pending_tap_x    = g->last_x;
+        g->pending_tap_y    = g->last_y;
+    }
     return out;
 }

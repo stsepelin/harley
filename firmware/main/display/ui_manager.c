@@ -27,6 +27,7 @@ static lv_obj_t *s_settings_general = NULL;
 static lv_obj_t *s_settings_trip    = NULL;
 static lv_obj_t *s_settings_odoset  = NULL;
 static lv_obj_t *s_settings_bt      = NULL;
+static lv_obj_t *s_map              = NULL;  // registered by the map module, if any
 static bool      s_ui_started    = false;
 static bool      s_event_started = false;
 
@@ -80,6 +81,9 @@ static void dispatch_gesture(gesture_event_t e, int x, int y)
         if (screen_ride_info_hit(x, y))
             screen_ride_cycle_info();
         break;
+    case GESTURE_DOUBLE_TAP:
+        ui_manager_toggle_map();
+        break;
     case GESTURE_NONE:
     default:                  break;
     }
@@ -107,11 +111,12 @@ static void event_watcher_task(void *arg)
         // Only consume input while the ride screen is up; settings has
         // its own back-button and ignoring stale presses keeps a long
         // press in settings from bouncing right back here.
-        lv_indev_t *indev   = lv_indev_get_next(NULL);
-        bool        on_ride = (lv_screen_active() == s_ride);
-        bool        pressed = false;
+        lv_indev_t *indev    = lv_indev_get_next(NULL);
+        lv_obj_t   *active   = lv_screen_active();
+        bool        on_input = (active == s_ride) || (s_map && active == s_map);
+        bool        pressed  = false;
         lv_point_t  pt = { 0, 0 };
-        if (indev && on_ride) {
+        if (indev && on_input) {
             pressed = (lv_indev_get_state(indev) == LV_INDEV_STATE_PRESSED);
             if (pressed) lv_indev_get_point(indev, &pt);
         }
@@ -185,6 +190,20 @@ void ui_manager_show_bench(void)
     lv_screen_load(s_bench);
 }
 #endif
+
+void ui_manager_set_map_screen(lv_obj_t *map)
+{
+    s_map = map;
+}
+
+void ui_manager_toggle_map(void)
+{
+    if (!s_map)
+        return;
+    bsp_display_lock(-1);
+    lv_screen_load(lv_screen_active() == s_map ? s_ride : s_map);
+    bsp_display_unlock();
+}
 
 void ui_manager_init(void)
 {

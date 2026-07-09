@@ -18,7 +18,8 @@ typedef enum {
     GESTURE_SWIPE_RIGHT,
     GESTURE_SWIPE_UP,
     GESTURE_SWIPE_DOWN,
-    GESTURE_TAP,  // short press + release, no long-press, no swipe
+    GESTURE_TAP,         // short press + release, no long-press, no swipe
+    GESTURE_DOUBLE_TAP,  // two taps in quick succession, near the same spot
 } gesture_event_t;
 
 typedef struct {
@@ -28,6 +29,7 @@ typedef struct {
     uint32_t long_press_ms;
     int      swipe_dist_min;   // px traveled along the dominant axis
     int      swipe_perp_max;   // px allowed on the other axis
+    uint32_t double_tap_ms;    // max gap between the two taps of a double-tap
 
     // Internal state. Treat as opaque.
     bool     pressing;
@@ -35,6 +37,11 @@ typedef struct {
     uint32_t press_start_tick;
     int      press_start_x, press_start_y;
     int      last_x, last_y;
+    // A tap is held pending for up to double_tap_ms so a second tap can upgrade
+    // it to a double-tap; if the window lapses it is emitted as a single tap.
+    bool     pending_tap;
+    uint32_t pending_tap_tick;
+    int      pending_tap_x, pending_tap_y;
 } gesture_state_t;
 
 void gesture_init(gesture_state_t *g);

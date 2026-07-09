@@ -193,8 +193,65 @@ static void test_custom_thresholds_honoured(void)
     TEST_ASSERT_EQUAL_INT(GESTURE_SWIPE_RIGHT, tick(&g, false, 115, 100, 310));
 }
 
+// --- double-tap ------------------------------------------------------------
+
+// One tap = press then release at the same spot; returns the release event.
+static gesture_event_t tap(gesture_state_t *g, int x, int y, uint32_t press_t, uint32_t release_t)
+{
+    tick(g, true, x, y, press_t);
+    return tick(g, false, x, y, release_t);
+}
+
+static void test_two_quick_taps_make_a_double_tap(void)
+{
+    gesture_state_t g;
+    gesture_init(&g);
+    TEST_ASSERT_EQUAL_INT(GESTURE_TAP, tap(&g, 100, 100, 0, 50));            // first: single
+    TEST_ASSERT_EQUAL_INT(GESTURE_DOUBLE_TAP, tap(&g, 100, 100, 150, 200));  // within 300 ms
+}
+
+static void test_slow_second_tap_is_two_singles(void)
+{
+    gesture_state_t g;
+    gesture_init(&g);
+    TEST_ASSERT_EQUAL_INT(GESTURE_TAP, tap(&g, 100, 100, 0, 50));
+    // Second release is 400 ms after the first -> outside the window -> single.
+    TEST_ASSERT_EQUAL_INT(GESTURE_TAP, tap(&g, 100, 100, 400, 450));
+}
+
+static void test_second_tap_far_in_x_is_not_a_double(void)
+{
+    gesture_state_t g;
+    gesture_init(&g);
+    TEST_ASSERT_EQUAL_INT(GESTURE_TAP, tap(&g, 100, 100, 0, 50));
+    TEST_ASSERT_EQUAL_INT(GESTURE_TAP, tap(&g, 200, 100, 100, 150));  // dx=100 > slop
+}
+
+static void test_second_tap_far_in_y_is_not_a_double(void)
+{
+    gesture_state_t g;
+    gesture_init(&g);
+    TEST_ASSERT_EQUAL_INT(GESTURE_TAP, tap(&g, 100, 100, 0, 50));
+    TEST_ASSERT_EQUAL_INT(GESTURE_TAP, tap(&g, 100, 200, 100, 150));  // dy=100 > slop
+}
+
+static void test_triple_tap_is_tap_double_tap(void)
+{
+    gesture_state_t g;
+    gesture_init(&g);
+    TEST_ASSERT_EQUAL_INT(GESTURE_TAP, tap(&g, 100, 100, 0, 50));
+    TEST_ASSERT_EQUAL_INT(GESTURE_DOUBLE_TAP, tap(&g, 100, 100, 100, 150));
+    // The double consumed the pair, so the third tap is a fresh single.
+    TEST_ASSERT_EQUAL_INT(GESTURE_TAP, tap(&g, 100, 100, 200, 250));
+}
+
 void RunTests(void)
 {
+    RUN_TEST(test_two_quick_taps_make_a_double_tap);
+    RUN_TEST(test_slow_second_tap_is_two_singles);
+    RUN_TEST(test_second_tap_far_in_x_is_not_a_double);
+    RUN_TEST(test_second_tap_far_in_y_is_not_a_double);
+    RUN_TEST(test_triple_tap_is_tap_double_tap);
     RUN_TEST(test_init_sets_defaults_and_idle);
     RUN_TEST(test_long_press_fires_after_threshold);
     RUN_TEST(test_long_press_suppresses_swipe_on_release);

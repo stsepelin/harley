@@ -2,6 +2,7 @@
 #include "map_tile.h"
 #include "phone_data.h"
 #include "screen_map.h"
+#include "ui_manager.h"
 #include "vehicle_data.h"
 
 #include "bsp/esp-bsp.h"
@@ -28,6 +29,7 @@ static const char *TAG = "map_demo";
 #define MAP_TACH_REDLINE  9000   // rpm mapped to a full tach bar
 
 static map_tileset_t *s_ts;
+static lv_obj_t      *s_screen;  // the map screen; rendered only while it's active
 
 // Instrument strip from the real bus data (gear N when out of 1..6).
 static void strip_from_vehicle(const vehicle_data_t *vd, int *speed, int *gear, int *tach,
@@ -61,6 +63,11 @@ static void anim_task(void *arg)
     const char *end    = track_txt_end;
     const char *cursor = track_txt_start;  // demo-track playback position
     for (;;) {
+        // Only draw while the map is the visible screen; idle on the gauge.
+        if (lv_screen_active() != s_screen) {
+            vTaskDelay(pdMS_TO_TICKS(120));
+            continue;
+        }
         double tx, ty;
         int    speed, gear, tach, temp;
 
@@ -107,8 +114,11 @@ void map_demo_start(void)
     }
     ESP_LOGI(TAG, "loaded %d tiles z%d (%zu KB embedded)", s_ts->ntiles, s_ts->zoom, len / 1024);
 
+    // Build the screen and hand it to ui_manager; it stays off-screen until a
+    // double-tap toggles to it (the gauge is the default view).
     bsp_display_lock(-1);
-    lv_screen_load(screen_map_create(s_ts, 800, 800));
+    s_screen = screen_map_create(s_ts, 800, 800);
+    ui_manager_set_map_screen(s_screen);
     bsp_display_unlock();
 
     xTaskCreatePinnedToCore(anim_task, "map_demo", 8192, NULL, 4, NULL, 1);

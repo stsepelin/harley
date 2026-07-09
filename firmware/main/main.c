@@ -157,20 +157,11 @@ void app_main(void)
         vTaskDelay(pdMS_TO_TICKS(20));
         bsp_display_lock(-1);
     }
-#if CONFIG_VROD_MAP_DEMO
-    // Spike: show the moving map instead of the gauge. The map screen itself is
-    // built AFTER the radio comes up (below) - nimble is memory-tight on this
-    // board and the tileset parse grabs ~100 KB of internal RAM, which starved
-    // nimble_port_init when the map loaded first. Panel stays black until then.
-    bsp_display_unlock();
-    bsp_display_brightness_set(settings_store_current()->brightness);
-#else
     boot_screen_show();
     lv_refr_now(NULL);
     bsp_display_unlock();
     vTaskDelay(pdMS_TO_TICKS(20));
     bsp_display_brightness_set(settings_store_current()->brightness);
-#endif
 
     // Non-display init continues in parallel with the boot animation
     // (LVGL task is pinned to core 1, the calls below run on core 0).
