@@ -88,6 +88,17 @@ menu "V-Rod cluster"
             speed_mph = raw / divisor recompute. Bench only; never on a bike
             (it fabricates vehicle data).
 
+    config VROD_RESET_CALIBRATION
+        bool "Recovery: reset speed divisor to default on boot"
+        depends on VROD_J1850
+        default n
+        help
+            One-shot recovery: on boot, overwrite the NVS speed_divisor with
+            SETTINGS_SPEED_DIVISOR_DEFAULT (logging the previous value first).
+            Clears a stale calibration - e.g. a bench-test divisor left in NVS -
+            WITHOUT erasing the odometer or BLE bonds (a full NVS erase would).
+            Flash once with this on, confirm the log, then flash a clean build.
+
     config VROD_RIDE_LOG
         bool "On-board ride log to microSD (laptop-free capture)"
         depends on VROD_J1850_SNIFFER

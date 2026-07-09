@@ -8,9 +8,11 @@
 // Floor everything below this so the user can't lock themselves out.
 #define SETTINGS_BRIGHTNESS_MIN  30u
 
-// Speed calibration bounds. Raw ECM count / divisor = mph; 195 is provisional
-// pending a GPS calibration pushed from the companion app.
-#define SETTINGS_SPEED_DIVISOR_DEFAULT 195u
+// Speed calibration bounds. Raw ECM count / divisor = mph. 188 is the
+// gear-ratio-physics value confirmed by Ride 1 AND Ride 2 (~117 counts/km-h)
+// and by a roadside-radar cross-check (see ride-2-findings.md); a companion
+// GPS calibration can still refine it and persist over this default.
+#define SETTINGS_SPEED_DIVISOR_DEFAULT 188u
 #define SETTINGS_SPEED_DIVISOR_MIN     50u
 #define SETTINGS_SPEED_DIVISOR_MAX     400u
 

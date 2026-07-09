@@ -135,10 +135,10 @@ static void test_speed_parked_is_zero(void)
 static void test_speed_math_nonzero(void)
 {
     vehicle_data_t vd   = {0};
-    uint8_t        pl[] = {0x48, 0x29, 0x10, 0x02, 0x40, 0x00};  // 0x4000=16384 / 195 = 84 mph
+    uint8_t        pl[] = {0x48, 0x29, 0x10, 0x02, 0x40, 0x00};  // 0x4000=16384 / 188 = 87 mph
     j1850_frame_t  f    = synth(pl, sizeof(pl));
     TEST_ASSERT_TRUE(j1850_parse(&f, &vd));
-    TEST_ASSERT_EQUAL_UINT16(84, vd.speed_mph);
+    TEST_ASSERT_EQUAL_UINT16(87, vd.speed_mph);
 }
 
 // --- rejection paths ----------------------------------------------------

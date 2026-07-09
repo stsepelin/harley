@@ -18,6 +18,9 @@ repos:
       - id: check-merge-conflict
       - id: check-added-large-files
         args: [--maxkb=2048]
+        # Ride/sniffer capture logs are intentionally large text artifacts; the
+        # 2 MB guard still applies everywhere else to catch stray binaries.
+        exclude: '^firmware/docs/captures/'
 
   # git clang-format reformats only the changed regions of the staged
   # diff, not whole files. Keeps the existing tree intact and only

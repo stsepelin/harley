@@ -15,13 +15,13 @@
 // km/h ~= counts/120. vehicle_data.speed_mph is mph-canonical, so the divisor
 // here converts counts -> mph directly: (counts/120 km/h)/1.609 ~= counts/193.
 //
-// Set to 195 PROVISIONALLY (the old 128 made the gauge read ~1.5x high, which
-// matched the ride: 30->40, 70->100+). Still +/-~5%: lock it with ONE
-// GPS-referenced point — planned via the companion app's phone GPS (auto-
-// correlate GPS speed with the logged raw counts), or a phone speedo held
-// steady. The ride log records the RAW counts (speed_raw=) so the divisor can
-// be re-derived from any capture without another ride.
-#define J1850_SPEED_DIVISOR 195
+// 188 = 117 counts/km-h x 1.609. The gear-ratio fit landed on ~117 counts/km-h
+// on BOTH Ride 1 and Ride 2 (independent captures), and a roadside-radar point
+// on Ride 2 confirmed it (true 28 km/h reads 28 km/h at 188). See
+// ride-2-findings.md. The runtime divisor (settings/NVS, set by the companion
+// GPS calibration) overrides this; the ride log records RAW counts (speed_raw=)
+// so it stays re-derivable from any capture.
+#define J1850_SPEED_DIVISOR 188
 
 // Decode one frame into *vd. Each broadcast is single-purpose, so this
 // updates only the field(s) that frame carries and leaves the rest of
