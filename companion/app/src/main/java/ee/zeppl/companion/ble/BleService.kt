@@ -43,6 +43,7 @@ class BleService : Service() {
     private var client:           BleClient?     = null
     private var previousSinkSend: ((ByteArray) -> Unit)? = null
     private var calCollector:     SpeedCalCollector? = null
+    private var rideCollector:    RideCollector?     = null
     private var callTracker:      CallStateTracker?  = null
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
 
@@ -86,11 +87,22 @@ class BleService : Service() {
                     collector.setActive(active)
                 }
         }
+        // Log rides from the telemetry stream (movement-gated; persisted to the
+        // History tab). Shares the once-a-second cadence with the calibrator.
+        val rides = RideCollector(applicationContext).also { rideCollector = it }
         scope.launch {
             while (isActive) {
                 delay(1000)
                 collector.tick()
+                rides.tick(System.currentTimeMillis())
             }
+        }
+        // Finalize the in-progress ride the moment the link drops, since
+        // TelemetryState is cleared on disconnect and the tick loop goes quiet.
+        scope.launch {
+            snapshotFlow { BleState.conn == BleConnState.CONNECTED }
+                .distinctUntilChanged()
+                .collect { connected -> if (!connected) rides.onLinkDown(System.currentTimeMillis()) }
         }
         // Mirror the phone's own call state to the cluster (answer/hang up on
         // the phone, not just via the cluster buttons).
@@ -118,6 +130,8 @@ class BleService : Service() {
     override fun onDestroy() {
         Log.i(TAG, "service stopping")
         scope.cancel()
+        rideCollector?.onLinkDown(System.currentTimeMillis())
+        rideCollector = null
         calCollector?.stop()
         calCollector = null
         callTracker?.stop()
