@@ -662,6 +662,89 @@ static void test_get_with_null_safe(void)
     phone_data_get(NULL);       // must not crash
 }
 
+// Must match NOTIF_AUTODISMISS_MS in phone_data.c.
+#define AD_MS 8000u
+
+static void test_notif_auto_dismisses_after_timeout(void)
+{
+    fresh();  // tick = 0
+    phone_event_t a = make_notif(1, NOTIF_KIND_SMS, "Alice");
+    phone_data_apply(&a);  // shown at tick 0
+    phone_state_t s;
+
+    lv_tick_stub_set(AD_MS - 1);
+    phone_data_tick();
+    phone_data_get(&s);
+    TEST_ASSERT_TRUE(s.notif.active);  // not yet
+
+    lv_tick_stub_set(AD_MS);
+    phone_data_tick();
+    phone_data_get(&s);
+    TEST_ASSERT_FALSE(s.notif.active);  // cluster-cleared
+}
+
+static void test_call_never_auto_dismisses(void)
+{
+    fresh();
+    phone_event_t c = make_notif(1, NOTIF_KIND_CALL, "Boss");
+    phone_data_apply(&c);
+    lv_tick_stub_set(AD_MS * 10);
+    phone_data_tick();
+    phone_state_t s;
+    phone_data_get(&s);
+    TEST_ASSERT_TRUE(s.notif.active);  // calls are never timed out
+}
+
+static void test_auto_dismiss_promotes_queued_and_restarts_clock(void)
+{
+    fresh();
+    phone_event_t a = make_notif(1, NOTIF_KIND_SMS, "Alice");
+    phone_event_t b = make_notif(2, NOTIF_KIND_APP, "Bob");
+    phone_data_apply(&a);  // active id 1 (shown at 0)
+    phone_data_apply(&b);  // queued
+    phone_state_t s;
+
+    lv_tick_stub_set(AD_MS);
+    phone_data_tick();  // id 1 times out -> promote id 2, clock restarts
+    phone_data_get(&s);
+    TEST_ASSERT_TRUE(s.notif.active);
+    TEST_ASSERT_EQUAL_UINT32(2, s.notif.id);
+
+    lv_tick_stub_set(AD_MS * 2 - 1);
+    phone_data_tick();
+    phone_data_get(&s);
+    TEST_ASSERT_TRUE(s.notif.active);  // id 2 not yet timed out
+
+    lv_tick_stub_set(AD_MS * 2);
+    phone_data_tick();
+    phone_data_get(&s);
+    TEST_ASSERT_FALSE(s.notif.active);
+}
+
+static void test_tick_noop_when_idle(void)
+{
+    fresh();
+    lv_tick_stub_set(AD_MS * 5);
+    phone_data_tick();  // nothing active -> no-op
+    phone_state_t s;
+    phone_data_get(&s);
+    TEST_ASSERT_FALSE(s.notif.active);
+}
+
+static void test_tick_dropped_when_take_fails(void)
+{
+    fresh();
+    phone_event_t a = make_notif(1, NOTIF_KIND_SMS, "Alice");
+    phone_data_apply(&a);
+    lv_tick_stub_set(AD_MS);
+    g_stub_take_succeeds = 0;
+    phone_data_tick();  // lock unavailable -> no dismiss
+    g_stub_take_succeeds = 1;
+    phone_state_t s;
+    phone_data_get(&s);
+    TEST_ASSERT_TRUE(s.notif.active);
+}
+
 // PHONE_EVT_CONFIG is cluster config, applied in ble_peripheral; phone_data
 // deliberately ignores it. Confirm it neither crashes nor disturbs state.
 static void test_config_event_is_noop_in_phone_data(void)
@@ -724,4 +807,9 @@ void RunTests(void)
     RUN_TEST(test_swipe_up_with_paused_media_shows_banner);
     RUN_TEST(test_null_event_safe);
     RUN_TEST(test_get_with_null_safe);
+    RUN_TEST(test_notif_auto_dismisses_after_timeout);
+    RUN_TEST(test_call_never_auto_dismisses);
+    RUN_TEST(test_auto_dismiss_promotes_queued_and_restarts_clock);
+    RUN_TEST(test_tick_noop_when_idle);
+    RUN_TEST(test_tick_dropped_when_take_fails);
 }

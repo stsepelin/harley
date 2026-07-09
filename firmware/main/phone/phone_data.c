@@ -37,10 +37,18 @@ static void send_dismiss(uint32_t id)
 // matching DISMISS event), the front of the queue is promoted.
 #define NOTIF_QUEUE_MAX  4
 
+// Non-call notifications clear themselves from the cluster after this long, so
+// a message doesn't sit on the gauge for the whole ride. Cluster-only: we do
+// NOT send a dismiss to the phone, so it stays in the phone's shade. Calls are
+// never auto-dismissed (the rider has to accept/reject/end them).
+#define NOTIF_AUTODISMISS_MS 8000u
+
 static phone_state_t      s_state;
 static notification_t     s_queue[NOTIF_QUEUE_MAX];
 static int                s_queue_count;
 static SemaphoreHandle_t  s_mutex;
+// lv_tick when s_state.notif last became the active one; drives auto-dismiss.
+static uint32_t s_shown_ms;
 
 void phone_data_init(void)
 {
@@ -60,6 +68,7 @@ static void promote_next_locked(void)
 {
     if (s_queue_count > 0) {
         s_state.notif = s_queue[0];
+        s_shown_ms    = lv_tick_get();  // restart the auto-dismiss clock
         queue_remove_at_locked(0);
     } else {
         memset(&s_state.notif, 0, sizeof(s_state.notif));
@@ -96,6 +105,7 @@ void phone_data_apply(const phone_event_t *evt)
             enqueue_or_drop_locked(&evt->notif);
         } else {
             s_state.notif = evt->notif;
+            s_shown_ms    = lv_tick_get();  // start the auto-dismiss clock
         }
         // A new notification (front or queued) hides the media banner so
         // it doesn't cover the overlay when promoted.
@@ -137,6 +147,20 @@ void phone_data_get(phone_state_t *out)
         memcpy(out, &s_state, sizeof(s_state));
         xSemaphoreGive(s_mutex);
     }
+}
+
+void phone_data_tick(void)
+{
+    if (xSemaphoreTake(s_mutex, pdMS_TO_TICKS(10)) != pdTRUE)
+        return;
+    // Auto-clear a lingering non-call notification. Calls (incoming or in
+    // progress) are never timed out. Cluster-only: promote_next_locked doesn't
+    // send a dismiss to the phone, so the entry stays in the phone's shade.
+    if (s_state.notif.active && s_state.notif.kind != NOTIF_KIND_CALL &&
+        (uint32_t)(lv_tick_get() - s_shown_ms) >= NOTIF_AUTODISMISS_MS) {
+        promote_next_locked();
+    }
+    xSemaphoreGive(s_mutex);
 }
 
 // --- User actions --------------------------------------------------------

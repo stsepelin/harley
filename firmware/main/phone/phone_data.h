@@ -17,6 +17,11 @@ void phone_data_apply(const phone_event_t *evt);
 
 void phone_data_get(phone_state_t *out);
 
+// Cluster-side housekeeping, called each UI update. Auto-dismisses a lingering
+// non-call notification after a timeout so it doesn't sit on the gauge; the
+// phone is NOT told (the entry stays in its shade). Calls are never timed out.
+void phone_data_tick(void);
+
 // User-facing actions. These dispatch to whatever phone-bridge backend
 // is linked (BLE on device, mock on the simulator) and also clear the
 // local state so the UI hides the banner immediately.

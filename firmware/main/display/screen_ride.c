@@ -194,6 +194,7 @@ void screen_ride_update(const vehicle_data_t *data, const settings_t *settings)
     // continuously underneath so it's already current when a banner
     // dismisses.
     phone_state_t phone;
+    phone_data_tick();  // auto-dismiss a stale non-call notification
     phone_data_get(&phone);
     notification_banner_update(s_banner, &phone.notif);
     // Media banner is only visible when the user has explicitly pulled
