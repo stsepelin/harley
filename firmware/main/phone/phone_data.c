@@ -134,7 +134,8 @@ void phone_data_apply(const phone_event_t *evt)
         }
         break;
     case PHONE_EVT_CONFIG:
-        break;  // cluster config, applied in ble_peripheral (not phone_data)
+    case PHONE_EVT_ICON:
+        break;  // handled in ble_peripheral (config -> NVS; icon -> cache)
     }
 
     xSemaphoreGive(s_mutex);

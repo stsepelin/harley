@@ -54,6 +54,10 @@ phone_parse_result_t phone_protocol_parse(const uint8_t  *buf,
         uint16_t mlen = rd_u16(p); p += 2;
         if (p + mlen > end) { *consumed = total_len; return PHONE_PARSE_BAD_FIELD; }
         const uint8_t *msg = p;
+        p += mlen;
+        // Optional trailing icon_id (u32) — length-keyed so an older phone that
+        // doesn't send it still parses. memset above defaults it to 0 (no icon).
+        uint32_t icon_id = (p + 4 <= end) ? rd_u32(p) : 0;
 
         // Zero the struct first — call_in_progress / call_start_ms aren't on
         // the wire (they're cluster-side state set by phone_data_call_accept),
@@ -66,6 +70,7 @@ phone_parse_result_t phone_protocol_parse(const uint8_t  *buf,
         out->notif.active    = true;
         out->notif.id        = id;
         out->notif.kind      = (kind < NOTIF_KIND_LAST) ? (notif_kind_t)kind : NOTIF_KIND_APP;
+        out->notif.icon_id   = icon_id;
         copy_str(out->notif.sender,  sizeof(out->notif.sender),  sender, slen);
         copy_str(out->notif.message, sizeof(out->notif.message), msg,    mlen);
         *consumed = total_len;
@@ -108,6 +113,26 @@ phone_parse_result_t phone_protocol_parse(const uint8_t  *buf,
         out->type                 = PHONE_EVT_CONFIG;
         out->config.speed_divisor = rd_u16(p);
         *consumed                 = total_len;
+        return PHONE_PARSE_OK;
+    }
+
+    case PHONE_EVT_ICON: {
+        // u32 icon_id + u16 total_len + u16 offset + chunk bytes. data points
+        // into buf (valid only until the caller reuses it).
+        if (payload_len < 8) {
+            *consumed = total_len;
+            return PHONE_PARSE_BAD_FIELD;
+        }
+        out->type         = PHONE_EVT_ICON;
+        out->icon.icon_id = rd_u32(p);
+        p += 4;
+        out->icon.total_len = rd_u16(p);
+        p += 2;
+        out->icon.offset = rd_u16(p);
+        p += 2;
+        out->icon.data = p;
+        out->icon.len  = (uint16_t)(end - p);
+        *consumed      = total_len;
         return PHONE_PARSE_OK;
     }
 

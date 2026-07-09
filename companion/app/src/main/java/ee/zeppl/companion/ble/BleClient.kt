@@ -48,6 +48,11 @@ class BleClient(
     private var gatt:       BluetoothGatt?               = null
     private var writeChar:  BluetoothGattCharacteristic? = null
     private var lastDevice: BluetoothDevice?             = null
+    // One GATT write may be outstanding at a time, so writes are queued and
+    // drained on onCharacteristicWrite. Matters for the ~20-chunk icon stream;
+    // notif/media are single frames that pass straight through.
+    private val writeQueue  = ArrayDeque<ByteArray>()
+    private var writing     = false
     // Held between "services discovered, pairing kicked off" and "bond
     // completed" so we can finish TX subscription once the link is authenticated.
     private var pendingTxChar: BluetoothGattCharacteristic? = null
@@ -136,6 +141,14 @@ class BleClient(
         override fun onMtuChanged(g: BluetoothGatt, mtu: Int, status: Int) {
             Log.i(TAG, "mtu=$mtu status=$status — discovering services")
             g.discoverServices()
+        }
+
+        override fun onCharacteristicWrite(
+            g: BluetoothGatt,
+            ch: BluetoothGattCharacteristic?,
+            status: Int,
+        ) {
+            onWriteComplete()   // advance the write queue (next icon chunk / frame)
         }
 
         @SuppressLint("MissingPermission")
@@ -262,28 +275,56 @@ class BleClient(
         gatt?.close()
         gatt = null
         writeChar = null
+        clearWrites()
         BleState.deviceName = null
         BleState.conn = BleConnState.IDLE
         // Deliberate disconnect: drop last-known telemetry so Ride shows the
         // clean offline state (a link-drop keeps it for the reconnect window).
         TelemetryState.clear()
+        IconSender.reset()   // re-send icons after any reconnect
     }
 
-    @SuppressLint("MissingPermission")
+    @Synchronized
     fun write(bytes: ByteArray) {
-        val g = gatt ?: return
-        val c = writeChar ?: return
-        // WRITE_NO_RESPONSE matches the firmware characteristic flags
-        // (BLE_GATT_CHR_F_WRITE | BLE_GATT_CHR_F_WRITE_NO_RSP) and
-        // keeps us off the slow request/response loop for things like
-        // PlaybackState position updates.
-        val rc = g.writeCharacteristic(
-            c, bytes, BluetoothGattCharacteristic.WRITE_TYPE_NO_RESPONSE
-        )
+        writeQueue.addLast(bytes)
+        if (!writing) pump()
+    }
+
+    // Send the head of the queue if nothing is in flight. WRITE_NO_RESPONSE
+    // matches the firmware characteristic flags and keeps us off the slow
+    // request/response loop; completion still fires onCharacteristicWrite, which
+    // is what advances the queue (one outstanding write at a time).
+    @SuppressLint("MissingPermission")
+    @Synchronized
+    private fun pump() {
+        if (writing) return
+        val g = gatt
+        val c = writeChar
+        if (g == null || c == null) { writeQueue.clear(); return }
+        val bytes = writeQueue.firstOrNull() ?: return
+        writing = true
+        val rc = g.writeCharacteristic(c, bytes, BluetoothGattCharacteristic.WRITE_TYPE_NO_RESPONSE)
         BleState.lastTx = bytes.joinToString(" ") { "%02X".format(it) }
-        if (rc != android.bluetooth.BluetoothStatusCodes.SUCCESS) {
+        if (rc == android.bluetooth.BluetoothStatusCodes.SUCCESS) {
+            writeQueue.removeFirst()
+        } else {
+            // Transient congestion (often GATT busy): keep the frame, retry soon.
             Log.w(TAG, "writeCharacteristic rc=$rc")
+            writing = false
+            mainHandler.postDelayed({ pump() }, 15)
         }
+    }
+
+    @Synchronized
+    private fun onWriteComplete() {
+        writing = false
+        pump()
+    }
+
+    @Synchronized
+    private fun clearWrites() {
+        writeQueue.clear()
+        writing = false
     }
 
     // --- internals -----------------------------------------------------

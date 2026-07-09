@@ -11,6 +11,7 @@
 #include "boot_screen.h"
 #include "emoji_font.h"
 #include "phone_data.h"
+#include "icon_cache.h"
 #include "telemetry_publisher.h"
 #include "screen_pairing.h"
 #include "vehicle_data.h"
@@ -76,6 +77,7 @@ void app_main(void)
     // against an uninitialised vehicle_data store.
     vehicle_data_init();
     phone_data_init();
+    icon_cache_init();  // PSRAM buffers for streamed app-notification icons
 #if CONFIG_VROD_INCLUDE_SIM_ENGINE
 #if !CONFIG_VROD_J1850
     // The J1850 producer and the sim both write vehicle_data; the real

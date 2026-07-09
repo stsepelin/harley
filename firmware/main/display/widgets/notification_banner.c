@@ -41,8 +41,14 @@ typedef enum {
     BANNER_MODE_ACTIVE_CALL,    // END CALL + running duration
 } banner_mode_t;
 
+// App-icon geometry — must match icon_cache (48x48 RGB565).
+#define BANNER_ICON_PX 48
+
 typedef struct {
     lv_obj_t              *kind_label;
+    lv_obj_t              *icon_img;  // app icon; replaces the kind tag when shown
+    lv_image_dsc_t         icon_dsc;  // .data points at the caller's RGB565 buffer
+    const void            *last_icon;
     lv_obj_t              *sender_label;
     lv_obj_t              *message_label;
     lv_obj_t              *btn_accept;
@@ -111,6 +117,12 @@ lv_obj_t *notification_banner_create(lv_obj_t *parent, notif_call_action_cb_t on
     lv_label_set_text(kind, "");
     lv_obj_align(kind, LV_ALIGN_TOP_LEFT, 0, 0);
 
+    // App icon shares the kind tag's slot; hidden until an SMS/app banner has
+    // one. RGB565, no transparency (the phone composites over the banner bg).
+    lv_obj_t *icon = lv_image_create(cont);
+    lv_obj_align(icon, LV_ALIGN_TOP_LEFT, 0, 0);
+    lv_obj_add_flag(icon, LV_OBJ_FLAG_HIDDEN);
+
     lv_obj_t *sender = lv_label_create(cont);
     lv_obj_set_style_text_font(sender, &jbm_bold_33, 0);
     lv_obj_set_style_text_color(sender, lv_color_hex(VROD_TEXT), 0);
@@ -169,6 +181,13 @@ lv_obj_t *notification_banner_create(lv_obj_t *parent, notif_call_action_cb_t on
 
     banner_data_t *bd = lv_malloc(sizeof(banner_data_t));
     bd->kind_label     = kind;
+    bd->icon_img       = icon;
+    memset(&bd->icon_dsc, 0, sizeof(bd->icon_dsc));
+    bd->icon_dsc.header.cf = LV_COLOR_FORMAT_RGB565;
+    bd->icon_dsc.header.w  = BANNER_ICON_PX;
+    bd->icon_dsc.header.h  = BANNER_ICON_PX;
+    bd->icon_dsc.data_size = BANNER_ICON_PX * BANNER_ICON_PX * 2;
+    bd->last_icon          = (const void *)-1;  // sentinel: force first apply
     bd->sender_label   = sender;
     bd->message_label  = message;
     bd->btn_accept     = accept;
@@ -250,12 +269,14 @@ static void fit_info_height(lv_obj_t *cont, banner_data_t *bd)
     }
 }
 
-void notification_banner_update(lv_obj_t *cont, const notification_t *notif)
+void notification_banner_update(lv_obj_t *cont, const notification_t *notif,
+                                const void *icon_rgb565)
 {
     banner_data_t *bd = lv_obj_get_user_data(cont);
     if (!bd || !notif) return;
 
     banner_mode_t mode = mode_for(notif);
+    bool          new_notif = (notif->id != bd->last_id);
 
     if (notif->active != bd->last_active) {
         if (notif->active) lv_obj_remove_flag(cont, LV_OBJ_FLAG_HIDDEN);
@@ -278,6 +299,7 @@ void notification_banner_update(lv_obj_t *cont, const notification_t *notif)
         bd->last_kind       = (notif_kind_t)-1;
         bd->last_message[0] = '\0';
         bd->last_call_sec   = (uint32_t)-1;
+        bd->last_icon       = (const void *)-1;  // re-apply icon after a mode flip
         bd->last_mode       = mode;
     }
 
@@ -287,6 +309,24 @@ void notification_banner_update(lv_obj_t *cont, const notification_t *notif)
         lv_obj_set_style_text_color(bd->kind_label,
             lv_color_hex(kind_color(mode, notif->kind)), 0);
         bd->last_kind = notif->kind;
+    }
+
+    // App icon: only on SMS/app banners (calls keep their button UI + tag).
+    // Re-apply on a new notification even if the pointer is unchanged — the
+    // caller reuses one buffer, so the same pointer can hold a different icon.
+    const void *icon = (mode == BANNER_MODE_INFO) ? icon_rgb565 : NULL;
+    if (icon != bd->last_icon || (new_notif && icon != NULL)) {
+        if (icon != NULL) {
+            bd->icon_dsc.data = icon;
+            lv_image_set_src(bd->icon_img, &bd->icon_dsc);
+            lv_obj_invalidate(bd->icon_img);
+            lv_obj_remove_flag(bd->icon_img, LV_OBJ_FLAG_HIDDEN);
+            lv_obj_add_flag(bd->kind_label, LV_OBJ_FLAG_HIDDEN);
+        } else {
+            lv_obj_add_flag(bd->icon_img, LV_OBJ_FLAG_HIDDEN);
+            lv_obj_remove_flag(bd->kind_label, LV_OBJ_FLAG_HIDDEN);
+        }
+        bd->last_icon = icon;
     }
 
     // Sender.

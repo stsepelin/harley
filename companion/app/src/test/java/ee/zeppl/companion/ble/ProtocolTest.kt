@@ -21,7 +21,7 @@ class ProtocolTest {
         val out = Protocol.encodeNotif(0xABCD1234u, Protocol.NotifKind.CALL, "John", "ringing")
         val expected = byteArrayOf(
             0x01,                                    // type = NOTIF
-            0x13, 0x00,                              // payload_len = 19 LE (4+1+1+4+2+7)
+            0x17, 0x00,                              // payload_len = 23 LE (4+1+1+4+2+7+4)
             0x34.toByte(), 0x12, 0xCD.toByte(), 0xAB.toByte(),  // id LE
             0x00,                                    // kind = CALL
             0x04,                                    // sender_len
@@ -29,6 +29,31 @@ class ProtocolTest {
             0x07, 0x00,                              // msg_len = 7 LE
             'r'.code.toByte(), 'i'.code.toByte(), 'n'.code.toByte(),
             'g'.code.toByte(), 'i'.code.toByte(), 'n'.code.toByte(), 'g'.code.toByte(),
+            0x00, 0x00, 0x00, 0x00,                  // icon_id = 0 (none)
+        )
+        assertArrayEquals(expected, out)
+    }
+
+    @Test fun `notif carries a trailing icon_id`() {
+        val out = Protocol.encodeNotif(1u, Protocol.NotifKind.APP, "A", "b", iconId = 0xDEADBEEFu)
+        // last four bytes are icon_id LE
+        val tail = out.copyOfRange(out.size - 4, out.size)
+        assertArrayEquals(
+            byteArrayOf(0xEF.toByte(), 0xBE.toByte(), 0xAD.toByte(), 0xDE.toByte()),
+            tail,
+        )
+    }
+
+    @Test fun `encodes an icon chunk`() {
+        val out = Protocol.encodeIcon(0x87654321u, totalLen = 4608, offset = 64,
+                                      chunk = byteArrayOf(0xAA.toByte(), 0xBB.toByte()))
+        val expected = byteArrayOf(
+            0x05,                                    // type = ICON
+            0x0A, 0x00,                              // payload_len = 10 LE (4+2+2+2)
+            0x21, 0x43, 0x65, 0x87.toByte(),         // icon_id LE
+            0x00, 0x12,                              // total_len = 4608 LE
+            0x40, 0x00,                              // offset = 64 LE
+            0xAA.toByte(), 0xBB.toByte(),            // chunk
         )
         assertArrayEquals(expected, out)
     }

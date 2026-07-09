@@ -86,6 +86,81 @@ static void test_parse_notif(void)
     TEST_ASSERT_EQUAL_INT(NOTIF_KIND_CALL, evt.notif.kind);
     TEST_ASSERT_EQUAL_STRING("John",    evt.notif.sender);
     TEST_ASSERT_EQUAL_STRING("ringing", evt.notif.message);
+    TEST_ASSERT_EQUAL_UINT32(0u, evt.notif.icon_id);  // absent -> 0 (backward compat)
+}
+
+static void test_parse_notif_with_icon_id(void)
+{
+    // NOTIF payload with a trailing icon_id: id, kind, slen "Al", mlen "hi", icon.
+    uint8_t p[] = {
+        0x11,
+        0x22,
+        0x33,
+        0x44,            // id
+        NOTIF_KIND_APP,  // kind
+        2,
+        'A',
+        'l',  // sender len + bytes
+        2,
+        0,
+        'h',
+        'i',  // msg len (LE) + bytes
+        0xEF,
+        0xBE,
+        0xAD,
+        0xDE,  // icon_id 0xDEADBEEF (LE)
+    };
+    uint8_t buf[64];
+    buf[0] = PHONE_EVT_NOTIF;
+    buf[1] = (uint8_t)sizeof(p);
+    buf[2] = 0;
+    memcpy(buf + 3, p, sizeof(p));
+    size_t        consumed = 0;
+    phone_event_t evt;
+    TEST_ASSERT_EQUAL_INT(PHONE_PARSE_OK,
+                          phone_protocol_parse(buf, 3 + sizeof(p), &consumed, &evt));
+    TEST_ASSERT_EQUAL_INT(PHONE_EVT_NOTIF, evt.type);
+    TEST_ASSERT_EQUAL_STRING("Al", evt.notif.sender);
+    TEST_ASSERT_EQUAL_STRING("hi", evt.notif.message);
+    TEST_ASSERT_EQUAL_UINT32(0xDEADBEEFu, evt.notif.icon_id);
+}
+
+static void test_parse_icon_chunk(void)
+{
+    uint8_t p[] = {
+        0x21, 0x43, 0x65, 0x87,  // icon_id 0x87654321 (LE)
+        0x00, 0x12,              // total_len 4608 (LE)
+        0x40, 0x00,              // offset 64 (LE)
+        0xAA, 0xBB, 0xCC,        // 3 chunk bytes
+    };
+    uint8_t buf[64];
+    buf[0] = PHONE_EVT_ICON;
+    buf[1] = (uint8_t)sizeof(p);
+    buf[2] = 0;
+    memcpy(buf + 3, p, sizeof(p));
+    size_t        consumed = 0;
+    phone_event_t evt;
+    TEST_ASSERT_EQUAL_INT(PHONE_PARSE_OK,
+                          phone_protocol_parse(buf, 3 + sizeof(p), &consumed, &evt));
+    TEST_ASSERT_EQUAL_INT(PHONE_EVT_ICON, evt.type);
+    TEST_ASSERT_EQUAL_UINT32(0x87654321u, evt.icon.icon_id);
+    TEST_ASSERT_EQUAL_UINT16(4608, evt.icon.total_len);
+    TEST_ASSERT_EQUAL_UINT16(64, evt.icon.offset);
+    TEST_ASSERT_EQUAL_UINT16(3, evt.icon.len);
+    TEST_ASSERT_EQUAL_UINT8(0xAA, evt.icon.data[0]);
+    TEST_ASSERT_EQUAL_UINT8(0xCC, evt.icon.data[2]);
+}
+
+static void test_parse_icon_too_short_rejected(void)
+{
+    uint8_t buf[16];
+    buf[0] = PHONE_EVT_ICON;
+    buf[1] = 7;
+    buf[2] = 0;  // payload 7 < 8
+    memset(buf + 3, 0, 7);
+    size_t        consumed = 0;
+    phone_event_t evt;
+    TEST_ASSERT_EQUAL_INT(PHONE_PARSE_BAD_FIELD, phone_protocol_parse(buf, 10, &consumed, &evt));
 }
 
 static void test_parse_dismiss(void)
@@ -430,4 +505,7 @@ void RunTests(void)
     RUN_TEST(test_encode_dismiss_little_endian_id);
     RUN_TEST(test_parse_config_speed_divisor);
     RUN_TEST(test_parse_config_too_short_rejected);
+    RUN_TEST(test_parse_notif_with_icon_id);
+    RUN_TEST(test_parse_icon_chunk);
+    RUN_TEST(test_parse_icon_too_short_rejected);
 }

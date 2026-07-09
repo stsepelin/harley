@@ -38,6 +38,8 @@ typedef struct {
     // the widget can render elapsed call duration.
     bool         call_in_progress;
     uint32_t     call_start_ms;
+    // Hash of the source app package; keys the cluster's icon cache. 0 = none.
+    uint32_t icon_id;
 } notification_t;
 
 typedef struct {
@@ -56,11 +58,24 @@ typedef struct {
     uint16_t speed_divisor;  // raw ECM count -> mph
 } vehicle_config_t;
 
+// One chunk of an app-icon image (48x48 RGB565, sent opaque). Chunks for the
+// same icon_id are reassembled by offset into a cluster-side cache; the NOTIF
+// then references the icon by icon_id. `data` points into the parse buffer and
+// is only valid during the apply call (copied out immediately).
+typedef struct {
+    uint32_t       icon_id;
+    uint16_t       total_len;  // full image byte count (48*48*2 = 4608)
+    uint16_t       offset;     // byte offset of this chunk within the image
+    const uint8_t *data;
+    uint16_t       len;  // bytes in this chunk
+} icon_chunk_t;
+
 typedef enum {
     PHONE_EVT_NOTIF         = 0x01,
     PHONE_EVT_NOTIF_DISMISS = 0x02,
     PHONE_EVT_MEDIA         = 0x03,
     PHONE_EVT_CONFIG        = 0x04,
+    PHONE_EVT_ICON          = 0x05,
 } phone_event_type_t;
 
 typedef struct {
@@ -70,6 +85,7 @@ typedef struct {
         uint32_t         dismiss_id;  // PHONE_EVT_NOTIF_DISMISS
         now_playing_t    media;       // PHONE_EVT_MEDIA
         vehicle_config_t config;      // PHONE_EVT_CONFIG
+        icon_chunk_t     icon;        // PHONE_EVT_ICON
     };
 } phone_event_t;
 

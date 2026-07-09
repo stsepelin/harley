@@ -41,6 +41,12 @@ object Protocol {
     private const val TYPE_NOTIF_DISMISS : Byte = 0x02
     private const val TYPE_MEDIA         : Byte = 0x03
     private const val TYPE_CONFIG        : Byte = 0x04
+    private const val TYPE_ICON          : Byte = 0x05
+
+    // App-icon image geometry (mirrors the cluster): 48x48 RGB565, opaque.
+    const val ICON_W = 48
+    const val ICON_H = 48
+    const val ICON_BYTES = ICON_W * ICON_H * 2
 
     // Mirrors notif_kind_t.
     enum class NotifKind(val wire: Byte) {
@@ -52,12 +58,19 @@ object Protocol {
         STOPPED(0), PAUSED(1), PLAYING(2);
     }
 
-    /** A new (or replacing) notification. */
-    fun encodeNotif(id: UInt, kind: NotifKind, sender: String, message: String): ByteArray {
+    /** A new (or replacing) notification. `iconId` (0 = none) references an icon
+     *  previously streamed via [encodeIcon]; the cluster renders it if cached. */
+    fun encodeNotif(
+        id: UInt,
+        kind: NotifKind,
+        sender: String,
+        message: String,
+        iconId: UInt = 0u,
+    ): ByteArray {
         val senderBytes  = truncatedUtf8(sanitize(sender),  Limits.NOTIF_SENDER_MAX)
         val messageBytes = truncatedUtf8(sanitize(message), Limits.NOTIF_MSG_MAX)
-        // payload: u32 id, u8 kind, u8 sender_len, sender, u16 msg_len, message
-        val payloadLen = 4 + 1 + 1 + senderBytes.size + 2 + messageBytes.size
+        // payload: u32 id, u8 kind, u8 sender_len, sender, u16 msg_len, message, u32 icon_id
+        val payloadLen = 4 + 1 + 1 + senderBytes.size + 2 + messageBytes.size + 4
         val buf = ByteBuffer.allocate(3 + payloadLen).order(ByteOrder.LITTLE_ENDIAN)
         buf.put(TYPE_NOTIF)
         buf.putShort(payloadLen.toShort())
@@ -67,6 +80,24 @@ object Protocol {
         buf.put(senderBytes)
         buf.putShort(messageBytes.size.toShort())
         buf.put(messageBytes)
+        buf.putInt(iconId.toInt())
+        return buf.array()
+    }
+
+    /**
+     * One chunk of an app-icon image (48x48 RGB565, opaque). Mirrors
+     * `PHONE_EVT_ICON`: u32 icon_id, u16 total_len, u16 offset, chunk bytes.
+     * The cluster reassembles chunks by offset into its icon cache.
+     */
+    fun encodeIcon(iconId: UInt, totalLen: Int, offset: Int, chunk: ByteArray): ByteArray {
+        val payloadLen = 4 + 2 + 2 + chunk.size
+        val buf = ByteBuffer.allocate(3 + payloadLen).order(ByteOrder.LITTLE_ENDIAN)
+        buf.put(TYPE_ICON)
+        buf.putShort(payloadLen.toShort())
+        buf.putInt(iconId.toInt())
+        buf.putShort(totalLen.toShort())
+        buf.putShort(offset.toShort())
+        buf.put(chunk)
         return buf.array()
     }
 

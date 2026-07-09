@@ -13,6 +13,8 @@
 #include "media_banner.h"
 #include "ble_peripheral.h"
 #include "phone_data.h"
+#include "icon_cache.h"
+#include "esp_heap_caps.h"
 #include "theme.h"
 #include "ui_manager.h"
 
@@ -47,6 +49,10 @@ static volatile int s_info_mode;
 #define INFO_HIT_PAD 30
 static volatile int s_info_hit_x0, s_info_hit_y0, s_info_hit_x1, s_info_hit_y1;
 static lv_obj_t *s_banner;
+// Scratch copy of the active notification's icon (RGB565), pulled from the
+// icon cache when its id changes; the banner renders directly from it.
+static uint8_t  *s_icon_buf;
+static uint32_t  s_icon_loaded;  // icon_id currently in s_icon_buf, 0 = none
 static lv_obj_t *s_media_banner;
 static lv_obj_t *s_media_hint;
 static lv_obj_t *s_ble_dot;
@@ -137,6 +143,7 @@ lv_obj_t *screen_ride_create(void)
     // banner has visible-circle clearance at y ≤ 746, so the bottom
     // sits at 745 with corners just inside the round visible area.
     s_banner = notification_banner_create(s_screen, on_call_action);
+    s_icon_buf = heap_caps_malloc(ICON_CACHE_BYTES, MALLOC_CAP_SPIRAM);
     lv_obj_align(s_banner, LV_ALIGN_BOTTOM_MID, 0, -55);
 
     s_media_banner = media_banner_create(s_screen, on_media_action);
@@ -196,7 +203,20 @@ void screen_ride_update(const vehicle_data_t *data, const settings_t *settings)
     phone_state_t phone;
     phone_data_tick();  // auto-dismiss a stale non-call notification
     phone_data_get(&phone);
-    notification_banner_update(s_banner, &phone.notif);
+    // Pull the app icon out of the cache into our scratch buffer when its id
+    // changes (and retry each frame until the chunks have all arrived).
+    const void *icon = NULL;
+    if (phone.notif.active && phone.notif.icon_id != 0 && s_icon_buf) {
+        if (s_icon_loaded != phone.notif.icon_id &&
+            icon_cache_copy(phone.notif.icon_id, s_icon_buf)) {
+            s_icon_loaded = phone.notif.icon_id;
+        }
+        if (s_icon_loaded == phone.notif.icon_id)
+            icon = s_icon_buf;
+    } else {
+        s_icon_loaded = 0;
+    }
+    notification_banner_update(s_banner, &phone.notif, icon);
     // Media banner is only visible when the user has explicitly pulled
     // it up AND there's no active notification claiming the space.
     bool media_visible = phone.media_banner_shown && !phone.notif.active;

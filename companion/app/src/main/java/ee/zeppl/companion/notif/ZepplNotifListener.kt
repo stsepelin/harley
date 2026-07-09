@@ -57,6 +57,7 @@ class ZepplNotifListener : NotificationListenerService() {
             Log.i(TAG, "  drop: muted via allowlist")
             return
         }
+        val iconId = ee.zeppl.companion.ble.IconCodec.iconId(sbn.packageName)
         val bytes  = NotifMapper.encodePost(
             ownPackage  = packageName,
             packageName = sbn.packageName,
@@ -67,6 +68,7 @@ class ZepplNotifListener : NotificationListenerService() {
             template    = template,
             title       = title,
             text        = text,
+            iconId      = iconId,
         )
         if (bytes == null) {
             Log.i(TAG, "  drop: mapper filter")
@@ -91,6 +93,9 @@ class ZepplNotifListener : NotificationListenerService() {
         // cancel. Only one entry per id is kept; if the upstream poster
         // recycles a key, the latest mapping wins.
         idToKey[id] = sbn.key
+        // Stream the app icon (once per app per connection) ahead of the notif
+        // frame so it's cached when the banner renders.
+        ee.zeppl.companion.ble.IconSender.sendIfNeeded(this, sbn.packageName)
         OutboundSink.send(bytes)
     }
 

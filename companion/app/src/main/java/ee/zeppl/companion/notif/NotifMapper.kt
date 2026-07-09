@@ -93,6 +93,7 @@ internal object NotifMapper {
         template:    String?,
         title:       String,
         text:        String,
+        iconId:      UInt = 0u,
     ): ByteArray? {
         if (packageName == ownPackage) return null
         // Calls are *always* ongoing (the notification persists for the
@@ -110,6 +111,6 @@ internal object NotifMapper {
         if (flags and FLAG_GROUP_SUMMARY      != 0) return null
         if (category == CAT_TRANSPORT)          return null
         if (template == TEMPLATE_MEDIA_STYLE)   return null
-        return Protocol.encodeNotif(stableId(key), kindFor(category, template), title, text)
+        return Protocol.encodeNotif(stableId(key), kindFor(category, template), title, text, iconId)
     }
 }
