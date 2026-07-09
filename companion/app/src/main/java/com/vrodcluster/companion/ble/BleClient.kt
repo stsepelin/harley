@@ -53,6 +53,10 @@ class BleClient(
     private var pendingTxChar: BluetoothGattCharacteristic? = null
     private val mainHandler = android.os.Handler(android.os.Looper.getMainLooper())
     private var bondPoll: Runnable? = null
+    // Auto-recovery of an asymmetric bond: `reachedServices` is per-attempt;
+    // `authRecoveryDone` guards to one removeBond+re-pair per connect sequence.
+    private var reachedServices = false
+    private var authRecoveryDone = false
 
     private val scanCallback = object : ScanCallback() {
         @SuppressLint("MissingPermission")
@@ -95,6 +99,22 @@ class BleClient(
                     g.close()
                     if (gatt === g) gatt = null
                     val dev = lastDevice
+                    // Stale/asymmetric bond: we connected to a device the phone
+                    // thinks is bonded but the link failed before we could even
+                    // resolve services (e.g. MTU rc=133 from a key mismatch).
+                    // Drop the phone-side bond and re-pair once - otherwise Android
+                    // churns (auth fail -> auto-unbond -> repair). Guarded to a
+                    // single attempt per sequence.
+                    if (dev != null && status != 0 && !reachedServices &&
+                        !authRecoveryDone && dev.bondState == BluetoothDevice.BOND_BONDED
+                    ) {
+                        authRecoveryDone = true
+                        Log.w(TAG, "stale bond suspected (status=$status); removing bond + re-pair")
+                        removeBond(dev)
+                        BleState.conn = BleConnState.CONNECTING
+                        repairAfterUnbond(dev)
+                        return
+                    }
                     if (dev != null && ReconnectPolicy.shouldReconnect(status)) {
                         // The cluster reboots on every ignition cycle;
                         // autoConnect=true parks its address on the
@@ -130,6 +150,7 @@ class BleClient(
             }
             writeChar = rxChr
             pendingTxChar = txChr
+            reachedServices = true  // got far enough that a later drop isn't a bad bond
 
             // The cluster's RX characteristic is gated with WRITE_AUTHEN, so we
             // must be bonded before writes (and TX CCCD) take. If not bonded
@@ -139,6 +160,7 @@ class BleClient(
             val device = g.device
             if (device.bondState == BluetoothDevice.BOND_BONDED) {
                 subscribeTx(g, txChr)
+                authRecoveryDone = false
                 BleState.conn = BleConnState.CONNECTED
                 Log.i(TAG, "ready; already bonded, RX resolved, TX subscribed")
             } else {
@@ -269,9 +291,37 @@ class BleClient(
     @SuppressLint("MissingPermission")
     private fun connectTo(device: BluetoothDevice, autoConnect: Boolean) {
         lastDevice = device
+        reachedServices = false
         BleState.deviceName = device.name ?: device.address
         BleState.conn = BleConnState.CONNECTING
         gatt = device.connectGatt(appContext, autoConnect, gattCallback)
+    }
+
+    // Reflection: BluetoothDevice.removeBond() is @hide but stable since API 1.
+    @SuppressLint("MissingPermission")
+    private fun removeBond(device: BluetoothDevice): Boolean = try {
+        (device.javaClass.getMethod("removeBond").invoke(device) as? Boolean) ?: false
+    } catch (t: Throwable) {
+        Log.w(TAG, "removeBond reflection failed: $t")
+        false
+    }
+
+    // After removeBond() (async), wait for the bond to actually clear, then do a
+    // fresh direct connect so onServicesDiscovered re-pairs from scratch.
+    @SuppressLint("MissingPermission")
+    private fun repairAfterUnbond(device: BluetoothDevice) {
+        val poll = object : Runnable {
+            private var tries = 0
+            override fun run() {
+                if (device.bondState == BluetoothDevice.BOND_NONE || tries++ > 25) {
+                    Log.i(TAG, "re-pairing after unbond")
+                    connectTo(device, autoConnect = false)
+                } else {
+                    mainHandler.postDelayed(this, 200)
+                }
+            }
+        }
+        mainHandler.postDelayed(poll, 200)
     }
 
     // Enable the TX (cluster → phone) notify channel: tell Android to deliver
@@ -313,6 +363,7 @@ class BleClient(
                     BluetoothDevice.BOND_BONDED -> {
                         Log.i(TAG, "bond confirmed; finishing TX subscription")
                         gatt?.let { subscribeTx(it, pendingTxChar) }
+                        authRecoveryDone = false
                         BleState.conn = BleConnState.CONNECTED
                         bondPoll = null
                     }
