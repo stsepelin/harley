@@ -20,7 +20,6 @@ kotlin             = "2.3.21"
 # every Compose artifact resolves on 1.11 and compiles against SDK 36.
 compose-bom        = "2026.05.01"
 material3          = "1.5.0-alpha18"
-adaptive-nav-suite = "1.5.0-alpha18"
 navigation-compose = "2.9.8"
 serialization-json = "1.9.0"
 activity-compose   = "1.9.3"
@@ -52,7 +51,6 @@ androidx-compose-ui-graphics = { group = "androidx.compose.ui",          name = 
 # material3 + adaptive navigation-suite are version-pinned (not BOM-managed)
 # to reach the Expressive surface. Everything else stays on the BOM.
 androidx-compose-material3 = { group = "androidx.compose.material3",     name = "material3",          version.ref = "material3" }
-androidx-compose-material3-adaptive-navigation-suite = { group = "androidx.compose.material3", name = "material3-adaptive-navigation-suite", version.ref = "adaptive-nav-suite" }
 androidx-compose-material-icons = { group = "androidx.compose.material", name = "material-icons-extended" }
 androidx-compose-ui-tooling-preview = { group = "androidx.compose.ui",   name = "ui-tooling-preview" }
 androidx-navigation-compose = { group = "androidx.navigation",           name = "navigation-compose", version.ref = "navigation-compose" }

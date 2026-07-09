@@ -73,8 +73,8 @@ fun SettingsScreen(onConfigureApps: () -> Unit) {
 
         SectionCard(title = "Appearance") {
             SwitchRow(
-                label = "Use wallpaper colors",
-                sublabel = "Material You. Off keeps the V-Rod orange theme.",
+                label = "Match device colors",
+                sublabel = "Use your phone's system color scheme. Off keeps the V-Rod orange theme.",
                 checked = AppPrefs.dynamicColor,
                 onCheckedChange = { AppPrefs.dynamicColor = it },
             )

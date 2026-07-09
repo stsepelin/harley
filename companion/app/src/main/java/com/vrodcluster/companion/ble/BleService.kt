@@ -57,32 +57,32 @@ class BleService : Service() {
         }
 
         val handler = CommandHandler(applicationContext)
+        // Swap the global sink so any future notif / media event goes straight
+        // to GATT instead of the default logcat path. Remember the prior lambda
+        // so we can restore it in onDestroy. The actual connect is kicked off in
+        // onStartCommand (which fires on every start, including while we're
+        // already running - so Reconnect works even without a service restart).
         client = BleClient(applicationContext, onCommand = handler::dispatch).also { c ->
-            // Swap the global sink so any future notif / media event
-            // goes straight to GATT instead of the default logcat path.
-            // Remember the prior lambda so we can restore it in
-            // onDestroy — letting the NotificationListener continue
-            // working in logcat mode after the service stops.
             previousSinkSend = OutboundSink.send
             OutboundSink.send = { bytes -> c.write(bytes) }
-            // If the caller picked a specific cluster via the in-app
-            // device picker, the chosen MAC arrived as EXTRA_TARGET_ADDRESS.
-            // Otherwise fall back to scan-and-take-first-match.
-            val target = pendingAddress
-            pendingAddress = null
-            if (target != null) {
-                c.startWithAddress(target)
-            } else {
-                c.start()
-            }
         }
-        Log.i(TAG, "service started; scanning for cluster")
+        Log.i(TAG, "service started")
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        // STICKY so Android restarts us after a low-memory kill once
-        // pressure subsides. The user's pairing intent is implicit:
-        // they tapped Connect at some point.
+        val c = client
+        if (c != null && intent != null) {
+            val address = intent.getStringExtra(EXTRA_ADDRESS)
+            val autoConnect = intent.getBooleanExtra(EXTRA_AUTOCONNECT, false)
+            if (address != null) {
+                c.connectAddress(address, autoConnect)
+            } else {
+                // No specific target: scan-and-take-first-match (fresh setup).
+                c.start()
+            }
+        }
+        // STICKY so Android restarts us after a low-memory kill once pressure
+        // subsides. The user's connect intent is implicit: they tapped at some point.
         return START_STICKY
     }
 
@@ -134,6 +134,7 @@ class BleService : Service() {
         BleConnState.IDLE         -> getString(R.string.ble_state_idle)
         BleConnState.SCANNING     -> getString(R.string.ble_state_scanning)
         BleConnState.CONNECTING   -> getString(R.string.ble_state_connecting, BleState.deviceName ?: "…")
+        BleConnState.PAIRING      -> getString(R.string.ble_state_pairing,    BleState.deviceName ?: "cluster")
         BleConnState.CONNECTED    -> getString(R.string.ble_state_connected,  BleState.deviceName ?: "?")
         BleConnState.DISCONNECTED -> getString(R.string.ble_state_disconnected)
         BleConnState.WAITING      -> getString(R.string.ble_state_waiting,    BleState.deviceName ?: "cluster")
@@ -155,17 +156,20 @@ class BleService : Service() {
         // permission we declared in the manifest is the gate.
         private const val FG_TYPE    = ServiceInfo.FOREGROUND_SERVICE_TYPE_CONNECTED_DEVICE
 
-        /**
-         * Address the in-app picker chose for the next service start.
-         * Set just before [start]; cleared by onCreate after consumption.
-         * Volatile because the picker thread and the service main thread
-         * touch it back-to-back.
-         */
-        @Volatile private var pendingAddress: String? = null
+        private const val EXTRA_ADDRESS     = "vrod.address"
+        private const val EXTRA_AUTOCONNECT = "vrod.autoConnect"
 
-        fun start(context: Context, address: String? = null) {
-            pendingAddress = address
-            val intent = Intent(context, BleService::class.java)
+        /**
+         * Start (or, if already running, redirect) the link. `address` = null
+         * scans for the first cluster (fresh setup); a specific MAC connects
+         * directly. `autoConnect=true` is for reconnecting to a bonded cluster
+         * that may not be visible - it parks the address on the accept list.
+         */
+        fun start(context: Context, address: String? = null, autoConnect: Boolean = false) {
+            val intent = Intent(context, BleService::class.java).apply {
+                if (address != null) putExtra(EXTRA_ADDRESS, address)
+                putExtra(EXTRA_AUTOCONNECT, autoConnect)
+            }
             context.startForegroundService(intent)
         }
 

@@ -48,10 +48,15 @@
         android:theme="@style/Theme.VRodCompanion"
         tools:targetApi="36">
 
+        <!-- resizeableActivity + no orientation lock / no configChanges: let the
+             OS resize us on fold/unfold and split-screen, and let Compose
+             recompose (currentWindowAdaptiveInfo reacts to the new size).
+             Handling the config change ourselves would strand stale layouts. -->
         <activity
             android:name=".MainActivity"
             android:exported="true"
             android:label="@string/app_name"
+            android:resizeableActivity="true"
             android:theme="@style/Theme.VRodCompanion">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />

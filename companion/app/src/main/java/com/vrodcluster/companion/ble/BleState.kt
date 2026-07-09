@@ -5,7 +5,10 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 
 enum class BleConnState {
-    IDLE, SCANNING, CONNECTING, CONNECTED, DISCONNECTED,
+    IDLE, SCANNING, CONNECTING,
+    /** GATT is up but SMP pairing (numeric comparison) isn't confirmed yet. */
+    PAIRING,
+    CONNECTED, DISCONNECTED,
     /** Link lost (power cycle / out of range); background reconnect armed. */
     WAITING,
 }
