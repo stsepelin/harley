@@ -38,6 +38,23 @@ int units_temp_display(int celsius, temp_units_t units)
     return (nine >= 0 ? (nine + 2) / 5 : (nine - 2) / 5) + 32;
 }
 
+// Provisional fuel calibration until a fill-up locks it (ride-1-findings):
+// ~0.025 mL per consumption tick. L/100km x10 = ticks * uL_per_tick / dist_m
+// (litres = ticks*uL/1e6; L/100km = litres*1e5/dist_m).
+#define FUEL_UL_PER_TICK 25u
+
+uint32_t units_econ_x10(uint32_t fuel_ticks, uint32_t dist_m, display_units_t units)
+{
+    if (dist_m < 100u)
+        return 0;  // too little distance to be meaningful
+    uint32_t lp100_x10 = (uint32_t)((uint64_t)fuel_ticks * FUEL_UL_PER_TICK / dist_m);
+    if (units != UNITS_MPH)
+        return lp100_x10;
+    if (lp100_x10 == 0)
+        return 0;
+    return 23522u / lp100_x10;  // mpg x10 = 235.215*100 / (L/100km x10)
+}
+
 const char *units_speed_label(display_units_t units)
 {
     return (units == UNITS_MPH) ? "mph" : "km/h";
@@ -51,4 +68,9 @@ const char *units_distance_label(display_units_t units)
 const char *units_temp_label(temp_units_t units)
 {
     return (units == UNITS_FAHRENHEIT) ? "F" : "C";
+}
+
+const char *units_econ_label(display_units_t units)
+{
+    return (units == UNITS_MPH) ? "mpg" : "L/100km";
 }

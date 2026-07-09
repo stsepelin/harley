@@ -8,6 +8,10 @@
 #include "ui_manager.h"
 #include "screen_ride.h"
 #include "screen_settings.h"
+#include "screen_settings_bluetooth.h"
+#include "screen_settings_general.h"
+#include "screen_settings_odoset.h"
+#include "screen_settings_trip.h"
 #include "settings.h"
 #include "settings_store.h"
 #include "sound.h"
@@ -70,11 +74,37 @@ void ui_manager_show_settings(void)
     lv_screen_load(s_settings);
 }
 
-// The dedicated BLE device-picker sub-screen isn't built into the sim; route
-// the button to the main settings screen so screen_settings.c links.
+void ui_manager_show_settings_general(void)
+{
+    static lv_obj_t *s = NULL;
+    if (!s)
+        s = screen_settings_general_create();
+    lv_screen_load(s);
+}
+
+void ui_manager_show_settings_trip(void)
+{
+    static lv_obj_t *s = NULL;
+    if (!s)
+        s = screen_settings_trip_create();
+    lv_screen_load(s);
+}
+
+void ui_manager_show_settings_odoset(void)
+{
+    static lv_obj_t *s = NULL;
+    if (s)
+        lv_obj_delete(s);  // fresh each entry, like the firmware
+    s = screen_settings_odoset_create();
+    lv_screen_load(s);
+}
+
 void ui_manager_show_settings_bluetooth(void)
 {
-    ui_manager_show_settings();
+    static lv_obj_t *s = NULL;
+    if (!s)
+        s = screen_settings_bluetooth_create();
+    lv_screen_load(s);
 }
 
 void ui_manager_init(void)

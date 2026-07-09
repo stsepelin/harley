@@ -119,6 +119,8 @@ static void sim_task(void *arg)
     float    odo_m_accum    = 12847000.0f;       // float so fractional metres carry over ticks
     float    trip1_m_accum  = 0.0f;              // resets at boot — typical "trip A" behaviour
     float    trip2_m_accum  = 47800.0f;          // pre-loaded so trip B looks lived-in
+    float          trip1_fuel     = 0.0f;              // synthetic fuel ticks (~ engine work)
+    float          trip2_fuel     = 6800.0f;
     float    fuel_progress  = 0.0f;
     float    clock_seconds  = 8 * 3600 + 24 * 60; // start at 08:24
     uint32_t breathing_lcg  = 0xDEADBEEFu;
@@ -167,6 +169,14 @@ static void sim_task(void *arg)
         data.odometer_m = (uint32_t)odo_m_accum;
         data.trip1_m    = (uint32_t)trip1_m_accum;
         data.trip2_m    = (uint32_t)trip2_m_accum;
+
+        // Synthetic fuel consumption ~ engine work (rpm x time) so the economy
+        // readouts show plausible moving numbers in the sim.
+        float dfuel = rpm * TICK_S * 0.014f;
+        trip1_fuel += dfuel;
+        trip2_fuel += dfuel;
+        data.trip1_fuel_ticks = (uint32_t)trip1_fuel;
+        data.trip2_fuel_ticks = (uint32_t)trip2_fuel;
 
         // 5) Fuel cycles ~10 s per segment so the low-fuel icon clearly trips.
         fuel_tick(&fuel_progress, &data.fuel_level, TICK_S, 10.0f, 6);

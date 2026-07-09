@@ -106,6 +106,27 @@ static void test_temp_labels(void)
     TEST_ASSERT_EQUAL_STRING("F", units_temp_label(UNITS_FAHRENHEIT));
 }
 
+// --- economy -------------------------------------------------------------
+
+static void test_econ_metric(void)
+{
+    // 8225 ticks over 3000 m at 0.025 mL/tick -> 6.8 L/100km (x10 = 68).
+    TEST_ASSERT_EQUAL_UINT32(68, units_econ_x10(8225, 3000, UNITS_KPH));
+    TEST_ASSERT_EQUAL_UINT32(0, units_econ_x10(8225, 50, UNITS_KPH));  // < 100 m -> unknown
+}
+
+static void test_econ_imperial(void)
+{
+    TEST_ASSERT_EQUAL_UINT32(345, units_econ_x10(8225, 3000, UNITS_MPH));  // 6.8 L/100km = 34.5 mpg
+    TEST_ASSERT_EQUAL_UINT32(0, units_econ_x10(0, 3000, UNITS_MPH));       // 0 consumption -> guard
+}
+
+static void test_econ_labels(void)
+{
+    TEST_ASSERT_EQUAL_STRING("L/100km", units_econ_label(UNITS_KPH));
+    TEST_ASSERT_EQUAL_STRING("mpg", units_econ_label(UNITS_MPH));
+}
+
 void RunTests(void)
 {
     RUN_TEST(test_speed_mph_passthrough);
@@ -120,4 +141,7 @@ void RunTests(void)
     RUN_TEST(test_temp_celsius_passthrough);
     RUN_TEST(test_temp_fahrenheit_conversion);
     RUN_TEST(test_temp_labels);
+    RUN_TEST(test_econ_metric);
+    RUN_TEST(test_econ_imperial);
+    RUN_TEST(test_econ_labels);
 }

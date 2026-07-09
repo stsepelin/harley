@@ -10,13 +10,15 @@ void ui_manager_init(void);
 // (true when called from an LVGL event / timer callback).
 void ui_manager_show_ride(void);
 
-// Switch to the settings screen. Lazy-creates on first call. Assumes
-// the LVGL lock is already held.
+// Switch to the settings menu. Lazy-creates on first call. Assumes the
+// LVGL lock is already held.
 void ui_manager_show_settings(void);
 
-// Switch to the Bluetooth sub-page of the settings screen. Lazy-creates
-// on first call. BACK on that screen returns to the main settings
-// screen. Assumes the LVGL lock is already held.
+// Settings sub-pages, reached from the menu; BACK on each returns to the
+// menu. Lazy-created; assume the LVGL lock is held.
+void ui_manager_show_settings_general(void);  // units / sound / brightness
+void ui_manager_show_settings_trip(void);     // odometer / trips / reset
+void ui_manager_show_settings_odoset(void);   // set the odometer value
 void ui_manager_show_settings_bluetooth(void);
 
 #if CONFIG_VROD_J1850_SNIFFER

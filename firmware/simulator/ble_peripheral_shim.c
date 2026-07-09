@@ -44,3 +44,5 @@ void ble_peripheral_pair_respond(bool accept)
 void ble_peripheral_forget_all_bonds(void)
 {
 }
+
+void ble_peripheral_refresh_visibility(void) {}
