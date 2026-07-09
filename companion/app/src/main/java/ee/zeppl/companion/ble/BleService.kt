@@ -1,5 +1,6 @@
 package ee.zeppl.companion.ble
 
+import android.Manifest
 import android.annotation.SuppressLint
 import android.app.Notification
 import android.app.NotificationChannel
@@ -7,19 +8,23 @@ import android.app.NotificationManager
 import android.app.Service
 import android.content.Context
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.content.pm.ServiceInfo
 import android.os.IBinder
 import android.util.Log
 import androidx.compose.runtime.snapshotFlow
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
+import androidx.core.content.ContextCompat
 import ee.zeppl.companion.MainActivity
 import ee.zeppl.companion.R
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 
 /**
@@ -37,6 +42,7 @@ class BleService : Service() {
 
     private var client:           BleClient?     = null
     private var previousSinkSend: ((ByteArray) -> Unit)? = null
+    private var calCollector:     SpeedCalCollector? = null
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
 
     override fun onCreate() {
@@ -66,6 +72,25 @@ class BleService : Service() {
             previousSinkSend = OutboundSink.send
             OutboundSink.send = { bytes -> c.write(bytes) }
         }
+
+        // Speed-calibration GPS sampling runs here (not in the wizard Composable)
+        // so it keeps collecting while the ride screen is off. Register GPS only
+        // while a run is active; sample the GPS/raw-count pair once a second.
+        val collector = SpeedCalCollector(applicationContext).also { calCollector = it }
+        scope.launch {
+            snapshotFlow { CalibrationSession.active }
+                .distinctUntilChanged()
+                .collect { active ->
+                    updateForegroundType(active)
+                    collector.setActive(active)
+                }
+        }
+        scope.launch {
+            while (isActive) {
+                delay(1000)
+                collector.tick()
+            }
+        }
         Log.i(TAG, "service started")
     }
 
@@ -89,6 +114,8 @@ class BleService : Service() {
     override fun onDestroy() {
         Log.i(TAG, "service stopping")
         scope.cancel()
+        calCollector?.stop()
+        calCollector = null
         client?.stop()
         client = null
         previousSinkSend?.let { OutboundSink.send = it }
@@ -146,6 +173,23 @@ class BleService : Service() {
     @SuppressLint("MissingPermission")
     private fun refreshNotification() {
         NotificationManagerCompat.from(this).notify(NOTIF_ID, buildNotification())
+    }
+
+    // While a calibration runs we add the LOCATION foreground-service type so
+    // GPS keeps flowing with the screen off. Only add it when fine-location is
+    // granted (the wizard requests it before starting) - startForeground with an
+    // ungranted location type throws.
+    @SuppressLint("MissingPermission")
+    private fun updateForegroundType(calibrating: Boolean) {
+        val withLocation = calibrating && ContextCompat.checkSelfPermission(
+            this, Manifest.permission.ACCESS_FINE_LOCATION,
+        ) == PackageManager.PERMISSION_GRANTED
+        val type = if (withLocation) FG_TYPE or ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION else FG_TYPE
+        try {
+            startForeground(NOTIF_ID, buildNotification(), type)
+        } catch (e: Exception) {
+            Log.w(TAG, "FGS type update failed: $e")
+        }
     }
 
     companion object {
