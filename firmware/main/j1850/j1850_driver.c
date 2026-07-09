@@ -14,6 +14,10 @@ static vehicle_data_t s_vd;
 static odo_meter_t    s_odo;         // odometer + trip totals (persisted by odo_store)
 static trip_meter_t   s_dist_meter;  // A8 69 10 rolling counter -> distance ticks
 static trip_meter_t   s_fuel_meter;  // A8 83 10 rolling counter -> fuel ticks
+// Raw speed count -> mph divisor. Runtime-settable (config write-back from the
+// companion's GPS calibration), persisted by the caller; defaults to the
+// provisional constant until calibrated.
+static uint16_t s_speed_divisor = J1850_SPEED_DIVISOR;
 
 // A per-frame counter delta beyond this is an ECM reset or a dropped-frame gap,
 // not a real 16-bit wrap (odo steps ~100 ticks/frame, fuel ~20), so the meter
@@ -74,12 +78,31 @@ void j1850_driver_feed(const j1850_frame_t *f)
     bool updated = j1850_parse(f, &s_vd);
     updated |= accumulate(f);
     if (updated) {
+        // Re-apply the runtime divisor to the raw ECM count (parse used the
+        // provisional default); a calibrated divisor from the phone lands here.
+        s_vd.speed_mph = s_speed_divisor ? (uint16_t)(s_vd.speed_raw / s_speed_divisor) : 0;
         // The bus carries no gear position (no sensor on this bike), so derive
         // it from the latest RPM:speed ratio. Recomputed on every republish;
         // RPM/speed frames keep both inputs fresh.
         s_vd.gear = gear_calc(s_vd.rpm, s_vd.speed_mph, s_vd.gear);
         vehicle_data_set(&s_vd);
     }
+}
+
+// Apply a calibrated raw->mph divisor and re-publish so the change is visible
+// immediately. Ignores 0 (would divide by zero). Persistence is the caller's.
+void j1850_driver_set_speed_divisor(uint16_t divisor)
+{
+    if (divisor == 0)
+        return;
+    s_speed_divisor = divisor;
+    s_vd.speed_mph  = (uint16_t)(s_vd.speed_raw / s_speed_divisor);
+    vehicle_data_set(&s_vd);
+}
+
+uint16_t j1850_driver_speed_divisor(void)
+{
+    return s_speed_divisor;
 }
 
 void j1850_driver_seed(const odo_meter_t *odo)

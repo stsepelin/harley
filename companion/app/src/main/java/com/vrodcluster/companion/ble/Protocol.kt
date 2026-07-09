@@ -40,6 +40,7 @@ object Protocol {
     private const val TYPE_NOTIF         : Byte = 0x01
     private const val TYPE_NOTIF_DISMISS : Byte = 0x02
     private const val TYPE_MEDIA         : Byte = 0x03
+    private const val TYPE_CONFIG        : Byte = 0x04
 
     // Mirrors notif_kind_t.
     enum class NotifKind(val wire: Byte) {
@@ -75,6 +76,19 @@ object Protocol {
         buf.put(TYPE_NOTIF_DISMISS)
         buf.putShort(4)
         buf.putInt(id.toInt())
+        return buf.array()
+    }
+
+    /**
+     * Config write-back to the cluster. Mirrors `PHONE_EVT_CONFIG` in
+     * `firmware/main/phone/phone_protocol.c`: u16 speed_divisor (LE). The
+     * cluster applies it live and persists it to NVS.
+     */
+    fun encodeConfig(speedDivisor: Int): ByteArray {
+        val buf = ByteBuffer.allocate(3 + 2).order(ByteOrder.LITTLE_ENDIAN)
+        buf.put(TYPE_CONFIG)
+        buf.putShort(2)
+        buf.putShort(speedDivisor.toShort())
         return buf.array()
     }
 

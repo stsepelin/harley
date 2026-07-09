@@ -86,6 +86,8 @@ void app_main(void)
     // Producer: the sniffer's decode feeds vehicle_data via the driver.
     // Init before the sniffer task so it can consume frames immediately.
     j1850_driver_init();
+    // Restore the GPS-calibrated speed divisor persisted in settings.
+    j1850_driver_set_speed_divisor(settings_store_current()->speed_divisor);
     // Restore the persisted odometer/trips into the driver, then keep them
     // saved (periodic + on user reset). Must follow driver_init (it seeds it).
     odo_store_init();

@@ -49,18 +49,27 @@ typedef struct {
 // A parsed wire message. The protocol layer fills exactly one of these
 // per call to phone_protocol_parse(); phone_data.c applies the event to
 // its internal state under the lock.
+// Cluster configuration pushed from the phone (GPS speed calibration; later
+// units / thresholds). Extend by appending fields + growing the payload; the
+// parser keys off length so older/newer peers interoperate.
+typedef struct {
+    uint16_t speed_divisor;  // raw ECM count -> mph
+} vehicle_config_t;
+
 typedef enum {
     PHONE_EVT_NOTIF         = 0x01,
     PHONE_EVT_NOTIF_DISMISS = 0x02,
     PHONE_EVT_MEDIA         = 0x03,
+    PHONE_EVT_CONFIG        = 0x04,
 } phone_event_type_t;
 
 typedef struct {
     phone_event_type_t type;
     union {
-        notification_t notif;          // PHONE_EVT_NOTIF
-        uint32_t       dismiss_id;     // PHONE_EVT_NOTIF_DISMISS
-        now_playing_t  media;          // PHONE_EVT_MEDIA
+        notification_t   notif;       // PHONE_EVT_NOTIF
+        uint32_t         dismiss_id;  // PHONE_EVT_NOTIF_DISMISS
+        now_playing_t    media;       // PHONE_EVT_MEDIA
+        vehicle_config_t config;      // PHONE_EVT_CONFIG
     };
 } phone_event_t;
 

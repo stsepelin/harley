@@ -377,6 +377,33 @@ static void test_encode_dismiss_little_endian_id(void)
     TEST_ASSERT_EQUAL_UINT8(0xDE, buf[6]);
 }
 
+static void test_parse_config_speed_divisor(void)
+{
+    uint8_t buf[5];
+    buf[0] = PHONE_EVT_CONFIG;
+    put_u16(buf + 1, 2);    // payload_len
+    put_u16(buf + 3, 188);  // speed_divisor
+
+    size_t        consumed = 0;
+    phone_event_t evt;
+    TEST_ASSERT_EQUAL_INT(PHONE_PARSE_OK, phone_protocol_parse(buf, sizeof(buf), &consumed, &evt));
+    TEST_ASSERT_EQUAL_INT(PHONE_EVT_CONFIG, evt.type);
+    TEST_ASSERT_EQUAL_UINT16(188, evt.config.speed_divisor);
+    TEST_ASSERT_EQUAL_size_t(5, consumed);
+}
+
+static void test_parse_config_too_short_rejected(void)
+{
+    uint8_t buf[4];
+    buf[0] = PHONE_EVT_CONFIG;
+    put_u16(buf + 1, 1);  // payload_len 1 (< 2)
+    buf[3]                 = 0xBC;
+    size_t        consumed = 0;
+    phone_event_t evt;
+    TEST_ASSERT_EQUAL_INT(PHONE_PARSE_BAD_FIELD,
+                          phone_protocol_parse(buf, sizeof(buf), &consumed, &evt));
+}
+
 void RunTests(void)
 {
     RUN_TEST(test_parse_notif);
@@ -401,4 +428,6 @@ void RunTests(void)
     RUN_TEST(test_encode_cmd_undersized_buffer);
     RUN_TEST(test_encode_dismiss_undersized_buffer);
     RUN_TEST(test_encode_dismiss_little_endian_id);
+    RUN_TEST(test_parse_config_speed_divisor);
+    RUN_TEST(test_parse_config_too_short_rejected);
 }

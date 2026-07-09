@@ -142,6 +142,32 @@ static void test_set_odometer_via_driver(void)
     TEST_ASSERT_EQUAL_UINT32(80000000u, vd.odometer_m);
 }
 
+static void test_speed_divisor_runtime(void)
+{
+    vehicle_data_init();
+    j1850_driver_init();
+    TEST_ASSERT_EQUAL_UINT16(195, j1850_driver_speed_divisor());  // provisional default
+
+    uint8_t       speed[] = {0x48, 0x29, 0x10, 0x02, 0x4C, 0x2C};  // raw 19500
+    j1850_frame_t f       = frame(speed, sizeof(speed));
+    j1850_driver_feed(&f);
+
+    vehicle_data_t vd;
+    vehicle_data_get(&vd);
+    TEST_ASSERT_EQUAL_UINT16(19500, vd.speed_raw);
+    TEST_ASSERT_EQUAL_UINT16(100, vd.speed_mph);  // 19500 / 195
+
+    // Calibrate: smaller divisor -> higher mph, applied to the last frame now.
+    j1850_driver_set_speed_divisor(130);
+    TEST_ASSERT_EQUAL_UINT16(130, j1850_driver_speed_divisor());
+    vehicle_data_get(&vd);
+    TEST_ASSERT_EQUAL_UINT16(150, vd.speed_mph);  // 19500 / 130
+
+    // 0 is rejected (no divide-by-zero, divisor unchanged).
+    j1850_driver_set_speed_divisor(0);
+    TEST_ASSERT_EQUAL_UINT16(130, j1850_driver_speed_divisor());
+}
+
 static void test_bad_crc_counter_is_ignored(void)
 {
     vehicle_data_init();
@@ -170,5 +196,6 @@ void RunTests(void)
     RUN_TEST(test_seed_restores_totals);
     RUN_TEST(test_reset_trip_via_driver);
     RUN_TEST(test_set_odometer_via_driver);
+    RUN_TEST(test_speed_divisor_runtime);
     RUN_TEST(test_bad_crc_counter_is_ignored);
 }

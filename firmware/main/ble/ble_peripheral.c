@@ -22,6 +22,9 @@
 #include "phone_protocol.h"
 #include "settings.h"
 #include "settings_store.h"
+#if CONFIG_VROD_J1850
+#include "j1850_driver.h"  // apply calibrated speed divisor live
+#endif
 
 static const char *TAG = "ble_peripheral";
 
@@ -100,6 +103,20 @@ static void start_advertising(void);
 
 // --- RX (phone → cluster) -------------------------------------------------
 
+// Apply a config write-back: push the calibrated divisor to the live decoder
+// and persist it. Runs on the NimBLE host task; settings_store_apply is only
+// NVS I/O (no display/LVGL work), so it's safe here. Rare (a calibration), so
+// the brief NVS write is fine.
+static void apply_config(const vehicle_config_t *cfg)
+{
+#if CONFIG_VROD_J1850
+    j1850_driver_set_speed_divisor(cfg->speed_divisor);
+#endif
+    settings_t s    = *settings_store_current();
+    s.speed_divisor = cfg->speed_divisor;
+    settings_store_apply(&s);  // validates + writes NVS
+}
+
 static int access_rx_cb(uint16_t conn_handle, uint16_t attr_handle,
                         struct ble_gatt_access_ctxt *ctxt, void *arg)
 {
@@ -127,6 +144,13 @@ static int access_rx_cb(uint16_t conn_handle, uint16_t attr_handle,
         // the call" indistinguishable from "the cluster never received
         // the bytes" without it. Cheap: a few notifs per minute at
         // most.
+        if (evt.type == PHONE_EVT_CONFIG) {
+            // Config write-back is cluster state, not a phone_data event:
+            // apply the calibrated divisor live and persist it to NVS.
+            ESP_LOGI(TAG, "rx CONFIG speed_divisor=%u", (unsigned)evt.config.speed_divisor);
+            apply_config(&evt.config);
+            return 0;
+        }
         switch (evt.type) {
         case PHONE_EVT_NOTIF:
             ESP_LOGI(TAG, "rx NOTIF id=%08lx kind=%d sender='%s' msg='%.40s'",
@@ -139,6 +163,8 @@ static int access_rx_cb(uint16_t conn_handle, uint16_t attr_handle,
         case PHONE_EVT_MEDIA:
             ESP_LOGI(TAG, "rx MEDIA state=%d", (int)evt.media.state);
             break;
+        case PHONE_EVT_CONFIG:
+            break;  // handled above
         }
         phone_data_apply(&evt);
     } else {

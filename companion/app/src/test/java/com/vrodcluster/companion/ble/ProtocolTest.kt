@@ -209,4 +209,12 @@ class ProtocolTest {
         assertEquals(0x00.toByte(), out[5])
         assertEquals(0x80.toByte(), out[6])
     }
+
+    @Test fun `encodes config speed divisor`() {
+        // Mirrors test_phone_protocol.c::test_parse_config_speed_divisor (188).
+        assertArrayEquals(
+            byteArrayOf(0x04, 0x02, 0x00, 0xBC.toByte(), 0x00),
+            Protocol.encodeConfig(188),
+        )
+    }
 }

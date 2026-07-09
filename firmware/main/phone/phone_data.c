@@ -123,6 +123,8 @@ void phone_data_apply(const phone_event_t *evt)
             s_state.media_banner_shown = false;
         }
         break;
+    case PHONE_EVT_CONFIG:
+        break;  // cluster config, applied in ble_peripheral (not phone_data)
     }
 
     xSemaphoreGive(s_mutex);

@@ -12,6 +12,7 @@ static const char *TAG = "settings";
 #define KEY_SND_EN  "sound_en"
 #define KEY_VOLUME  "volume"
 #define KEY_BLE_VIS "ble_vis"
+#define KEY_SPEEDIV "speed_div"
 
 static settings_t s_current;
 
@@ -38,6 +39,9 @@ static void load_into(settings_t *out)
         out->volume = v;
     if (nvs_get_u8(h, KEY_BLE_VIS, &v) == ESP_OK)
         out->ble_visible_override = (v != 0);
+    uint16_t sd;
+    if (nvs_get_u16(h, KEY_SPEEDIV, &sd) == ESP_OK)
+        out->speed_divisor = sd;
     nvs_close(h);
 
     settings_validate(out);
@@ -58,7 +62,7 @@ static bool save_from(const settings_t *s)
               nvs_set_u8(h, KEY_SND_EN, s->sound_enabled ? 1u : 0u) == ESP_OK &&
               nvs_set_u8(h, KEY_VOLUME, s->volume) == ESP_OK &&
               nvs_set_u8(h, KEY_BLE_VIS, s->ble_visible_override ? 1u : 0u) == ESP_OK &&
-              nvs_commit(h) == ESP_OK;
+              nvs_set_u16(h, KEY_SPEEDIV, s->speed_divisor) == ESP_OK && nvs_commit(h) == ESP_OK;
 
     nvs_close(h);
     if (!ok) ESP_LOGW(TAG, "save failed");
