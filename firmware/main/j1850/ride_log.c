@@ -106,6 +106,29 @@ static void log_existing_sessions(void)
     ESP_LOGI(TAG, "existing sessions on card: %d", count);
 }
 
+int ride_log_purge(void)
+{
+    if (s_state == RIDE_LOG_RECORDING || !s_card)
+        return -1;  // don't delete under an open file, or with no card
+    DIR *d = opendir(MOUNT_POINT);
+    if (!d)
+        return -1;
+    int            deleted = 0;
+    struct dirent *e;
+    while ((e = readdir(d)) != NULL) {
+        int n = -1;
+        if (sscanf(e->d_name, "ride_%d.log", &n) != 1)
+            continue;
+        char path[48];
+        snprintf(path, sizeof(path), MOUNT_POINT "/%s", e->d_name);
+        if (unlink(path) == 0)
+            deleted++;
+    }
+    closedir(d);
+    ESP_LOGI(TAG, "purged %d ride log(s)", deleted);
+    return deleted;
+}
+
 #if CONFIG_VROD_RIDE_LOG_DUMP
 // Serial retrieval: print every ride_NNN.log to the console framed by markers,
 // so the files can be pulled over UART without removing the card. Silences the

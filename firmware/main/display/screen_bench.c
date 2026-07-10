@@ -39,6 +39,7 @@ static lv_obj_t *s_sweep_value;
 #if CONFIG_VROD_RIDE_LOG
 static lv_obj_t        *s_ridelog_value;
 static lv_obj_t        *s_rec_lbl;
+static lv_obj_t        *s_clr_lbl;
 static ride_log_state_t s_shown_rl_state  = -1;
 static uint32_t         s_shown_rl_frames = UINT32_MAX;
 static uint32_t         s_shown_rl_drop   = UINT32_MAX;
@@ -206,6 +207,16 @@ static void rec_cb(lv_event_t *e)
     (void)e;
     ride_log_toggle();
 }
+
+// Delete all saved ride logs from the card. Shows the count on the button (or
+// keeps "CLR" when refused - recording, or no card).
+static void clear_cb(lv_event_t *e)
+{
+    (void)e;
+    int n = ride_log_purge();
+    if (n >= 0)
+        lv_label_set_text_fmt(s_clr_lbl, "%d", n);
+}
 #endif
 
 lv_obj_t *screen_bench_create(void)
@@ -276,9 +287,10 @@ lv_obj_t *screen_bench_create(void)
     lv_obj_set_style_text_font(s_ridelog_value, &jbm_bold_26, 0);
     lv_obj_align(s_ridelog_value, LV_ALIGN_TOP_MID, 0, 590);
 
+    // Bottom row: REC | CLEAR | BACK (kept inside the round bezel's chord).
     lv_obj_t *rec = lv_button_create(s_scr);
-    lv_obj_set_size(rec, 230, 80);
-    lv_obj_align(rec, LV_ALIGN_BOTTOM_MID, -135, -80);
+    lv_obj_set_size(rec, 170, 80);
+    lv_obj_align(rec, LV_ALIGN_BOTTOM_MID, -175, -80);
     lv_obj_set_style_bg_color(rec, lv_color_hex(VROD_RED), 0);
     lv_obj_set_style_radius(rec, 12, 0);
     lv_obj_add_event_cb(rec, rec_cb, LV_EVENT_CLICKED, NULL);
@@ -288,9 +300,21 @@ lv_obj_t *screen_bench_create(void)
     lv_obj_set_style_text_font(s_rec_lbl, &jbm_bold_45, 0);
     lv_obj_center(s_rec_lbl);
 
+    lv_obj_t *clr = lv_button_create(s_scr);
+    lv_obj_set_size(clr, 170, 80);
+    lv_obj_align(clr, LV_ALIGN_BOTTOM_MID, 0, -80);
+    lv_obj_set_style_bg_color(clr, lv_color_hex(0x555555), 0);
+    lv_obj_set_style_radius(clr, 12, 0);
+    lv_obj_add_event_cb(clr, clear_cb, LV_EVENT_CLICKED, NULL);
+    s_clr_lbl = lv_label_create(clr);
+    lv_label_set_text(s_clr_lbl, "CLR");
+    lv_obj_set_style_text_color(s_clr_lbl, lv_color_black(), 0);
+    lv_obj_set_style_text_font(s_clr_lbl, &jbm_bold_45, 0);
+    lv_obj_center(s_clr_lbl);
+
     lv_obj_t *back = lv_button_create(s_scr);
-    lv_obj_set_size(back, 230, 80);
-    lv_obj_align(back, LV_ALIGN_BOTTOM_MID, 135, -80);
+    lv_obj_set_size(back, 170, 80);
+    lv_obj_align(back, LV_ALIGN_BOTTOM_MID, 175, -80);
 #else
     lv_obj_t *back = lv_button_create(s_scr);
     lv_obj_set_size(back, 260, 80);

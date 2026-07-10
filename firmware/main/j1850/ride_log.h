@@ -47,3 +47,8 @@ void ride_log_frame(const j1850_frame_t *f);
 
 // Snapshot the current state + counters for the bench indicator.
 void ride_log_get_stats(ride_log_stats_t *out);
+
+// Delete every ride_NNN.log record from the card. Refuses while a recording is
+// active (stop first) or if the card isn't mounted. Returns the number deleted,
+// or -1 on refusal. Blocks briefly on directory I/O - call off the LVGL core.
+int ride_log_purge(void);
