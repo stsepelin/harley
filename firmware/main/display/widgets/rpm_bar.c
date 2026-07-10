@@ -15,7 +15,8 @@
 // of small object redraws.
 #define BAR_W   560
 #define BAR_H   22
-#define SEG_GAP 5
+#define SEG_GAP 4
+#define SEG_CR  5.0f  // rounded-rect corner radius, like the tach redline segments
 
 typedef struct {
     lv_obj_t      *img;
@@ -30,12 +31,31 @@ static void bake_bar(rpm_data_t *rd, int lit)
     memset(rd->buf, 0, (size_t)BAR_W * BAR_H * 4);
     int         redline = rpm_scale_redline_seg();
     const float seg_w   = (float)(BAR_W - (RPM_SCALE_SEGMENTS - 1) * SEG_GAP) / RPM_SCALE_SEGMENTS;
-    const float r       = BAR_H / 2.0f;
+    const float half_w  = BAR_H / 2.0f;
     const float cy      = BAR_H / 2.0f;
     for (int i = 0; i < RPM_SCALE_SEGMENTS; i++) {
         float    sx  = i * (seg_w + SEG_GAP);
+        float    ccx = sx + seg_w / 2.0f;
         uint32_t col = (i < lit) ? ((i >= redline) ? VROD_RED_BRIGHT : VROD_ORANGE) : VROD_RAIL;
-        sprite_stamp_capsule(rd->buf, BAR_W, BAR_H, sx + r, cy, sx + seg_w - r, cy, r, col);
+        uint8_t  cb = col & 0xFF, cg = (col >> 8) & 0xFF, cr = (col >> 16) & 0xFF;
+        // Solid rounded-rectangle chunk (redline-segment style), AA via the
+        // shared rounded-box SDF in (x,y) space.
+        int x0 = (int)sx - 1, x1 = (int)(sx + seg_w) + 1;
+        for (int y = 0; y < BAR_H; y++) {
+            for (int x = x0; x <= x1; x++) {
+                if (x < 0 || x >= BAR_W)
+                    continue;
+                float cov = sprite_arc_seg_cov((float)x + 0.5f - ccx, (float)y + 0.5f - cy,
+                                               seg_w / 2.0f, half_w, SEG_CR);
+                if (cov <= 0.0f)
+                    continue;
+                int idx          = (y * BAR_W + x) * 4;
+                rd->buf[idx + 0] = cb;
+                rd->buf[idx + 1] = cg;
+                rd->buf[idx + 2] = cr;
+                rd->buf[idx + 3] = (uint8_t)(cov * 255.0f + 0.5f);
+            }
+        }
     }
 }
 

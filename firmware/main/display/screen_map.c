@@ -185,14 +185,12 @@ static void bake_chip(uint8_t *buf, float deg)
         for (int s = 0; s <= steps; s++) {
             float t  = (float)s / (float)steps;
             float px = x0 + (x1 - x0) * t, py = y0 + (y1 - y0) * t;
-            // Chunky, solid, rounded band -- the classic tach's redline-sector
-            // weight rather than a thin tapered outline: a thick stroke that
-            // barely tapers and stays near-opaque, fading only at the very ends.
+            // Width taper + alpha fade from the shape centre, like the gauge.
             float d  = fabsf(px - CHIP_CX);
             float tw = fminf(d / CHIP_SPAN, 1.0f);
-            float r  = 6.0f - 1.6f * tw;  // ~12 px centre -> ~9 px ends (solid band)
-            float ta = fminf(fmaxf((d - 80.0f) / (CHIP_SPAN - 80.0f), 0.0f), 1.0f);
-            float al = 255.0f * (1.0f - 0.7f * ta);  // ends hold ~30% instead of fading out
+            float r  = 2.8f - 1.9f * tw;  // ~5.6 px centre -> ~1.8 px ends
+            float ta = fminf(fmaxf((d - 46.0f) / (CHIP_SPAN - 46.0f), 0.0f), 1.0f);
+            float al = 255.0f * (1.0f - ta);
             // Rotate around the shape centre.
             float rx = px - CHIP_CX, ry = py - CHIP_CY;
             sprite_stamp_disk_max(buf, CHIP_W, CHIP_H, CHIP_CX + rx * ca - ry * sa,
