@@ -218,8 +218,10 @@ static lv_obj_t *chip(lv_obj_t *p, const lv_font_t *font, uint32_t color, int x,
     lv_label_set_text(v, "--");
     // The flat top sits 25 px above the pivot, so tilting slides its centre
     // sideways by 25*sin(deg); shift the value the same way to stay under it.
+    // The -14 (vs the pivot) leaves padding between the frame's top and the
+    // value, mirroring the gap we give the fuel E/F above their ticks.
     int vdx = (int)lroundf(25.0f * sinf(deg * (float)M_PI / 180.0f));
-    lv_obj_align(v, LV_ALIGN_TOP_MID, vdx, (int)CHIP_CY - 24);
+    lv_obj_align(v, LV_ALIGN_TOP_MID, vdx, (int)CHIP_CY - 14);
     return v;
 }
 
@@ -318,7 +320,7 @@ lv_obj_t *screen_map_create(map_tileset_t *ts, int w, int h)
     static lv_image_dsc_t gdsc, tdsc;
     gbuf     = heap_caps_malloc((size_t)CHIP_W * CHIP_H * 4, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
     tbuf     = heap_caps_malloc((size_t)CHIP_W * CHIP_H * 4, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
-    const int gx = -290, tx = 290, cy = MAP_H + 66;  // out to the edges, a touch lower
+    const int gx = -290, tx = 290, cy = MAP_H + 88;  // out to the edges, lower down
     s_gear_v = chip(scr, &jbm_bold_45, VROD_ORANGE, gx, cy, gbuf, &gdsc, chip_bezel_tilt(gx, cy));
     s_temp_v = chip(scr, &jbm_bold_45, VROD_TEXT, tx, cy, tbuf, &tdsc, chip_bezel_tilt(tx, cy));
 
