@@ -15,6 +15,10 @@ LV_FONT_DECLARE(jbm_bold_72);
 LV_FONT_DECLARE(jbm_bold_45);
 LV_FONT_DECLARE(jbm_bold_33);
 LV_FONT_DECLARE(jbm_bold_26);
+LV_FONT_DECLARE(mdi_36);
+
+#define ICON_ARROW_L "\xF3\xB0\x9C\xB1"  // U+F0731 arrow-left-bold
+#define ICON_ARROW_R "\xF3\xB0\x9C\xB4"  // U+F0734 arrow-right-bold
 
 // Compact cluster on the 800x800 round panel: the map fills the top (corners
 // masked by the round bezel); below the chord sit a row of warning lamps, then a
@@ -41,6 +45,8 @@ static lv_obj_t      *s_speed_v;
 static lv_obj_t      *s_speed_u;
 static lv_obj_t      *s_rpm_v;
 static lv_obj_t      *s_fuel_arc;
+static lv_obj_t      *s_turn_l;
+static lv_obj_t      *s_turn_r;
 static lv_obj_t      *s_no_map;  // "off area" overlay, shown when position has no tiles
 static map_tileset_t *s_ts;
 
@@ -205,10 +211,30 @@ lv_obj_t *screen_map_create(map_tileset_t *ts, int w, int h)
     s_warn                         = warning_lights_create(scr, LAMPS, 6, WARN_LAYOUT_ROW);
     lv_obj_align(s_warn, LV_ALIGN_TOP_MID, 0, MAP_H + 16);
 
+    // Turn-signal arrows flanking the lamp row; lit green when active.
+    s_turn_l = lv_label_create(scr);
+    lv_obj_set_style_text_font(s_turn_l, &mdi_36, 0);
+    lv_obj_set_style_text_color(s_turn_l, lv_color_hex(VROD_ARROW_OFF), 0);
+    lv_label_set_text(s_turn_l, ICON_ARROW_L);
+    lv_obj_align(s_turn_l, LV_ALIGN_TOP_MID, -330, MAP_H + 22);
+    s_turn_r = lv_label_create(scr);
+    lv_obj_set_style_text_font(s_turn_r, &mdi_36, 0);
+    lv_obj_set_style_text_color(s_turn_r, lv_color_hex(VROD_ARROW_OFF), 0);
+    lv_label_set_text(s_turn_r, ICON_ARROW_R);
+    lv_obj_align(s_turn_r, LV_ALIGN_TOP_MID, 330, MAP_H + 22);
+
     // Readout row: TEMP | GEAR | SPEED (big centre) | RPM. Fuel is the arc below.
-    s_temp_v = readout(scr, "TEMP", &jbm_bold_33, VROD_TEXT, -250, MAP_H + 62, MAP_H + 88);
+    s_temp_v = readout(scr, "TEMP", &jbm_bold_33, VROD_TEXT, -250, MAP_H + 62, MAP_H + 84);
     s_gear_v = readout(scr, "GEAR", &jbm_bold_45, VROD_ORANGE, -140, MAP_H + 62, MAP_H + 82);
-    s_rpm_v  = readout(scr, "RPM", &jbm_bold_33, VROD_TEXT, 250, MAP_H + 62, MAP_H + 88);
+    s_rpm_v  = readout(scr, "RPM", &jbm_bold_33, VROD_TEXT, 250, MAP_H + 62, MAP_H + 84);
+
+    // #56: rounded box around the gear digit, like the reference cluster.
+    lv_obj_set_style_border_color(s_gear_v, lv_color_hex(VROD_TEXT_DIM), 0);
+    lv_obj_set_style_border_width(s_gear_v, 2, 0);
+    lv_obj_set_style_radius(s_gear_v, 8, 0);
+    lv_obj_set_style_pad_hor(s_gear_v, 16, 0);
+    lv_obj_set_style_pad_ver(s_gear_v, 2, 0);
+    lv_obj_set_style_text_align(s_gear_v, LV_TEXT_ALIGN_CENTER, 0);
 
     s_speed_v = lv_label_create(scr);
     lv_obj_set_style_text_font(s_speed_v, &jbm_bold_72, 0);
@@ -344,6 +370,19 @@ void screen_map_commit(const vehicle_data_t *data, const settings_t *settings)
     lv_label_set_text(s_speed_u, units_speed_label(settings->units));
     lv_label_set_text_fmt(s_rpm_v, "%d", data->rpm);
     fuel_arc_set_level(s_fuel_arc, data->fuel_level);
+
+    // Turn arrows: green when active, dim otherwise. Cached (house rule).
+    static int last_tl = -1, last_tr = -1;
+    if (last_tl != data->turn_left) {
+        last_tl = data->turn_left;
+        lv_obj_set_style_text_color(
+            s_turn_l, lv_color_hex(data->turn_left ? VROD_GREEN_SIGNAL : VROD_ARROW_OFF), 0);
+    }
+    if (last_tr != data->turn_right) {
+        last_tr = data->turn_right;
+        lv_obj_set_style_text_color(
+            s_turn_r, lv_color_hex(data->turn_right ? VROD_GREEN_SIGNAL : VROD_ARROW_OFF), 0);
+    }
 
     warning_lights_update(s_warn, data);
 }
