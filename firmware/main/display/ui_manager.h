@@ -37,3 +37,12 @@ void ui_manager_set_map_screen(lv_obj_t *map);
 // is lazy-loaded here on first use so a classic setting never loads it. Ensures
 // the ride screen + update tasks exist regardless of which view is shown.
 void ui_manager_show_home(void);
+
+// Request a re-apply of the saved layout from another task (e.g. the BLE host
+// task when the phone pushes a layout change). Deferred to the UI task so the
+// map load never runs on the radio task. Safe to call before the UI is up.
+void ui_manager_request_home(void);
+
+// True once the map screen has been built (a successful map_load). Reported in
+// telemetry so the companion knows whether the map view is actually working.
+bool ui_manager_map_available(void);

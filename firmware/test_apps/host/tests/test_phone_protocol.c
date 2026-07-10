@@ -521,29 +521,125 @@ static void test_encode_dismiss_little_endian_id(void)
 
 static void test_parse_config_speed_divisor(void)
 {
-    uint8_t buf[5];
+    uint8_t buf[3 + 4];
     buf[0] = PHONE_EVT_CONFIG;
-    put_u16(buf + 1, 2);    // payload_len
-    put_u16(buf + 3, 188);  // speed_divisor
+    put_u16(buf + 1, 4);  // payload_len
+    buf[3] = CONFIG_FIELD_SPEED_DIVISOR;
+    buf[4] = 2;
+    put_u16(buf + 5, 188);
 
     size_t        consumed = 0;
     phone_event_t evt;
     TEST_ASSERT_EQUAL_INT(PHONE_PARSE_OK, phone_protocol_parse(buf, sizeof(buf), &consumed, &evt));
     TEST_ASSERT_EQUAL_INT(PHONE_EVT_CONFIG, evt.type);
+    TEST_ASSERT_TRUE(evt.config.has_speed_divisor);
     TEST_ASSERT_EQUAL_UINT16(188, evt.config.speed_divisor);
-    TEST_ASSERT_EQUAL_size_t(5, consumed);
+    TEST_ASSERT_FALSE(evt.config.has_layout);
+    TEST_ASSERT_EQUAL_size_t(7, consumed);
 }
 
-static void test_parse_config_too_short_rejected(void)
+static void test_parse_config_layout(void)
 {
-    uint8_t buf[4];
+    uint8_t buf[3 + 3];
     buf[0] = PHONE_EVT_CONFIG;
-    put_u16(buf + 1, 1);  // payload_len 1 (< 2)
-    buf[3]                 = 0xBC;
+    put_u16(buf + 1, 3);
+    buf[3]                 = CONFIG_FIELD_LAYOUT;
+    buf[4]                 = 1;
+    buf[5]                 = 1;  // LAYOUT_MAP
     size_t        consumed = 0;
     phone_event_t evt;
-    TEST_ASSERT_EQUAL_INT(PHONE_PARSE_BAD_FIELD,
-                          phone_protocol_parse(buf, sizeof(buf), &consumed, &evt));
+    TEST_ASSERT_EQUAL_INT(PHONE_PARSE_OK, phone_protocol_parse(buf, sizeof(buf), &consumed, &evt));
+    TEST_ASSERT_TRUE(evt.config.has_layout);
+    TEST_ASSERT_EQUAL_UINT8(1, evt.config.layout);
+    TEST_ASSERT_FALSE(evt.config.has_speed_divisor);
+}
+
+static void test_parse_config_both_fields(void)
+{
+    uint8_t buf[3 + 7];
+    buf[0] = PHONE_EVT_CONFIG;
+    put_u16(buf + 1, 7);
+    buf[3] = CONFIG_FIELD_SPEED_DIVISOR;
+    buf[4] = 2;
+    put_u16(buf + 5, 200);
+    buf[7]                 = CONFIG_FIELD_LAYOUT;
+    buf[8]                 = 1;
+    buf[9]                 = 0;  // LAYOUT_CLASSIC
+    size_t        consumed = 0;
+    phone_event_t evt;
+    TEST_ASSERT_EQUAL_INT(PHONE_PARSE_OK, phone_protocol_parse(buf, sizeof(buf), &consumed, &evt));
+    TEST_ASSERT_TRUE(evt.config.has_speed_divisor);
+    TEST_ASSERT_EQUAL_UINT16(200, evt.config.speed_divisor);
+    TEST_ASSERT_TRUE(evt.config.has_layout);
+    TEST_ASSERT_EQUAL_UINT8(0, evt.config.layout);
+}
+
+static void test_parse_config_unknown_field_skipped(void)
+{
+    uint8_t buf[3 + 8];
+    buf[0] = PHONE_EVT_CONFIG;
+    put_u16(buf + 1, 8);
+    buf[3]                 = 0x7F;  // unknown field id
+    buf[4]                 = 3;     // len 3
+    buf[5]                 = 0xAA;
+    buf[6]                 = 0xBB;
+    buf[7]                 = 0xCC;
+    buf[8]                 = CONFIG_FIELD_LAYOUT;
+    buf[9]                 = 1;
+    buf[10]                = 1;
+    size_t        consumed = 0;
+    phone_event_t evt;
+    TEST_ASSERT_EQUAL_INT(PHONE_PARSE_OK, phone_protocol_parse(buf, sizeof(buf), &consumed, &evt));
+    TEST_ASSERT_FALSE(evt.config.has_speed_divisor);
+    TEST_ASSERT_TRUE(evt.config.has_layout);
+    TEST_ASSERT_EQUAL_UINT8(1, evt.config.layout);
+}
+
+static void test_parse_config_wrong_field_lengths_skipped(void)
+{
+    // Known field ids but wrong value lengths -> neither is applied (covers the
+    // `&& flen == N` guards). SPEED with len 1, LAYOUT with len 2.
+    uint8_t buf[3 + 7];
+    buf[0] = PHONE_EVT_CONFIG;
+    put_u16(buf + 1, 7);
+    buf[3]                 = CONFIG_FIELD_SPEED_DIVISOR;
+    buf[4]                 = 1;
+    buf[5]                 = 0xAA;
+    buf[6]                 = CONFIG_FIELD_LAYOUT;
+    buf[7]                 = 2;
+    buf[8]                 = 0xBB;
+    buf[9]                 = 0xCC;
+    size_t        consumed = 0;
+    phone_event_t evt;
+    TEST_ASSERT_EQUAL_INT(PHONE_PARSE_OK, phone_protocol_parse(buf, sizeof(buf), &consumed, &evt));
+    TEST_ASSERT_FALSE(evt.config.has_speed_divisor);
+    TEST_ASSERT_FALSE(evt.config.has_layout);
+}
+
+static void test_parse_config_empty_payload_ok(void)
+{
+    uint8_t buf[3];
+    buf[0] = PHONE_EVT_CONFIG;
+    put_u16(buf + 1, 0);  // no sub-fields
+    size_t        consumed = 0;
+    phone_event_t evt;
+    TEST_ASSERT_EQUAL_INT(PHONE_PARSE_OK, phone_protocol_parse(buf, sizeof(buf), &consumed, &evt));
+    TEST_ASSERT_FALSE(evt.config.has_speed_divisor);
+    TEST_ASSERT_FALSE(evt.config.has_layout);
+}
+
+static void test_parse_config_truncated_field_ignored(void)
+{
+    uint8_t buf[3 + 3];
+    buf[0] = PHONE_EVT_CONFIG;
+    put_u16(buf + 1, 3);
+    buf[3]                 = CONFIG_FIELD_SPEED_DIVISOR;
+    buf[4]                 = 2;     // claims 2 value bytes
+    buf[5]                 = 0xBC;  // but only 1 present
+    size_t        consumed = 0;
+    phone_event_t evt;
+    TEST_ASSERT_EQUAL_INT(PHONE_PARSE_OK, phone_protocol_parse(buf, sizeof(buf), &consumed, &evt));
+    TEST_ASSERT_FALSE(evt.config.has_speed_divisor);  // dropped, not misread
 }
 
 void RunTests(void)
@@ -571,7 +667,12 @@ void RunTests(void)
     RUN_TEST(test_encode_dismiss_undersized_buffer);
     RUN_TEST(test_encode_dismiss_little_endian_id);
     RUN_TEST(test_parse_config_speed_divisor);
-    RUN_TEST(test_parse_config_too_short_rejected);
+    RUN_TEST(test_parse_config_layout);
+    RUN_TEST(test_parse_config_both_fields);
+    RUN_TEST(test_parse_config_unknown_field_skipped);
+    RUN_TEST(test_parse_config_wrong_field_lengths_skipped);
+    RUN_TEST(test_parse_config_empty_payload_ok);
+    RUN_TEST(test_parse_config_truncated_field_ignored);
     RUN_TEST(test_parse_notif_with_icon_id);
     RUN_TEST(test_parse_icon_chunk);
     RUN_TEST(test_parse_icon_too_short_rejected);

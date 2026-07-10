@@ -31,7 +31,7 @@ static vehicle_data_t sample(void)
 static void test_encode_exact_frame(void)
 {
     static const uint8_t expected[TELEMETRY_FRAME_LEN] = {
-        0x40, 0x21, 0x00,        // type, payload_len = 33
+        0x40, 0x22, 0x00,        // type, payload_len = 34
         0x00, 0x30,              // speed_raw
         0x3F, 0x00,              // speed_mph
         0x80, 0x0C,              // rpm
@@ -45,10 +45,12 @@ static void test_encode_exact_frame(void)
         0x57, 0x04, 0x00, 0x00,  // trip1_fuel_ticks
         0xAE, 0x08, 0x00, 0x00,  // trip2_fuel_ticks
         0x08, 0x18,              // clock h:m
+        0x06,                    // status (LAYOUT_MAP | MAP_AVAILABLE)
     };
     vehicle_data_t vd = sample();
     uint8_t        out[TELEMETRY_FRAME_LEN];
-    size_t         n = telemetry_encode(&vd, out, sizeof(out));
+    size_t n = telemetry_encode(&vd, TELEMETRY_STATUS_LAYOUT_MAP | TELEMETRY_STATUS_MAP_AVAILABLE,
+                                out, sizeof(out));
     TEST_ASSERT_EQUAL_UINT(TELEMETRY_FRAME_LEN, n);
     TEST_ASSERT_EQUAL_UINT8_ARRAY(expected, out, TELEMETRY_FRAME_LEN);
 }
@@ -62,7 +64,7 @@ static void test_all_lamps_pack(void)
     vd.battery_warning = vd.immobiliser_warning = true;
 
     uint8_t out[TELEMETRY_FRAME_LEN];
-    TEST_ASSERT_EQUAL_UINT(TELEMETRY_FRAME_LEN, telemetry_encode(&vd, out, sizeof(out)));
+    TEST_ASSERT_EQUAL_UINT(TELEMETRY_FRAME_LEN, telemetry_encode(&vd, 0, out, sizeof(out)));
     uint16_t lamps = (uint16_t)(out[12] | (out[13] << 8));
     TEST_ASSERT_EQUAL_HEX16(0x03FF, lamps);  // bits 0..9 all set
 }
@@ -71,7 +73,7 @@ static void test_buffer_too_small_returns_zero(void)
 {
     vehicle_data_t vd = sample();
     uint8_t        out[TELEMETRY_FRAME_LEN - 1];
-    TEST_ASSERT_EQUAL_UINT(0, telemetry_encode(&vd, out, sizeof(out)));
+    TEST_ASSERT_EQUAL_UINT(0, telemetry_encode(&vd, 0, out, sizeof(out)));
 }
 
 void RunTests(void)

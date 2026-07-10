@@ -45,8 +45,9 @@ static lv_obj_t *s_settings_trip    = NULL;
 static lv_obj_t *s_settings_odoset  = NULL;
 static lv_obj_t *s_settings_bt      = NULL;
 static lv_obj_t *s_map              = NULL;  // registered by the map module, if any
-static bool      s_ui_started    = false;
-static bool      s_event_started = false;
+static bool          s_ui_started       = false;
+static bool          s_event_started    = false;
+static volatile bool s_home_pending;  // a cross-task request to re-apply the layout
 
 #define EVENT_POLL_MS   10        // 100 Hz event polling
 
@@ -54,6 +55,13 @@ static void ui_update_task(void *arg)
 {
     (void)arg;
     while (1) {
+        // A phone-pushed layout change lands here (off the BLE task) so the
+        // heavy map load runs on the UI core, not the radio's.
+        if (s_home_pending) {
+            s_home_pending = false;
+            ui_manager_show_home();
+        }
+
         vehicle_data_t d;
         vehicle_data_get(&d);
         const settings_t *s = settings_store_current();
@@ -217,6 +225,16 @@ void ui_manager_show_bench(void)
 void ui_manager_set_map_screen(lv_obj_t *map)
 {
     s_map = map;
+}
+
+bool ui_manager_map_available(void)
+{
+    return s_map != NULL;  // set only after a successful map_load()
+}
+
+void ui_manager_request_home(void)
+{
+    s_home_pending = true;  // picked up by ui_update_task
 }
 
 void ui_manager_show_home(void)

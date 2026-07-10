@@ -35,7 +35,7 @@ static uint16_t pack_lamps(const vehicle_data_t *vd)
                       ((uint16_t)vd->immobiliser_warning << 9));
 }
 
-size_t telemetry_encode(const vehicle_data_t *vd, uint8_t *out, size_t out_sz)
+size_t telemetry_encode(const vehicle_data_t *vd, uint8_t status, uint8_t *out, size_t out_sz)
 {
     if (out_sz < TELEMETRY_FRAME_LEN)
         return 0;
@@ -57,5 +57,6 @@ size_t telemetry_encode(const vehicle_data_t *vd, uint8_t *out, size_t out_sz)
     o        = put_u32(out, o, vd->trip2_fuel_ticks);
     o        = put_u8(out, o, vd->clock_hours);
     o        = put_u8(out, o, vd->clock_minutes);
+    o        = put_u8(out, o, status);
     return o;
 }

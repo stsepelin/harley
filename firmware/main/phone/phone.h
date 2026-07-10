@@ -51,11 +51,19 @@ typedef struct {
 // A parsed wire message. The protocol layer fills exactly one of these
 // per call to phone_protocol_parse(); phone_data.c applies the event to
 // its internal state under the lock.
-// Cluster configuration pushed from the phone (GPS speed calibration; later
-// units / thresholds). Extend by appending fields + growing the payload; the
-// parser keys off length so older/newer peers interoperate.
+// Cluster configuration pushed from the phone. Field-keyed: the CONFIG payload
+// is a sequence of {u8 field_id, u8 len, value[len]} sub-fields, so each setting
+// is written independently (changing the layout never clobbers the calibrated
+// divisor, and vice versa). Unknown field ids are skipped by length. The has_*
+// flags say which fields this message actually carried.
+#define CONFIG_FIELD_SPEED_DIVISOR 0x01u  // u16 LE
+#define CONFIG_FIELD_LAYOUT        0x02u  // u8 (0 = classic gauge, 1 = map)
+
 typedef struct {
+    bool     has_speed_divisor;
     uint16_t speed_divisor;  // raw ECM count -> mph
+    bool     has_layout;
+    uint8_t  layout;  // layout_t: 0 = classic, 1 = map
 } vehicle_config_t;
 
 // One chunk of an app-icon image (48x48 RGB565, sent opaque). Chunks for the

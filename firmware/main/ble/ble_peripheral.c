@@ -23,6 +23,7 @@
 #include "icon_cache.h"
 #include "settings.h"
 #include "settings_store.h"
+#include "ui_manager.h"  // request a layout switch when the phone sets it
 #if CONFIG_VROD_J1850
 #include "j1850_driver.h"  // apply calibrated speed divisor live
 #endif
@@ -110,12 +111,23 @@ static void start_advertising(void);
 // the brief NVS write is fine.
 static void apply_config(const vehicle_config_t *cfg)
 {
+    settings_t s = *settings_store_current();
+    if (cfg->has_speed_divisor) {
 #if CONFIG_VROD_J1850
-    j1850_driver_set_speed_divisor(cfg->speed_divisor);
+        j1850_driver_set_speed_divisor(cfg->speed_divisor);
 #endif
-    settings_t s    = *settings_store_current();
-    s.speed_divisor = cfg->speed_divisor;
+        s.speed_divisor = cfg->speed_divisor;
+    }
+    bool layout_changed = false;
+    if (cfg->has_layout && cfg->layout != (uint8_t)s.layout) {
+        s.layout       = (layout_t)cfg->layout;
+        layout_changed = true;
+    }
     settings_store_apply(&s);  // validates + writes NVS
+    // Switch the view off the NimBLE host task (show_home may load the map);
+    // ui_manager_request_home defers the actual swap to the UI task.
+    if (layout_changed)
+        ui_manager_request_home();
 }
 
 static int access_rx_cb(uint16_t conn_handle, uint16_t attr_handle,
@@ -148,7 +160,9 @@ static int access_rx_cb(uint16_t conn_handle, uint16_t attr_handle,
         if (evt.type == PHONE_EVT_CONFIG) {
             // Config write-back is cluster state, not a phone_data event:
             // apply the calibrated divisor live and persist it to NVS.
-            ESP_LOGI(TAG, "rx CONFIG speed_divisor=%u", (unsigned)evt.config.speed_divisor);
+            ESP_LOGI(TAG, "rx CONFIG divisor=%u(%d) layout=%u(%d)",
+                     (unsigned)evt.config.speed_divisor, evt.config.has_speed_divisor,
+                     (unsigned)evt.config.layout, evt.config.has_layout);
             apply_config(&evt.config);
             return 0;
         }
