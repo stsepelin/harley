@@ -47,6 +47,47 @@ menu "V-Rod cluster"
             -1 compiles the tool out entirely. Bench only — never leave
             enabled in a bike build.
 
+    config VROD_GPS_UART
+        bool "Read a NEO-6M/M8N GPS module on a UART"
+        default n
+        help
+            Starts the NMEA reader task: RMC sentences from the module are
+            parsed and published into gps_source, which the map view prefers
+            over the phone GPS (freshest/lowest-latency wins). Position only --
+            no POI/speed-camera or direction features. Off by default until the
+            module is physically wired to the 40-pin header.
+
+    config VROD_GPS_UART_NUM
+        int "UART number for the GPS module"
+        depends on VROD_GPS_UART
+        range 1 4
+        default 1
+        help
+            UART0 carries the console; pick any other. The GPIO matrix routes
+            any UART to any pin, so the number itself hardly matters.
+
+    config VROD_GPS_RX_GPIO
+        int "GPIO wired to the module's TX pin"
+        depends on VROD_GPS_UART
+        default 21
+        help
+            Set to whatever header pin you actually soldered/jumpered.
+
+    config VROD_GPS_TX_GPIO
+        int "GPIO wired to the module's RX pin (-1 if not wired)"
+        depends on VROD_GPS_UART
+        default -1
+        help
+            Only needed to push UBX config (fix rate, constellations) to the
+            module. Receiving fixes works with RX alone.
+
+    config VROD_GPS_BAUD
+        int "GPS module baud rate"
+        depends on VROD_GPS_UART
+        default 9600
+        help
+            Factory default for both NEO-6M and NEO-M8N is 9600.
+
     config VROD_J1850_SNIFFER
         bool "J1850 passive sniffer (Phase 3 Stage 2 capture build)"
         default n

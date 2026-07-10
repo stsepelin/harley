@@ -4,6 +4,7 @@
 
 #include "driver/uart.h"
 #include "esp_log.h"
+#include "esp_timer.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 
@@ -38,7 +39,9 @@ static void gps_uart_task(void *arg)
                 .speed_mph   = rmc.speed_mph,
                 .heading_deg = rmc.heading_deg,
                 .fix_ok      = rmc.valid,
-                .time_ms     = rmc.time_utc_ms,
+                // Monotonic receive time (not the NMEA UTC-of-day), so the map
+                // fusion can age it out against esp_timer if the module goes silent.
+                .time_ms = (uint32_t)(esp_timer_get_time() / 1000),
             };
             gps_source_set(&g);
         }

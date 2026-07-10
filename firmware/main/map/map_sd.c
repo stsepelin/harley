@@ -1,4 +1,5 @@
 #include "map_sd.h"
+#include "gps_source.h"
 #include "map_tile.h"
 #include "phone_data.h"
 #include "screen_map.h"
@@ -9,6 +10,7 @@
 #include "bsp/esp-bsp.h"
 #include "driver/sdmmc_host.h"
 #include "esp_log.h"
+#include "esp_timer.h"
 #include "esp_vfs_fat.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
@@ -37,6 +39,7 @@ static const char *TAG = "map_sd";
 #define MAP_SD_PPT      340.0
 #define MAP_SD_FRAME_MS 66
 #define LOC_STALE_MS    5000
+#define GPS_MODULE_STALE_MS 3000  // module fix older than this -> fall back to the phone
 
 static map_tileset_t       *s_ts;
 static lv_obj_t            *s_screen;
@@ -118,12 +121,24 @@ static void anim_task(void *arg)
         vehicle_data_t vd;
         vehicle_data_get(&vd);
 
-        double           heading = -1.0;
-        phone_location_t loc;
-        phone_data_get_location(&loc);
-        if (loc.valid && loc.age_ms < LOC_STALE_MS) {
-            map_lonlat_to_tilef(loc.lon_e7 / 1e7, loc.lat_e7 / 1e7, s_ts->zoom, &cx, &cy);
-            heading = loc.heading_cd == 0xFFFF ? -1.0 : loc.heading_cd / 100.0;
+        // Dual-source position: prefer the onboard GPS module (fresh, low
+        // latency, real course-over-ground); fall back to the phone's GPS over
+        // BLE when the module has no recent fix. When no module is compiled in,
+        // gps_source stays empty (fix_ok false) and we always use the phone.
+        double       heading = -1.0;
+        gps_source_t g;
+        gps_source_get(&g);
+        uint32_t now_ms = (uint32_t)(esp_timer_get_time() / 1000);
+        if (g.fix_ok && (now_ms - g.time_ms) < GPS_MODULE_STALE_MS) {
+            map_lonlat_to_tilef(g.lon_e7 / 1e7, g.lat_e7 / 1e7, s_ts->zoom, &cx, &cy);
+            heading = g.heading_deg;
+        } else {
+            phone_location_t loc;
+            phone_data_get_location(&loc);
+            if (loc.valid && loc.age_ms < LOC_STALE_MS) {
+                map_lonlat_to_tilef(loc.lon_e7 / 1e7, loc.lat_e7 / 1e7, s_ts->zoom, &cx, &cy);
+                heading = loc.heading_cd == 0xFFFF ? -1.0 : loc.heading_cd / 100.0;
+            }
         }
 
         screen_map_render(cx, cy, MAP_SD_PPT, heading);

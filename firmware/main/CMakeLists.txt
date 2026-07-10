@@ -15,6 +15,7 @@ idf_component_register(
         vehicle/gear_calc.c
         vehicle/trip_meter.c
         vehicle/odo_meter.c
+        gps/gps_source.c
         simulator/gear_table.c
         display/boot_screen.c
         display/screen_ride.c
@@ -124,6 +125,14 @@ endif()
 # esp_adc boot-crash repro — see main/adc_repro.c.
 if(CONFIG_VROD_ADC_REPRO)
     target_sources(${COMPONENT_LIB} PRIVATE adc_repro.c)
+endif()
+
+# NEO-6M/M8N GPS module: NMEA reader task publishing into gps_source, which the
+# map view prefers over the phone GPS. nmea.c is the host-tested parser;
+# gps_source.c (the shared fix store) is always compiled so the map's fusion
+# reads an empty store and falls back to the phone when the module is absent.
+if(CONFIG_VROD_GPS_UART)
+    target_sources(${COMPONENT_LIB} PRIVATE gps/nmea.c gps/gps_uart.c)
 endif()
 
 # J1850 codec (Phase 3). j1850_vpw.c is the host-tested VPW encoder +

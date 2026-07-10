@@ -15,6 +15,10 @@
 #include "telemetry_publisher.h"
 #include "screen_pairing.h"
 #include "vehicle_data.h"
+#include "gps_source.h"
+#if CONFIG_VROD_GPS_UART
+#include "gps_uart.h"
+#endif
 #if CONFIG_VROD_INCLUDE_SIM_ENGINE
 #include "sim_engine.h"
 #endif
@@ -77,6 +81,7 @@ void app_main(void)
     // against an uninitialised vehicle_data store.
     vehicle_data_init();
     phone_data_init();
+    gps_source_init();  // shared GPS fix store (module producer, map consumer)
     icon_cache_init();  // PSRAM buffers for streamed app-notification icons
 #if CONFIG_VROD_INCLUDE_SIM_ENGINE
 #if !CONFIG_VROD_J1850 || CONFIG_VROD_MAP_DEMO
@@ -120,6 +125,9 @@ void app_main(void)
 #if CONFIG_VROD_J1850_SNIFFER
     // Read-only capture; also feeds the producer when CONFIG_VROD_J1850.
     j1850_sniffer_start();
+#endif
+#if CONFIG_VROD_GPS_UART
+    gps_uart_start();  // NMEA reader -> gps_source (map prefers it over phone GPS)
 #endif
 #if defined(CONFIG_VROD_J1850_ADC_GPIO) && CONFIG_VROD_J1850_ADC_GPIO >= 0
     j1850_adc_probe_start();
