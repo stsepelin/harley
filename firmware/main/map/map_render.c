@@ -15,14 +15,18 @@ static inline void put(canvas_t *c, int x, int y, uint16_t color)
         c->buf[y * c->w + x] = color;
 }
 
-static void fill_rect(canvas_t *c, int x, int y, int half, uint16_t color)
+// Stamp a filled disc of radius `half`. Round stamps (vs a square) give rounded
+// caps and smoother joints, so thick strokes look far less blocky.
+static void fill_disc(canvas_t *c, int x, int y, int half, uint16_t color)
 {
+    int r2 = half * half + half;  // slightly generous so the disc keeps full width
     for (int dy = -half; dy <= half; dy++)
         for (int dx = -half; dx <= half; dx++)
-            put(c, x + dx, y + dy, color);
+            if (dx * dx + dy * dy <= r2)
+                put(c, x + dx, y + dy, color);
 }
 
-// Bresenham segment, stamping a (2*half+1) square at each step for stroke width.
+// Bresenham segment, stamping a disc at each step for a smooth rounded stroke.
 static void draw_seg(canvas_t *c, int x0, int y0, int x1, int y1, uint16_t color, int half)
 {
     int dx = abs(x1 - x0), sx = x0 < x1 ? 1 : -1;
@@ -30,7 +34,7 @@ static void draw_seg(canvas_t *c, int x0, int y0, int x1, int y1, uint16_t color
     int err = dx + dy;
     for (;;) {
         if (half > 0)
-            fill_rect(c, x0, y0, half, color);
+            fill_disc(c, x0, y0, half, color);
         else
             put(c, x0, y0, color);
         if (x0 == x1 && y0 == y1)

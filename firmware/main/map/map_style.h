@@ -25,15 +25,15 @@ static inline map_style_t map_style(uint8_t id)
 {
     switch (id) {
     case MAP_STYLE_MID:
-        return (map_style_t){MAP_RGB565(0x7A, 0x80, 0x8A), 4};
+        return (map_style_t){MAP_RGB565(0x7A, 0x80, 0x8A), 6};
     case MAP_STYLE_PRIMARY:
-        return (map_style_t){MAP_RGB565(0xC9, 0xA2, 0x4B), 6};
+        return (map_style_t){MAP_RGB565(0xC9, 0xA2, 0x4B), 9};
     case MAP_STYLE_MAJOR:
-        return (map_style_t){MAP_RGB565(0xE6, 0xB8, 0x4B), 8};
+        return (map_style_t){MAP_RGB565(0xE6, 0xB8, 0x4B), 12};
     case MAP_STYLE_WATER:
         return (map_style_t){MAP_RGB565(0x1E, 0x33, 0x49), 0};
     case MAP_STYLE_MINOR:
     default:
-        return (map_style_t){MAP_RGB565(0x53, 0x57, 0x5E), 2};
+        return (map_style_t){MAP_RGB565(0x53, 0x57, 0x5E), 3};
     }
 }
