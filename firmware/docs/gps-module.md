@@ -11,8 +11,9 @@ or not the module is fitted.
 
 ## Wiring
 
-Schematic: [`docs/schematics/gps_module.svg`](../../docs/schematics/gps_module.svg)
-(regenerate with `gps_module.py` — see `docs/schematics/README.md`).
+![NEO-6M -> ESP32-P4 wiring](../../docs/schematics/gps_module.svg)
+
+*(source: `docs/schematics/gps_module.py`; regenerate per `docs/schematics/README.md`)*
 
 | Module pin | Wires to | Notes |
 |------------|----------|-------|
