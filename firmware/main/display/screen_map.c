@@ -17,6 +17,7 @@ LV_FONT_DECLARE(jbm_bold_45);
 LV_FONT_DECLARE(jbm_bold_33);
 LV_FONT_DECLARE(jbm_bold_26);
 LV_FONT_DECLARE(mdi_36);
+LV_FONT_DECLARE(mdi_60);
 
 #define ICON_ARROW_L "\xF3\xB0\x9C\xB1"  // U+F0731 arrow-left-bold
 #define ICON_ARROW_R "\xF3\xB0\x9C\xB4"  // U+F0734 arrow-right-bold
@@ -331,15 +332,15 @@ lv_obj_t *screen_map_create(map_tileset_t *ts, int w, int h)
 
     // Turn-signal arrows flanking the lamp row; lit green when active.
     s_turn_l = lv_label_create(scr);
-    lv_obj_set_style_text_font(s_turn_l, &mdi_36, 0);
+    lv_obj_set_style_text_font(s_turn_l, &mdi_60, 0);
     lv_obj_set_style_text_color(s_turn_l, lv_color_hex(VROD_ARROW_OFF), 0);
     lv_label_set_text(s_turn_l, ICON_ARROW_L);
-    lv_obj_align(s_turn_l, LV_ALIGN_TOP_MID, -330, MAP_H + 22);
+    lv_obj_align(s_turn_l, LV_ALIGN_TOP_MID, -332, MAP_H + 12);
     s_turn_r = lv_label_create(scr);
-    lv_obj_set_style_text_font(s_turn_r, &mdi_36, 0);
+    lv_obj_set_style_text_font(s_turn_r, &mdi_60, 0);
     lv_obj_set_style_text_color(s_turn_r, lv_color_hex(VROD_ARROW_OFF), 0);
     lv_label_set_text(s_turn_r, ICON_ARROW_R);
-    lv_obj_align(s_turn_r, LV_ALIGN_TOP_MID, 330, MAP_H + 22);
+    lv_obj_align(s_turn_r, LV_ALIGN_TOP_MID, 332, MAP_H + 12);
 
     // RPM readout in the top-left corner (TEMP has moved into the right chip).
     s_rpm_v = readout(scr, "RPM", &jbm_bold_33, VROD_TEXT, -285, MAP_H + 40, MAP_H + 62);
@@ -353,8 +354,8 @@ lv_obj_t *screen_map_create(map_tileset_t *ts, int w, int h)
     tbuf     = heap_caps_malloc((size_t)CHIP_W * CHIP_H * 4, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
     // GEAR (left) + TEMP (right) on the edge arc, just up-and-out from the fuel
     // E/F ends. Angles mirror about 90 deg (bottom-centre).
-    s_gear_v = edge_chip(scr, &jbm_bold_45, VROD_ORANGE, 134.0f, gbuf, &gdsc, "GEAR");
-    s_temp_v = edge_chip(scr, &jbm_bold_33, VROD_TEXT, 46.0f, tbuf, &tdsc, "TEMP");
+    s_gear_v = edge_chip(scr, &jbm_bold_45, VROD_ORANGE, 139.0f, gbuf, &gdsc, "GEAR");
+    s_temp_v = edge_chip(scr, &jbm_bold_33, VROD_TEXT, 41.0f, tbuf, &tdsc, "TEMP");
 
     s_speed_v = lv_label_create(scr);
     lv_obj_set_style_text_font(s_speed_v, &jbm_bold_72, 0);

@@ -3,6 +3,7 @@
 #include "widget_util.h"
 
 LV_FONT_DECLARE(mdi_50);
+LV_FONT_DECLARE(mdi_36);
 
 // Material Design Icons UTF-8 encodings (codepoints in main/display/fonts).
 #define ICON_OIL          "\xF3\xB0\x8F\x87"   // U+F03C7
@@ -78,11 +79,15 @@ lv_obj_t *warning_lights_create(lv_obj_t *parent,
     wd->beam_tick = 0;
     wd->beam_show_high = false;
 
+    // The compact map row uses smaller lamps; the gauge's chevron/column
+    // clusters keep the larger glyph.
+    const lv_font_t *lamp_font = (layout == WARN_LAYOUT_ROW) ? &mdi_36 : &mdi_50;
+
     for (int i = 0; i < count; i++) {
         lamp_id_t id = ids[i];
         wd->ids[i] = id;
         lv_obj_t *lbl = lv_label_create(cont);
-        lv_obj_set_style_text_font(lbl, &mdi_50, 0);
+        lv_obj_set_style_text_font(lbl, lamp_font, 0);
         lv_obj_set_style_text_color(lbl, lv_color_hex(VROD_LAMP_OFF), 0);
         lv_label_set_text(lbl, k_specs[id].icon);
         wd->last_icon[i]  = k_specs[id].icon;
