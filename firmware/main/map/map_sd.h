@@ -5,5 +5,7 @@
 // scrolls it from live phone GPS + vehicle_data. Unlike map_demo there is no
 // synthetic route: position/heading come from the phone fix, the strip from the
 // bus. No-op (logs a warning) if the card or archive is missing. Gated by
-// CONFIG_VROD_MAP_SD; call once after ble_peripheral_init (nimble RAM ordering).
-void map_sd_start(void);
+// CONFIG_VROD_MAP_SD. Idempotent + lazy: ui_manager calls it the first time the
+// map layout is shown (always after ble_peripheral_init, so nimble RAM ordering
+// holds), so a classic setting never mounts the card or loads the archive.
+void map_sd_load(void);

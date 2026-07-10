@@ -19,6 +19,15 @@
 // Persisted user preferences. Loaded once at boot, written by the
 // settings screen on change. Keep small — anything bigger than a few
 // bytes per field should probably be its own NVS namespace.
+
+// Which driving view the cluster shows. Persisted so the choice is permanent
+// (not a per-boot / accidental toggle) and so a classic setting never loads the
+// map at all until it is selected.
+typedef enum {
+    LAYOUT_CLASSIC = 0,  // full round gauge
+    LAYOUT_MAP     = 1,  // compact moving-map cluster
+} layout_t;
+
 typedef struct {
     display_units_t units;                 // kph or mph
     temp_units_t    temp_units;            // celsius or fahrenheit
@@ -27,6 +36,7 @@ typedef struct {
     uint8_t         volume;                // 0..100 (codec out_vol)
     bool            ble_visible_override;  // force undirected BLE adv even when bonded
     uint16_t        speed_divisor;         // raw ECM count -> mph (GPS-calibrated)
+    layout_t        layout;                // classic gauge or moving map
 } settings_t;
 
 // Hardcoded fallback values. Used when NVS is empty or unreadable.

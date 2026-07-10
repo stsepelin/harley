@@ -28,10 +28,12 @@ void ui_manager_show_settings_bluetooth(void);
 void ui_manager_show_bench(void);
 #endif
 
-// Register the map screen (created by the map module) so double-tap can toggle
-// to it. NULL until registered - the toggle no-ops when no map is present.
+// Register the map screen once the map module has built it. Called by the map
+// driver from inside map_*_load().
 void ui_manager_set_map_screen(lv_obj_t *map);
 
-// Double-tap handler: toggle between the ride gauge and the map screen. No-op
-// if no map screen is registered. Takes the LVGL lock internally.
-void ui_manager_toggle_map(void);
+// Show the driving view chosen in settings (classic gauge or moving map). Used
+// at the boot hand-off and whenever the user leaves the settings menu; the map
+// is lazy-loaded here on first use so a classic setting never loads it. Ensures
+// the ride screen + update tasks exist regardless of which view is shown.
+void ui_manager_show_home(void);

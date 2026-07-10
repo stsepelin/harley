@@ -107,6 +107,13 @@ void ui_manager_show_settings_bluetooth(void)
     lv_screen_load(s);
 }
 
+void ui_manager_show_home(void)
+{
+    // The desktop sim has no lazy map layout; home is always the gauge here
+    // (the sim's map mode is a separate standalone path in main.c).
+    ui_manager_show_ride();
+}
+
 void ui_manager_init(void)
 {
     settings_store_init();

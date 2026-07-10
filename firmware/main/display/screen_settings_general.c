@@ -22,6 +22,9 @@ static lv_obj_t *s_temp_units_value;
 static lv_obj_t *s_sound_badge;
 static lv_obj_t *s_brightness_value;
 static lv_obj_t *s_volume_value;
+#if CONFIG_VROD_MAP_DEMO || CONFIG_VROD_MAP_SD
+static lv_obj_t *s_layout_value;
+#endif
 
 static lv_obj_t *make_half_row(lv_obj_t *parent, int32_t x_off, int32_t y, int32_t height)
 {
@@ -112,6 +115,16 @@ static void temp_units_row_clicked_cb(lv_event_t *e)
     lv_label_set_text(s_temp_units_value, units_temp_label(s_pending.temp_units));
     settings_store_apply(&s_pending);
 }
+
+#if CONFIG_VROD_MAP_DEMO || CONFIG_VROD_MAP_SD
+static void layout_row_clicked_cb(lv_event_t *e)
+{
+    (void)e;
+    s_pending.layout = (s_pending.layout == LAYOUT_MAP) ? LAYOUT_CLASSIC : LAYOUT_MAP;
+    lv_label_set_text(s_layout_value, s_pending.layout == LAYOUT_MAP ? "MAP" : "CLASSIC");
+    settings_store_apply(&s_pending);  // applied on BACK, when show_home reads it
+}
+#endif
 
 static void sound_badge_clicked_cb(lv_event_t *e)
 {
@@ -214,6 +227,16 @@ lv_obj_t *screen_settings_general_create(void)
                                  brightness_changed_cb, brightness_released_cb);
         s_brightness_value = b.value;
     }
+
+#if CONFIG_VROD_MAP_DEMO || CONFIG_VROD_MAP_SD
+    // LAYOUT — tap to toggle the driving view; applied on BACK (show_home).
+    lv_obj_t *layout_row = make_row(scr, 80, 515);
+    lv_obj_add_flag(layout_row, LV_OBJ_FLAG_CLICKABLE);
+    lv_obj_add_event_cb(layout_row, layout_row_clicked_cb, LV_EVENT_CLICKED, NULL);
+    make_caption(layout_row, "LAYOUT", LV_ALIGN_LEFT_MID, VROD_TEXT);
+    s_layout_value = make_caption(layout_row, s_pending.layout == LAYOUT_MAP ? "MAP" : "CLASSIC",
+                                  LV_ALIGN_RIGHT_MID, VROD_ORANGE);
+#endif
 
     lv_obj_t *back = lv_button_create(scr);
     lv_obj_set_size(back, 260, 80);

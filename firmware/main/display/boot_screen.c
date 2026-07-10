@@ -24,7 +24,7 @@ static void boot_hand_off(void)
     if (s_handed_off) return;
     s_handed_off = true;
 
-    ui_manager_show_ride();             // swap to gauge screen + start updates
+    ui_manager_show_home();  // swap to the saved layout + start updates
 
     if (s_boot_scr) {
         lv_obj_delete(s_boot_scr);

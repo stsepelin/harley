@@ -14,6 +14,18 @@ static void test_defaults_known_values(void)
     // advertising is the safer steady state. The override is opt-in.
     TEST_ASSERT_FALSE(s.ble_visible_override);
     TEST_ASSERT_EQUAL_UINT16(SETTINGS_SPEED_DIVISOR_DEFAULT, s.speed_divisor);
+    TEST_ASSERT_EQUAL_UINT8(LAYOUT_CLASSIC, s.layout);
+}
+
+static void test_validate_repairs_bad_layout_enum(void)
+{
+    settings_t s = {.units = UNITS_KPH, .brightness = 50, .layout = (layout_t)7};
+    settings_validate(&s);
+    TEST_ASSERT_EQUAL_UINT8(LAYOUT_CLASSIC, s.layout);
+    // A valid non-default value must be preserved.
+    s.layout = LAYOUT_MAP;
+    settings_validate(&s);
+    TEST_ASSERT_EQUAL_UINT8(LAYOUT_MAP, s.layout);
 }
 
 static void test_validate_passes_valid_values(void)
@@ -111,5 +123,6 @@ void RunTests(void)
     RUN_TEST(test_validate_clamps_speed_divisor_out_of_range);
     RUN_TEST(test_validate_repairs_bad_units_enum);
     RUN_TEST(test_validate_repairs_bad_temp_units_enum);
+    RUN_TEST(test_validate_repairs_bad_layout_enum);
     RUN_TEST(test_validate_is_idempotent);
 }

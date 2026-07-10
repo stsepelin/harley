@@ -170,8 +170,10 @@ static void anim_task(void *arg)
     }
 }
 
-void map_demo_start(void)
+void map_demo_load(void)
 {
+    if (s_ts)
+        return;  // already loaded (lazy + idempotent)
     size_t len = (size_t)(corridor_zmta_end - corridor_zmta_start);
     s_ts       = map_tileset_load_mem(corridor_zmta_start, len);
     if (!s_ts || s_ts->ntiles == 0) {

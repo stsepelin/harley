@@ -10,8 +10,6 @@
 #include "ble_peripheral.h"
 #include "boot_screen.h"
 #include "emoji_font.h"
-#include "map_demo.h"
-#include "map_sd.h"
 #include "phone_data.h"
 #include "icon_cache.h"
 #include "telemetry_publisher.h"
@@ -178,15 +176,10 @@ void app_main(void)
     ble_peripheral_init();
     telemetry_publisher_start();
 
-#if CONFIG_VROD_MAP_DEMO
-    // Now that nimble has claimed its RAM, build + show the map (loads the
-    // embedded tileset and starts the animation task).
-    map_demo_start();
-    ESP_LOGI(TAG, "map demo running");
-#elif CONFIG_VROD_MAP_SD
-    // Real map: mount the card, load the ZMTA archive off SD, follow live GPS.
-    map_sd_start();
-#endif
+    // The map is no longer started here: it loads lazily the first time the map
+    // layout is shown (ui_manager_show_home), so a classic setting never mounts
+    // the SD or builds the tileset. The boot hand-off always follows this point
+    // (ble is up), so the lazy load keeps nimble's RAM ordering.
     ESP_LOGI(TAG, "boot complete");
     // app_main can return — all the real work runs in the FreeRTOS tasks
     // we spawned (ui_update_task, event_watcher_task, sim_engine_task,

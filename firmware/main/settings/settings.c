@@ -9,6 +9,7 @@ void settings_default(settings_t *out)
     out->volume               = 70;
     out->ble_visible_override = false;
     out->speed_divisor        = SETTINGS_SPEED_DIVISOR_DEFAULT;
+    out->layout               = LAYOUT_CLASSIC;
 }
 
 void settings_validate(settings_t *out)
@@ -31,5 +32,8 @@ void settings_validate(settings_t *out)
     if (out->speed_divisor < SETTINGS_SPEED_DIVISOR_MIN ||
         out->speed_divisor > SETTINGS_SPEED_DIVISOR_MAX) {
         out->speed_divisor = SETTINGS_SPEED_DIVISOR_DEFAULT;
+    }
+    if (out->layout != LAYOUT_CLASSIC && out->layout != LAYOUT_MAP) {
+        out->layout = LAYOUT_CLASSIC;
     }
 }

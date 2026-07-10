@@ -175,8 +175,10 @@ static void anim_task(void *arg)
     }
 }
 
-void map_sd_start(void)
+void map_sd_load(void)
 {
+    if (s_ts)
+        return;  // already loaded (lazy + idempotent)
     if (!mount_card())
         return;
 

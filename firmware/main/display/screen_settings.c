@@ -69,7 +69,7 @@ static void bench_cb(lv_event_t *e)
 static void back_cb(lv_event_t *e)
 {
     (void)e;
-    ui_manager_show_ride();
+    ui_manager_show_home();  // apply the layout chosen in settings
 }
 
 lv_obj_t *screen_settings_create(void)
