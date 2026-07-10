@@ -20,6 +20,11 @@ lv_obj_t *screen_map_create(map_tileset_t *ts, int w, int h);
 // (false if neither the view nor the heading moved since the last call).
 bool screen_map_render(double center_tx, double center_ty, double ppt, double heading_deg);
 
+// Show/hide the "off area" overlay - call when the rider's position is outside
+// the baked tiles, so a blank map is explained rather than just empty. Cached;
+// call UNDER the LVGL lock.
+void screen_map_set_no_coverage(bool off_area);
+
 // Swap in the freshly-composited map (if any) and refresh the instrument
 // widgets from vehicle_data. Cheap (widgets cache internally); call UNDER the
 // LVGL lock.

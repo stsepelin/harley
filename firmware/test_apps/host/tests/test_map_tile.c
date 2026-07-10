@@ -334,6 +334,31 @@ static void test_load_file_missing(void)
     TEST_ASSERT_NULL(map_tileset_load_file("/tmp/does_not_exist_zmta_9v3"));
 }
 
+// --- coverage / off-area (bounding box over the baked tiles) ----------------
+
+static void test_covers_within_and_outside_bbox(void)
+{
+    uint8_t        b[1024];
+    size_t         n  = build_archive(b);  // tiles (100,200) and (101,201)
+    map_tileset_t *ts = map_tileset_load_mem(b, n);
+    TEST_ASSERT_NOT_NULL(ts);
+    // Inside the box - both real tiles and a gap between them count as covered.
+    TEST_ASSERT_TRUE(map_tileset_covers(ts, 100, 200));
+    TEST_ASSERT_TRUE(map_tileset_covers(ts, 101, 201));
+    TEST_ASSERT_TRUE(map_tileset_covers(ts, 100, 201));  // gap, still "in area"
+    // Outside the box on each side.
+    TEST_ASSERT_FALSE(map_tileset_covers(ts, 99, 200));
+    TEST_ASSERT_FALSE(map_tileset_covers(ts, 102, 201));
+    TEST_ASSERT_FALSE(map_tileset_covers(ts, 100, 199));
+    TEST_ASSERT_FALSE(map_tileset_covers(ts, 101, 202));
+    map_tileset_free(ts);
+}
+
+static void test_covers_null_set_is_false(void)
+{
+    TEST_ASSERT_FALSE(map_tileset_covers(NULL, 100, 200));
+}
+
 void RunTests(void)
 {
     RUN_TEST(test_parse_valid_tile);
@@ -354,4 +379,6 @@ void RunTests(void)
     RUN_TEST(test_load_mem_owned_frees_on_bad_archive);
     RUN_TEST(test_load_file_reads_archive);
     RUN_TEST(test_load_file_missing);
+    RUN_TEST(test_covers_within_and_outside_bbox);
+    RUN_TEST(test_covers_null_set_is_false);
 }

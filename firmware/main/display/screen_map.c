@@ -42,6 +42,7 @@ static lv_obj_t      *s_speed_u;
 static lv_obj_t      *s_rpm_v;
 static lv_obj_t      *s_fuel_v;
 static lv_obj_t      *s_rpm_bar;
+static lv_obj_t      *s_no_map;  // "off area" overlay, shown when position has no tiles
 static map_tileset_t *s_ts;
 
 // Double buffer: the map composites into the back buffer OFF the LVGL lock, then
@@ -165,6 +166,20 @@ lv_obj_t *screen_map_create(map_tileset_t *ts, int w, int h)
     lv_obj_set_style_border_color(marker, lv_color_black(), 0);
     lv_obj_set_style_border_width(marker, 5, 0);
     lv_obj_align(marker, LV_ALIGN_TOP_MID, 0, MAP_H / 2 - 24);
+
+    // Off-area overlay: shown when the rider's position falls outside the baked
+    // tiles (e.g. another country), where the map would otherwise be blank.
+    s_no_map = lv_label_create(scr);
+    lv_obj_set_style_text_font(s_no_map, &jbm_bold_26, 0);
+    lv_obj_set_style_text_color(s_no_map, lv_color_hex(VROD_TEXT), 0);
+    lv_obj_set_style_text_align(s_no_map, LV_TEXT_ALIGN_CENTER, 0);
+    lv_obj_set_style_bg_color(s_no_map, lv_color_black(), 0);
+    lv_obj_set_style_bg_opa(s_no_map, LV_OPA_70, 0);
+    lv_obj_set_style_pad_all(s_no_map, 12, 0);
+    lv_obj_set_style_radius(s_no_map, 8, 0);
+    lv_label_set_text(s_no_map, "NO MAP\nFOR THIS AREA");
+    lv_obj_align(s_no_map, LV_ALIGN_TOP_MID, 0, MAP_H / 2 - 90);
+    lv_obj_add_flag(s_no_map, LV_OBJ_FLAG_HIDDEN);
 
     lv_obj_t *div = lv_obj_create(scr);
     lv_obj_remove_style_all(div);
@@ -297,6 +312,18 @@ bool screen_map_render(double center_tx, double center_ty, double ppt, double he
     s_last_ppt     = ppt;
     s_last_heading = heading_deg;
     return true;
+}
+
+void screen_map_set_no_coverage(bool off_area)
+{
+    static int last = -1;  // cache: avoid re-invalidating the label every frame
+    if (last == (int)off_area)
+        return;
+    last = (int)off_area;
+    if (off_area)
+        lv_obj_remove_flag(s_no_map, LV_OBJ_FLAG_HIDDEN);
+    else
+        lv_obj_add_flag(s_no_map, LV_OBJ_FLAG_HIDDEN);
 }
 
 void screen_map_commit(const vehicle_data_t *data, const settings_t *settings)

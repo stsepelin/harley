@@ -379,6 +379,7 @@ int main(void)
                 vehicle_data_t vd = sim_map_vd((int)lrint(mph_pt[i0]));
                 screen_map_render(tx, ty, ppt, heading);
                 screen_map_commit(&vd, settings_store_current());
+                screen_map_set_no_coverage(!map_tileset_covers(ts, (uint32_t)tx, (uint32_t)ty));
                 lv_timer_handler();
                 maybe_screenshot();
                 usleep(UI_TICK_MS * 1000);
@@ -392,6 +393,7 @@ int main(void)
             vehicle_data_t vd = sim_map_vd(speed);
             screen_map_render(ctx, cty, ppt, -1.0);
             screen_map_commit(&vd, settings_store_current());
+            screen_map_set_no_coverage(!map_tileset_covers(ts, (uint32_t)ctx, (uint32_t)cty));
             lv_timer_handler();
             maybe_screenshot();
             usleep(UI_TICK_MS * 1000);

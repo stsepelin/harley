@@ -112,14 +112,47 @@ static map_tileset_t *load_mem_impl(const uint8_t *data, size_t len, uint8_t *ow
     return ts;
 }
 
+// Cache the tile-coordinate bounding box so off-area checks are O(1) per frame.
+static void compute_bbox(map_tileset_t *ts)
+{
+    if (ts->ntiles <= 0)
+        return;
+    ts->min_tx = ts->max_tx = ts->tiles[0].tx;
+    ts->min_ty = ts->max_ty = ts->tiles[0].ty;
+    for (int i = 1; i < ts->ntiles; i++) {
+        uint32_t tx = ts->tiles[i].tx, ty = ts->tiles[i].ty;
+        if (tx < ts->min_tx)
+            ts->min_tx = tx;
+        if (tx > ts->max_tx)
+            ts->max_tx = tx;
+        if (ty < ts->min_ty)
+            ts->min_ty = ty;
+        if (ty > ts->max_ty)
+            ts->max_ty = ty;
+    }
+}
+
+bool map_tileset_covers(const map_tileset_t *ts, uint32_t tx, uint32_t ty)
+{
+    if (!ts || ts->ntiles <= 0)
+        return false;
+    return tx >= ts->min_tx && tx <= ts->max_tx && ty >= ts->min_ty && ty <= ts->max_ty;
+}
+
 map_tileset_t *map_tileset_load_mem(const uint8_t *data, size_t len)
 {
-    return load_mem_impl(data, len, NULL);
+    map_tileset_t *ts = load_mem_impl(data, len, NULL);
+    if (ts)
+        compute_bbox(ts);
+    return ts;
 }
 
 map_tileset_t *map_tileset_load_mem_owned(uint8_t *data, size_t len)
 {
-    return load_mem_impl(data, len, data);
+    map_tileset_t *ts = load_mem_impl(data, len, data);
+    if (ts)
+        compute_bbox(ts);
+    return ts;
 }
 
 void map_tile_free(map_tile_t *t)
@@ -228,6 +261,7 @@ map_tileset_t *map_tileset_load_dir(const char *dir)
         closedir(xd);
     }
     closedir(zd);
+    compute_bbox(ts);
     return ts;
 }
 

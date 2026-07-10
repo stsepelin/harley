@@ -161,6 +161,7 @@ static void anim_task(void *arg)
         int64_t us = esp_timer_get_time() - t0;
         bsp_display_lock(-1);
         screen_map_commit(&vd, settings_store_current());
+        screen_map_set_no_coverage(!map_tileset_covers(s_ts, (uint32_t)tx, (uint32_t)ty));
         bsp_display_unlock();
 
         static int frame = 0;

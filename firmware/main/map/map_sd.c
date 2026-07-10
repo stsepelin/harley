@@ -169,6 +169,7 @@ static void anim_task(void *arg)
         screen_map_render(cx, cy, MAP_SD_PPT, heading);
         bsp_display_lock(-1);
         screen_map_commit(&vd, settings_store_current());
+        screen_map_set_no_coverage(!map_tileset_covers(s_ts, (uint32_t)cx, (uint32_t)cy));
         bsp_display_unlock();
 
         vTaskDelay(pdMS_TO_TICKS(MAP_SD_FRAME_MS));

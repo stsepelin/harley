@@ -30,6 +30,10 @@ typedef struct {
     int         ntiles;
     map_tile_t *tiles;
     uint8_t    *owned;  // backing archive buffer to free with the set, or NULL
+    // Tile-coordinate bounding box of the baked area (inclusive). Used to tell
+    // whether the rider's position has map data (else "off area", e.g. another
+    // country). Valid only when ntiles > 0.
+    uint32_t min_tx, min_ty, max_tx, max_ty;
 } map_tileset_t;
 
 // Parse one tile's bytes into `out` (copies the data). false on bad magic /
@@ -54,6 +58,11 @@ map_tileset_t *map_tileset_load_mem_owned(uint8_t *data, size_t len);
 map_tileset_t *map_tileset_load_file(const char *path);
 
 void map_tileset_free(map_tileset_t *ts);
+
+// True if tile (tx,ty) lies within the baked area's bounding box - i.e. the map
+// has data to render for that position. False for an empty set. A gap inside the
+// box still counts as covered (it renders as background, not "off area").
+bool map_tileset_covers(const map_tileset_t *ts, uint32_t tx, uint32_t ty);
 
 // Slippy-map projection: lon/lat degrees -> fractional tile coordinate at zoom.
 void map_lonlat_to_tilef(double lon, double lat, int zoom, double *tx, double *ty);
