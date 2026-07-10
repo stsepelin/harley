@@ -51,6 +51,8 @@ SCOPED=(
     '*/main/vehicle/trip_meter.c'
     '*/main/vehicle/odo_meter.c'
     '*/main/ble/ble_visibility.c'
+    '*/main/gps/nmea.c'
+    '*/main/gps/gps_source.c'
     '*/main/j1850/j1850_vpw.c'
     '*/main/j1850/j1850_tx_logic.c'
     '*/main/j1850/j1850_parse.c'

@@ -51,6 +51,8 @@ jobs:
                '*/firmware/main/vehicle/trip_meter.c' \
                '*/firmware/main/vehicle/odo_meter.c' \
                '*/firmware/main/ble/ble_visibility.c' \
+               '*/firmware/main/gps/nmea.c' \
+               '*/firmware/main/gps/gps_source.c' \
                '*/firmware/main/j1850/j1850_vpw.c' \
                '*/firmware/main/j1850/j1850_tx_logic.c' \
                '*/firmware/main/j1850/j1850_parse.c' \

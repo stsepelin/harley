@@ -73,6 +73,8 @@ Today that's:
 | `main/vehicle/trip_meter.c` | Rolling 16-bit bus counter (odometer/fuel ticks) -> per-frame delta, wrap-safe + reset-clamp. |
 | `main/vehicle/odo_meter.c` | Odometer + dual-trip totals: add distance/fuel, reset a trip, set the odometer. Pure (odo_store owns NVS). |
 | `main/ble/ble_visibility.c` | Pure decision: `(has_bond, override) → adv_mode`. Stage 8. |
+| `main/gps/nmea.c` | NMEA 0183 sentence framing + RMC parse (NEO-6M) → lat/lon/speed/heading |
+| `main/gps/gps_source.c` | Mutex-guarded latest-fix store (module producer, map consumer) |
 | `main/j1850/j1850_vpw.c` | J1850 VPW symbol codec: pulse-width decoder + encoder + CRC-8/SAE-J1850. Round-trip tested. |
 | `main/j1850/j1850_parse.c` | J1850 message decoder: frame -> vehicle_data (RPM/temp/speed/turns/CEL), calibrated against real captures. Gear is not on the bus (see gear_calc). |
 | `main/j1850/j1850_driver.c` | J1850 producer glue: decoded frame -> j1850_parse (+ gear_calc, + odometer/fuel tick accumulation) -> vehicle_data_set (running aggregate). |
