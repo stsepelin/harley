@@ -216,10 +216,22 @@ static lv_obj_t *chip(lv_obj_t *p, const lv_font_t *font, uint32_t color, int x,
     lv_obj_set_style_text_font(v, font, 0);
     lv_obj_set_style_text_color(v, lv_color_hex(color), 0);
     lv_label_set_text(v, "--");
-    // Centre on the shape's rotation pivot (CHIP_CX,CHIP_CY) - invariant under the
-    // tilt, so the value stays centred in the frame's band at any angle.
-    lv_obj_align(v, LV_ALIGN_TOP_MID, 0, (int)CHIP_CY - 24);
+    // The flat top sits 25 px above the pivot, so tilting slides its centre
+    // sideways by 25*sin(deg); shift the value the same way to stay under it.
+    int vdx = (int)lroundf(25.0f * sinf(deg * (float)M_PI / 180.0f));
+    lv_obj_align(v, LV_ALIGN_TOP_MID, vdx, (int)CHIP_CY - 24);
     return v;
+}
+
+// Tilt that makes a chip's flat top tangent to the round bezel (centre 400,400)
+// at the chip's own centre, so the frame follows the screen curve. x,y are the
+// TOP_MID offsets the chip is placed at; the frame centre is (400+x, y+CHIP_CY).
+static float chip_bezel_tilt(int x, int y)
+{
+    float fx  = 400.0f + (float)x;
+    float fy  = (float)y + CHIP_CY;
+    float phi = atan2f(fy - 400.0f, fx - 400.0f) * 180.0f / (float)M_PI;
+    return phi - 90.0f;
 }
 
 lv_obj_t *screen_map_create(map_tileset_t *ts, int w, int h)
@@ -306,8 +318,9 @@ lv_obj_t *screen_map_create(map_tileset_t *ts, int w, int h)
     static lv_image_dsc_t gdsc, tdsc;
     gbuf     = heap_caps_malloc((size_t)CHIP_W * CHIP_H * 4, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
     tbuf     = heap_caps_malloc((size_t)CHIP_W * CHIP_H * 4, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
-    s_gear_v = chip(scr, &jbm_bold_45, VROD_ORANGE, -230, MAP_H + 46, gbuf, &gdsc, 33.0f);
-    s_temp_v = chip(scr, &jbm_bold_45, VROD_TEXT, 230, MAP_H + 46, tbuf, &tdsc, -33.0f);
+    const int gx = -290, tx = 290, cy = MAP_H + 66;  // out to the edges, a touch lower
+    s_gear_v = chip(scr, &jbm_bold_45, VROD_ORANGE, gx, cy, gbuf, &gdsc, chip_bezel_tilt(gx, cy));
+    s_temp_v = chip(scr, &jbm_bold_45, VROD_TEXT, tx, cy, tbuf, &tdsc, chip_bezel_tilt(tx, cy));
 
     s_speed_v = lv_label_create(scr);
     lv_obj_set_style_text_font(s_speed_v, &jbm_bold_72, 0);
