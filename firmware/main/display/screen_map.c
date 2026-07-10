@@ -225,15 +225,20 @@ static lv_obj_t *chip(lv_obj_t *p, const lv_font_t *font, uint32_t color, int x,
     return v;
 }
 
-// Tilt that makes a chip's flat top tangent to the round bezel (centre 400,400)
-// at the chip's own centre, so the frame follows the screen curve. x,y are the
-// TOP_MID offsets the chip is placed at; the frame centre is (400+x, y+CHIP_CY).
-static float chip_bezel_tilt(int x, int y)
+// Place a chip on the "edge" arc: a circle concentric with the round bezel
+// (centre 400,400) at the SAME gap from it as the fuel arc (~33 px), so gear
+// and temp stick to the screen edge alongside the arc. Position is an angle
+// from straight-right; 90 deg is bottom-centre, and a LARGER angle slides the
+// frame up-and-out along the left edge (a smaller one down-and-in toward
+// centre). The tilt is the arc tangent there, so the frame follows the curve.
+#define CHIP_EDGE_R 343.0f
+static lv_obj_t *edge_chip(lv_obj_t *p, const lv_font_t *font, uint32_t color, float ang,
+                           uint8_t *buf, lv_image_dsc_t *dsc)
 {
-    float fx  = 400.0f + (float)x;
-    float fy  = (float)y + CHIP_CY;
-    float phi = atan2f(fy - 400.0f, fx - 400.0f) * 180.0f / (float)M_PI;
-    return phi - 90.0f;
+    float a = ang * (float)M_PI / 180.0f;
+    int   x = (int)lroundf(400.0f + CHIP_EDGE_R * cosf(a)) - 400;
+    int   y = (int)lroundf(400.0f + CHIP_EDGE_R * sinf(a) - CHIP_CY);
+    return chip(p, font, color, x, y, buf, dsc, ang - 90.0f);
 }
 
 lv_obj_t *screen_map_create(map_tileset_t *ts, int w, int h)
@@ -320,12 +325,10 @@ lv_obj_t *screen_map_create(map_tileset_t *ts, int w, int h)
     static lv_image_dsc_t gdsc, tdsc;
     gbuf     = heap_caps_malloc((size_t)CHIP_W * CHIP_H * 4, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
     tbuf     = heap_caps_malloc((size_t)CHIP_W * CHIP_H * 4, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
-    // Sit on the fuel arc's circle just past E/F: same distance from the bezel
-    // as the arc (~33 px), lower and toward the centre. chip_bezel_tilt makes
-    // each frame tangent to the screen curve at its own spot.
-    const int gx = -205, tx = 205, cy = MAP_H + 88;
-    s_gear_v = chip(scr, &jbm_bold_45, VROD_ORANGE, gx, cy, gbuf, &gdsc, chip_bezel_tilt(gx, cy));
-    s_temp_v = chip(scr, &jbm_bold_45, VROD_TEXT, tx, cy, tbuf, &tdsc, chip_bezel_tilt(tx, cy));
+    // GEAR (left) + TEMP (right) on the edge arc, just up-and-out from the fuel
+    // E/F ends. Angles mirror about 90 deg (bottom-centre).
+    s_gear_v = edge_chip(scr, &jbm_bold_45, VROD_ORANGE, 132.0f, gbuf, &gdsc);
+    s_temp_v = edge_chip(scr, &jbm_bold_45, VROD_TEXT, 48.0f, tbuf, &tdsc);
 
     s_speed_v = lv_label_create(scr);
     lv_obj_set_style_text_font(s_speed_v, &jbm_bold_72, 0);
