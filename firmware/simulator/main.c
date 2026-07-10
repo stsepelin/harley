@@ -364,7 +364,12 @@ static void sim_demo_map_frame(void)
         double lat = s_demo_lat[i0] + f * (s_demo_lat[i1] - s_demo_lat[i0]);
         double lon = s_demo_lon[i0] + f * (s_demo_lon[i1] - s_demo_lon[i0]);
         map_lonlat_to_tilef(lon, lat, s_demo_ts->zoom, &tx, &ty);
-        heading = sim_bearing(lat, lon, s_demo_lat[i1], s_demo_lon[i1]);
+        // Heading from a lookahead point (~6 samples ahead), not the immediate
+        // next one: the recorded track has GPS jitter, so the bearing to an
+        // adjacent (near-coincident) point swings wildly and spins the whole
+        // heading-up map. A longer baseline gives a stable travel direction.
+        int look = (i0 + 6) % s_demo_npts;
+        heading  = sim_bearing(s_demo_lat[i0], s_demo_lon[i0], s_demo_lat[look], s_demo_lon[look]);
         s_demo_pos += 0.08;
         if (s_demo_pos >= s_demo_npts)
             s_demo_pos -= s_demo_npts;
