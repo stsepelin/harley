@@ -216,12 +216,10 @@ static lv_obj_t *chip(lv_obj_t *p, const lv_font_t *font, uint32_t color, int x,
     lv_obj_set_style_text_font(v, font, 0);
     lv_obj_set_style_text_color(v, lv_color_hex(color), 0);
     lv_label_set_text(v, "--");
-    // The flat top sits 25 px above the pivot, so tilting slides its centre
-    // sideways by 25*sin(deg); shift the value the same way to stay under it.
-    // The -14 (vs the pivot) leaves padding between the frame's top and the
-    // value, mirroring the gap we give the fuel E/F above their ticks.
-    int vdx = (int)lroundf(25.0f * sinf(deg * (float)M_PI / 180.0f));
-    lv_obj_align(v, LV_ALIGN_TOP_MID, vdx, (int)CHIP_CY - 14);
+    // Centre on the frame's centroid (= the rotation pivot at CHIP_CX,CHIP_CY),
+    // which is tilt-invariant; LV_ALIGN_CENTER also re-centres on any text width
+    // or font, so gear "5" and temp "85 deg" both sit centred in the pocket.
+    lv_obj_align(v, LV_ALIGN_CENTER, 0, (int)CHIP_CY - CHIP_H / 2);
     return v;
 }
 
@@ -334,12 +332,12 @@ lv_obj_t *screen_map_create(map_tileset_t *ts, int w, int h)
     lv_obj_set_style_text_font(s_speed_v, &jbm_bold_72, 0);
     lv_obj_set_style_text_color(s_speed_v, lv_color_hex(VROD_TEXT), 0);
     lv_label_set_text(s_speed_v, "0");
-    lv_obj_align(s_speed_v, LV_ALIGN_TOP_MID, 0, MAP_H + 78);
+    lv_obj_align(s_speed_v, LV_ALIGN_TOP_MID, 0, MAP_H + 120);
     s_speed_u = lv_label_create(scr);
     lv_obj_set_style_text_font(s_speed_u, &jbm_bold_26, 0);
     lv_obj_set_style_text_color(s_speed_u, lv_color_hex(VROD_TEXT_DIM), 0);
     lv_label_set_text(s_speed_u, "MPH");
-    lv_obj_align(s_speed_u, LV_ALIGN_TOP_MID, 0, MAP_H + 150);
+    lv_obj_align(s_speed_u, LV_ALIGN_TOP_MID, 0, MAP_H + 192);
 
     // Compact fuel arc at the bottom - the same segmented E..F arc as the full
     // gauge, ~1.5x smaller so the map strip has room to breathe.
