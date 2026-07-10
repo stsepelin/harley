@@ -321,6 +321,25 @@ menu "V-Rod cluster"
 
             OFF in production: the entire map module and the embedded tiles are
             compiled out (no baked-route fallback ships). The real SD-backed map
-            will be its own option.
+            is CONFIG_VROD_MAP_SD.
+
+    config VROD_MAP_SD
+        bool "Real map: vector tiles from microSD"
+        default n
+        help
+            Ship the moving map for real: mount the microSD, load a packed ZMTA
+            archive (tools/maptiles/pack.py) from CONFIG_VROD_MAP_SD_PATH into
+            PSRAM, and scroll it from live phone GPS + bus data - no synthetic
+            route. A city/region archive is small enough (roads + water at z16 =
+            hundreds of KB to a few MB) to keep off flash and on the card.
+
+            Boots to the gauge; double-tap toggles to the map. No-op if the card
+            or archive is missing. Independent of CONFIG_VROD_MAP_DEMO (that one
+            embeds a demo route in flash); enabling both is pointless but safe.
+
+    config VROD_MAP_SD_PATH
+        string "microSD path to the ZMTA map archive"
+        depends on VROD_MAP_SD
+        default "/sdcard/map.zmta"
 
 endmenu

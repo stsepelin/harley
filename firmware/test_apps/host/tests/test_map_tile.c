@@ -287,6 +287,53 @@ static void test_load_dir_missing_manifest(void)
     TEST_ASSERT_NULL(map_tileset_load_dir(dir));  // no manifest.json
 }
 
+// --- file / owned-buffer loaders (SD path) ---------------------------------
+
+static void test_load_mem_owned_takes_ownership(void)
+{
+    uint8_t  stack[1024];
+    size_t   n   = build_archive(stack);
+    uint8_t *buf = malloc(n);  // freed by map_tileset_free, not by us
+    memcpy(buf, stack, n);
+    map_tileset_t *ts = map_tileset_load_mem_owned(buf, n);
+    TEST_ASSERT_NOT_NULL(ts);
+    TEST_ASSERT_EQUAL_PTR(buf, ts->owned);
+    TEST_ASSERT_EQUAL_INT(2, ts->ntiles);
+    map_tileset_free(ts);  // ASan would flag a leak or double-free here
+}
+
+static void test_load_mem_owned_frees_on_bad_archive(void)
+{
+    uint8_t *buf = malloc(8);
+    memcpy(buf, "ZMTX", 4);
+    TEST_ASSERT_NULL(map_tileset_load_mem_owned(buf, 8));  // bad magic -> frees buf
+}
+
+static void test_load_file_reads_archive(void)
+{
+    uint8_t b[1024];
+    size_t  n      = build_archive(b);
+    char    path[] = "/tmp/zmta_XXXXXX";
+    int     fd     = mkstemp(path);
+    TEST_ASSERT_TRUE(fd >= 0);
+    close(fd);
+    write_file(path, b, n);
+
+    map_tileset_t *ts = map_tileset_load_file(path);
+    TEST_ASSERT_NOT_NULL(ts);
+    TEST_ASSERT_EQUAL_INT(16, ts->zoom);
+    TEST_ASSERT_EQUAL_INT(2, ts->ntiles);
+    TEST_ASSERT_EQUAL_UINT32(100, ts->tiles[0].tx);
+    TEST_ASSERT_NOT_NULL(ts->owned);
+    map_tileset_free(ts);
+    unlink(path);
+}
+
+static void test_load_file_missing(void)
+{
+    TEST_ASSERT_NULL(map_tileset_load_file("/tmp/does_not_exist_zmta_9v3"));
+}
+
 void RunTests(void)
 {
     RUN_TEST(test_parse_valid_tile);
@@ -303,4 +350,8 @@ void RunTests(void)
     RUN_TEST(test_load_mem_skips_out_of_range_tile);
     RUN_TEST(test_load_dir_reads_tiles);
     RUN_TEST(test_load_dir_missing_manifest);
+    RUN_TEST(test_load_mem_owned_takes_ownership);
+    RUN_TEST(test_load_mem_owned_frees_on_bad_archive);
+    RUN_TEST(test_load_file_reads_archive);
+    RUN_TEST(test_load_file_missing);
 }

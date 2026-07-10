@@ -79,30 +79,47 @@ bool map_tile_parse(const uint8_t *data, size_t len, map_tile_t *out)
     return parse_into(data, len, out, true);
 }
 
-map_tileset_t *map_tileset_load_mem(const uint8_t *data, size_t len)
+// `owned` (when non-NULL) is a heap buffer equal to `data` that the tileset
+// takes over and frees on destroy - lets an SD/PSRAM archive be parsed in place.
+static map_tileset_t *load_mem_impl(const uint8_t *data, size_t len, uint8_t *owned)
 {
     // ZMTA: magic(4) + zoom(2) + rsvd(2) + count(4), then 16-byte index entries.
-    if (len < 12 || memcmp(data, "ZMTA", 4) != 0)
+    if (len < 12 || memcmp(data, "ZMTA", 4) != 0) {
+        free(owned);
         return NULL;
+    }
     uint16_t zoom  = rd16(data + 4);
     uint32_t count = rd32(data + 8);
-    if (12 + (size_t)count * 16 > len)
+    if (12 + (size_t)count * 16 > len) {
+        free(owned);
         return NULL;
+    }
 
     map_tileset_t *ts = calloc(1, sizeof(*ts));
     ts->zoom          = zoom;
     ts->tiles         = calloc(count, sizeof(map_tile_t));
+    ts->owned         = owned;
 
     for (uint32_t i = 0; i < count; i++) {
         const uint8_t *e   = data + 12 + (size_t)i * 16;
         uint32_t       off = rd32(e + 8), tlen = rd32(e + 12);
         if ((size_t)off + tlen > len)
             continue;
-        // Parse in place: xy aliases the flash-mapped archive, no copy.
+        // Parse in place: xy aliases the archive (flash or the owned buffer).
         if (parse_into(data + off, tlen, &ts->tiles[ts->ntiles], false))
             ts->ntiles++;
     }
     return ts;
+}
+
+map_tileset_t *map_tileset_load_mem(const uint8_t *data, size_t len)
+{
+    return load_mem_impl(data, len, NULL);
+}
+
+map_tileset_t *map_tileset_load_mem_owned(uint8_t *data, size_t len)
+{
+    return load_mem_impl(data, len, data);
 }
 
 void map_tile_free(map_tile_t *t)
@@ -221,5 +238,16 @@ void map_tileset_free(map_tileset_t *ts)
     for (int i = 0; i < ts->ntiles; i++)
         map_tile_free(&ts->tiles[i]);
     free(ts->tiles);
+    free(ts->owned);
     free(ts);
+}
+
+map_tileset_t *map_tileset_load_file(const char *path)
+{
+    size_t   len;
+    uint8_t *bytes = read_file(path, &len);
+    if (!bytes)
+        return NULL;
+    map_tileset_t *ts = map_tileset_load_mem_owned(bytes, len);  // frees bytes on failure
+    return ts;
 }

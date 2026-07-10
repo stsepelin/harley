@@ -271,10 +271,13 @@ int main(void)
     // the gauge. VROD_MAP_CENTER="lat,lon" (default: tileset centre),
     // VROD_MAP_PPT px/tile (default 256), VROD_MAP_SPEED mph. Honours VROD_SHOT.
     const char *mapdir = getenv("VROD_MAP");
-    if (mapdir) {
-        map_tileset_t *ts = map_tileset_load_dir(mapdir);
+    const char *mapzmta = getenv("VROD_MAP_ZMTA");
+    if (mapdir || mapzmta) {
+        // VROD_MAP_ZMTA exercises the packed-archive file loader (the on-device
+        // SD path); VROD_MAP is the per-tile directory loader.
+        map_tileset_t *ts = mapzmta ? map_tileset_load_file(mapzmta) : map_tileset_load_dir(mapdir);
         if (!ts) {
-            fprintf(stderr, "map: failed to load %s\n", mapdir);
+            fprintf(stderr, "map: failed to load %s\n", mapzmta ? mapzmta : mapdir);
             return 1;
         }
         double      ctx = 0, cty = 0;

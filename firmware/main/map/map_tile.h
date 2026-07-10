@@ -29,6 +29,7 @@ typedef struct {
     int         zoom;
     int         ntiles;
     map_tile_t *tiles;
+    uint8_t    *owned;  // backing archive buffer to free with the set, or NULL
 } map_tileset_t;
 
 // Parse one tile's bytes into `out` (copies the data). false on bad magic /
@@ -42,6 +43,15 @@ map_tileset_t *map_tileset_load_dir(const char *dir);
 // Load a packed ZMTA archive from memory (flash-mapped embedded blob). Tiles are
 // parsed in place - `data` must outlive the tileset. See tools/maptiles/pack.py.
 map_tileset_t *map_tileset_load_mem(const uint8_t *data, size_t len);
+
+// Same, but the tileset takes ownership of `data` (a heap buffer) and frees it
+// in map_tileset_free. Use for a ZMTA read off SD/PSRAM rather than flash.
+map_tileset_t *map_tileset_load_mem_owned(uint8_t *data, size_t len);
+
+// Read a whole ZMTA archive from a filesystem path (e.g. /sdcard/map.zmta) into
+// a heap buffer and load it (owned). NULL on open / bad-archive. Host, sim, and
+// the on-device SD path all reach the file the same way via VFS.
+map_tileset_t *map_tileset_load_file(const char *path);
 
 void map_tileset_free(map_tileset_t *ts);
 

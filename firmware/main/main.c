@@ -11,6 +11,7 @@
 #include "boot_screen.h"
 #include "emoji_font.h"
 #include "map_demo.h"
+#include "map_sd.h"
 #include "phone_data.h"
 #include "icon_cache.h"
 #include "telemetry_publisher.h"
@@ -182,6 +183,9 @@ void app_main(void)
     // embedded tileset and starts the animation task).
     map_demo_start();
     ESP_LOGI(TAG, "map demo running");
+#elif CONFIG_VROD_MAP_SD
+    // Real map: mount the card, load the ZMTA archive off SD, follow live GPS.
+    map_sd_start();
 #endif
     ESP_LOGI(TAG, "boot complete");
     // app_main can return — all the real work runs in the FreeRTOS tasks
