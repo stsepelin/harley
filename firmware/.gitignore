@@ -1,4 +1,4 @@
 
-# Generated map demo assets (tools/maptiles)
-main/assets/corridor.zmta
-main/assets/track.txt
+# The map demo tiles (main/assets/corridor.zmta + track.txt) are committed so a
+# fresh clone can build CONFIG_VROD_MAP_DEMO and run the sim map without baking.
+# Regenerate with tools/maptiles/region.py + the route capture if the area moves.

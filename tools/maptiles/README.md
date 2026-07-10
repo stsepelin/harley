@@ -63,8 +63,24 @@ so restyling never needs a re-bake.
 `styles.py` is the single source of truth for classification + palette, shared by
 the preview today and the cluster firmware later.
 
+## Committed demo tiles
+
+`firmware/main/assets/corridor.zmta` + `track.txt` (a short Tallinn route, ~224
+KB) are checked in so a fresh clone can build `CONFIG_VROD_MAP_DEMO` and preview
+the map in the sim without baking anything:
+
+```sh
+cd firmware/simulator && cmake -B build -S . && cmake --build build
+VROD_MAP_ZMTA=../main/assets/corridor.zmta VROD_MAP_PPT=340 \
+  VROD_TRACK=../main/assets/track.txt ./build/vrod_sim   # animates the route
+```
+
+Regenerate them with `region.py` (+ a route capture) if the demo area moves.
+
 ## Files
 
+- `region.py` — one command: `.osm.pbf` -> `.zmta` (clip, filter, bake, pack)
 - `bake.py` — GeoJSON -> per-tile `.bin` + `manifest.json`
+- `pack.py` — baked `tiles/` -> single `.zmta` archive
 - `preview.py` — `.bin` -> PNG (reads the exact bytes the cluster will read)
 - `styles.py` — OSM tag -> style id, style id -> colour/width
