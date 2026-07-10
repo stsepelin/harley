@@ -304,8 +304,8 @@ lv_obj_t *screen_map_create(map_tileset_t *ts, int w, int h)
     static lv_image_dsc_t gdsc, tdsc;
     gbuf     = heap_caps_malloc((size_t)CHIP_W * CHIP_H * 4, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
     tbuf     = heap_caps_malloc((size_t)CHIP_W * CHIP_H * 4, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
-    s_gear_v = chip(scr, &jbm_bold_45, VROD_ORANGE, -188, MAP_H + 84, gbuf, &gdsc, 29.0f);
-    s_temp_v = chip(scr, &jbm_bold_45, VROD_TEXT, 188, MAP_H + 84, tbuf, &tdsc, -29.0f);
+    s_gear_v = chip(scr, &jbm_bold_45, VROD_ORANGE, -196, MAP_H + 62, gbuf, &gdsc, 29.0f);
+    s_temp_v = chip(scr, &jbm_bold_45, VROD_TEXT, 196, MAP_H + 62, tbuf, &tdsc, -29.0f);
 
     s_speed_v = lv_label_create(scr);
     lv_obj_set_style_text_font(s_speed_v, &jbm_bold_72, 0);
