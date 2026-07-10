@@ -150,62 +150,54 @@ static lv_obj_t *readout(lv_obj_t *p, const char *cap, const lv_font_t *font, ui
     return v;
 }
 
-// A frame around a value - just the TOP of the gauge's gear-selector shape
-// (flat top + splayed sides, open bottom), baked like gear_indicator: a white
-// outline that is thick + opaque in the middle and tapers thinner + fades to
-// transparent at the ends, rotated to sit tangent to the fuel arc's E/F ends.
-#define CHIP_W    200
-#define CHIP_H    140
-#define CHIP_CX   100.0f  // shape centre in buffer-local coords
-#define CHIP_CY   66.0f
-#define CHIP_SPAN 78.0f  // centre-to-end taper/fade span
-static const lv_point_precise_t k_chip_top[] = {
-    {28, 92},  {52, 52},              // left diagonal side
-    {57, 47},  {63, 44},  {71, 42},   // smooth left shoulder
-    {100, 41},                        // flat top
-    {129, 42}, {137, 44}, {143, 47},  // smooth right shoulder
-    {148, 52}, {172, 92},             // right diagonal side
-};
+// GEAR / TEMP brackets. These are true arc segments lying on the SAME circle
+// as the compact fuel arc, placed just past the E and F ends, so the bottom of
+// the strip reads as one continuous curved rail:  [gear] E ==fuel== F [temp].
+// A tilted straight-sided frame can't follow a curve; a concentric arc does by
+// construction. The stroke is thick + opaque at the centre and tapers thinner +
+// fades at the ends, matching the gauge's baked frames. The value rides just
+// inside the rim, at the bracket's centre angle.
+//
+// Fuel circle in screen coords: the compact preset (container 384x88, bottom-
+// aligned at -12) puts the arc centre at (400, 526) with an outer rim r=245.
+// If the compact fuel_arc geometry changes, update these to match.
+#define FUEL_CX  400.0f
+#define FUEL_CY  526.0f
+#define FUEL_R   245.0f
+#define BK_HALF  17.0f   // bracket half-span (deg); E/F sit at +-29 deg from centre
+#define BK_VAL_R 205.0f  // value radius (inside the rim)
+#define BK_W     140
+#define BK_H     150
 
-static void bake_chip(uint8_t *buf, float deg)
+static void bake_arc_bracket(uint8_t *buf, float clx, float cly, float ang_c)
 {
-    memset(buf, 0, (size_t)CHIP_W * CHIP_H * 4);
-    float a = deg * (float)M_PI / 180.0f, ca = cosf(a), sa = sinf(a);
-    int   n = sizeof(k_chip_top) / sizeof(k_chip_top[0]);
-    for (int i = 0; i < n - 1; i++) {
-        float x0 = (float)k_chip_top[i].x, y0 = (float)k_chip_top[i].y;
-        float x1 = (float)k_chip_top[i + 1].x, y1 = (float)k_chip_top[i + 1].y;
-        int   steps = (int)hypotf(x1 - x0, y1 - y0) + 1;
-        for (int s = 0; s <= steps; s++) {
-            float t  = (float)s / (float)steps;
-            float px = x0 + (x1 - x0) * t, py = y0 + (y1 - y0) * t;
-            // Width taper + alpha fade from the shape centre, like the gauge.
-            float d  = fabsf(px - CHIP_CX);
-            float tw = fminf(d / CHIP_SPAN, 1.0f);
-            float r  = 2.8f - 1.9f * tw;  // ~5.6 px centre -> ~1.8 px ends
-            float ta = fminf(fmaxf((d - 34.0f) / (CHIP_SPAN - 34.0f), 0.0f), 1.0f);
-            float al = 255.0f * (1.0f - ta);
-            // Rotate around the shape centre.
-            float rx = px - CHIP_CX, ry = py - CHIP_CY;
-            sprite_stamp_disk_max(buf, CHIP_W, CHIP_H, CHIP_CX + rx * ca - ry * sa,
-                                  CHIP_CY + rx * sa + ry * ca, r, al, 0xFFFFFF);
-        }
+    memset(buf, 0, (size_t)BK_W * BK_H * 4);
+    const float d2r   = (float)M_PI / 180.0f;
+    int         steps = (int)(BK_HALF * 2.0f * FUEL_R * d2r) + 1;  // ~1 px arc-length
+    for (int s = 0; s <= steps; s++) {
+        float t   = (float)s / (float)steps;  // 0..1 across the sweep
+        float ang = (ang_c - BK_HALF + t * 2.0f * BK_HALF) * d2r;
+        float d   = fabsf(t - 0.5f) * 2.0f;                // 0 centre -> 1 ends
+        float r   = 2.8f - 1.9f * fminf(d / 0.78f, 1.0f);  // thick centre -> thin ends
+        float al  = 255.0f * (1.0f - fminf(fmaxf((d - 0.55f) / 0.45f, 0.0f), 1.0f));  // fade ends
+        sprite_stamp_disk_max(buf, BK_W, BK_H, clx + FUEL_R * cosf(ang), cly + FUEL_R * sinf(ang),
+                              r, al, 0xFFFFFF);
     }
 }
 
-static lv_obj_t *chip(lv_obj_t *p, const lv_font_t *font, uint32_t color, int x, int y,
-                      uint8_t *buf, lv_image_dsc_t *dsc, float deg)
+static lv_obj_t *arc_chip(lv_obj_t *p, const lv_font_t *font, uint32_t color, int bx, int by,
+                          uint8_t *buf, lv_image_dsc_t *dsc, float ang_c)
 {
     lv_obj_t *f = lv_obj_create(p);
     lv_obj_remove_style_all(f);
-    lv_obj_set_size(f, CHIP_W, CHIP_H);
-    lv_obj_align(f, LV_ALIGN_TOP_MID, x, y);
+    lv_obj_set_size(f, BK_W, BK_H);
+    lv_obj_align(f, LV_ALIGN_TOP_LEFT, bx, by);
     lv_obj_remove_flag(f, LV_OBJ_FLAG_SCROLLABLE);
-    lv_obj_set_style_clip_corner(f, false, 0);
 
+    float clx = FUEL_CX - (float)bx, cly = FUEL_CY - (float)by;  // fuel centre, buffer-local
     if (buf) {
-        bake_chip(buf, deg);
-        sprite_dsc_init_argb(dsc, buf, CHIP_W, CHIP_H);
+        bake_arc_bracket(buf, clx, cly, ang_c);
+        sprite_dsc_init_argb(dsc, buf, BK_W, BK_H);
         lv_obj_t *img = lv_image_create(f);
         lv_image_set_src(img, dsc);
         lv_obj_set_pos(img, 0, 0);
@@ -216,11 +208,12 @@ static lv_obj_t *chip(lv_obj_t *p, const lv_font_t *font, uint32_t color, int x,
     lv_obj_set_style_text_font(v, font, 0);
     lv_obj_set_style_text_color(v, lv_color_hex(color), 0);
     lv_label_set_text(v, "--");
-    // The flat top sits 25 px above the pivot, so tilting the frame slides its
-    // centre sideways by 25*sin(deg); shift the value the same way to keep it
-    // centred under the top rather than on the (stationary) pivot.
-    int vdx = (int)lroundf(25.0f * sinf(deg * (float)M_PI / 180.0f));
-    lv_obj_align(v, LV_ALIGN_TOP_MID, vdx, (int)CHIP_CY - 24);
+    // Value centred (TOP_MID auto-recentres on text-width change) on the point
+    // BK_VAL_R inward at the bracket's centre angle.
+    const float d2r = (float)M_PI / 180.0f;
+    float       vx  = clx + BK_VAL_R * cosf(ang_c * d2r);
+    float       vy  = cly + BK_VAL_R * sinf(ang_c * d2r);
+    lv_obj_align(v, LV_ALIGN_TOP_MID, (int)lroundf(vx) - BK_W / 2, (int)lroundf(vy) - 22);
     return v;
 }
 
@@ -301,15 +294,14 @@ lv_obj_t *screen_map_create(map_tileset_t *ts, int w, int h)
     // RPM readout in the top-left corner (TEMP has moved into the right chip).
     s_rpm_v = readout(scr, "RPM", &jbm_bold_33, VROD_TEXT, -285, MAP_H + 40, MAP_H + 62);
 
-    // GEAR (left) + TEMP (right) in gear-selector frames stuck to the E/F edges,
-    // rotated tangent to the arc. Baked ARGB (thick/opaque centre -> thin/faded
-    // ends) so they match the gauge's frame exactly.
+    // GEAR (left of E) + TEMP (right of F): arc brackets on the fuel circle,
+    // continuing it past the E/F ends so the bottom reads as one curved rail.
     static uint8_t       *gbuf, *tbuf;
     static lv_image_dsc_t gdsc, tdsc;
-    gbuf     = heap_caps_malloc((size_t)CHIP_W * CHIP_H * 4, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
-    tbuf     = heap_caps_malloc((size_t)CHIP_W * CHIP_H * 4, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
-    s_gear_v = chip(scr, &jbm_bold_45, VROD_ORANGE, -232, MAP_H + 60, gbuf, &gdsc, 20.0f);
-    s_temp_v = chip(scr, &jbm_bold_45, VROD_TEXT, 232, MAP_H + 60, tbuf, &tdsc, -20.0f);
+    gbuf     = heap_caps_malloc((size_t)BK_W * BK_H * 4, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
+    tbuf     = heap_caps_malloc((size_t)BK_W * BK_H * 4, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
+    s_gear_v = arc_chip(scr, &jbm_bold_45, VROD_ORANGE, 156, 608, gbuf, &gdsc, 138.0f);
+    s_temp_v = arc_chip(scr, &jbm_bold_45, VROD_TEXT, 504, 608, tbuf, &tdsc, 42.0f);
 
     s_speed_v = lv_label_create(scr);
     lv_obj_set_style_text_font(s_speed_v, &jbm_bold_72, 0);
