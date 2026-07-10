@@ -357,19 +357,19 @@ lv_obj_t *screen_map_create(map_tileset_t *ts, int w, int h)
     tbuf     = heap_caps_malloc((size_t)CHIP_W * CHIP_H * 4, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
     // GEAR (left) + TEMP (right) on the edge arc, just up-and-out from the fuel
     // E/F ends. Angles mirror about 90 deg (bottom-centre).
-    s_gear_v = edge_chip(scr, &jbm_bold_45, VROD_ORANGE, 135.0f, gbuf, &gdsc, "GEAR");
-    s_temp_v = edge_chip(scr, &jbm_bold_33, VROD_TEXT, 45.0f, tbuf, &tdsc, "TEMP");
+    s_gear_v = edge_chip(scr, &jbm_bold_45, VROD_ORANGE, 143.0f, gbuf, &gdsc, "GEAR");
+    s_temp_v = edge_chip(scr, &jbm_bold_33, VROD_TEXT, 37.0f, tbuf, &tdsc, "TEMP");
 
     s_speed_v = lv_label_create(scr);
     lv_obj_set_style_text_font(s_speed_v, &jbm_bold_72, 0);
     lv_obj_set_style_text_color(s_speed_v, lv_color_hex(VROD_TEXT), 0);
     lv_label_set_text(s_speed_v, "0");
-    lv_obj_align(s_speed_v, LV_ALIGN_TOP_MID, 0, MAP_H + 173);
+    lv_obj_align(s_speed_v, LV_ALIGN_TOP_MID, 0, MAP_H + 125);
     s_speed_u = lv_label_create(scr);
     lv_obj_set_style_text_font(s_speed_u, &jbm_bold_26, 0);
     lv_obj_set_style_text_color(s_speed_u, lv_color_hex(VROD_TEXT_DIM), 0);
     lv_label_set_text(s_speed_u, "MPH");
-    lv_obj_align(s_speed_u, LV_ALIGN_TOP_MID, 0, MAP_H + 245);
+    lv_obj_align(s_speed_u, LV_ALIGN_TOP_MID, 0, MAP_H + 197);
 
     // Compact fuel arc at the bottom - the same segmented E..F arc as the full
     // gauge, ~1.5x smaller so the map strip has room to breathe.
