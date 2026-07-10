@@ -320,7 +320,10 @@ lv_obj_t *screen_map_create(map_tileset_t *ts, int w, int h)
     static lv_image_dsc_t gdsc, tdsc;
     gbuf     = heap_caps_malloc((size_t)CHIP_W * CHIP_H * 4, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
     tbuf     = heap_caps_malloc((size_t)CHIP_W * CHIP_H * 4, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
-    const int gx = -290, tx = 290, cy = MAP_H + 88;  // out to the edges, lower down
+    // Sit on the fuel arc's circle just past E/F: same distance from the bezel
+    // as the arc (~33 px), lower and toward the centre. chip_bezel_tilt makes
+    // each frame tangent to the screen curve at its own spot.
+    const int gx = -205, tx = 205, cy = MAP_H + 104;
     s_gear_v = chip(scr, &jbm_bold_45, VROD_ORANGE, gx, cy, gbuf, &gdsc, chip_bezel_tilt(gx, cy));
     s_temp_v = chip(scr, &jbm_bold_45, VROD_TEXT, tx, cy, tbuf, &tdsc, chip_bezel_tilt(tx, cy));
 
