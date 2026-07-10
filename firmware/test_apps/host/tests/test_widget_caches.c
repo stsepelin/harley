@@ -365,6 +365,20 @@ static void test_fuel_alloc_fail_degrades(void)
     TEST_ASSERT_EQUAL_INT(1, g_lv_obj_set_style_text_color_calls);  // icon still recolours
 }
 
+// The compact preset (map strip) has its own create entry + geometry but shares
+// the draw path; exercise create + a fill + a low rebake so the widget-scope
+// gate stays at 100%.
+static void test_fuel_compact_bakes_and_caches(void)
+{
+    lv_obj_t *w = fuel_arc_create_compact(NULL);
+    fuel_arc_set_level(w, 4);
+    lv_stub_reset();
+    fuel_arc_set_level(w, 4);
+    TEST_ASSERT_EQUAL_INT(0, g_lv_obj_invalidate_calls);
+    fuel_arc_set_level(w, 2);  // low: red band rebakes + one invalidate
+    TEST_ASSERT_EQUAL_INT(1, g_lv_obj_invalidate_calls);
+}
+
 // --- notification_banner -----------------------------------------------------
 // Runs every frame while a notification is up, so its per-field caches are
 // the difference between one repaint per change and a repaint per frame.
@@ -946,6 +960,7 @@ void RunTests(void)
     RUN_TEST(test_fuel_cache_clamps_overrange);
     RUN_TEST(test_fuel_low_level_renders_red);
     RUN_TEST(test_fuel_alloc_fail_degrades);
+    RUN_TEST(test_fuel_compact_bakes_and_caches);
     RUN_TEST(test_notif_banner_inactive_is_quiet);
     RUN_TEST(test_notif_banner_cache_skips_unchanged);
     RUN_TEST(test_notif_banner_message_change_repaints_once);

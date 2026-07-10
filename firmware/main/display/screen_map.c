@@ -231,11 +231,11 @@ static lv_obj_t *chip(lv_obj_t *p, const lv_font_t *font, uint32_t color, int x,
         lv_obj_set_style_transform_pivot_x(c, LV_PCT(50), 0);
         lv_obj_set_style_transform_pivot_y(c, LV_PCT(50), 0);
         lv_obj_set_style_transform_rotation(c, rot, 0);
-        lv_obj_set_style_transform_scale_x(c, 80, 0);  // ~x3.2 smaller (256 = 1x)
-        lv_obj_set_style_transform_scale_y(c, 80, 0);
-        // Sit just off the value's baseline, tilted with the frame.
-        lv_obj_align(c, LV_ALIGN_CENTER, cx - (int)lroundf(16.0f * ux),
-                     cyb - (int)lroundf(16.0f * uy));
+        lv_obj_set_style_transform_scale_x(c, 160, 0);  // ~x1.6 smaller (256 = 1x)
+        lv_obj_set_style_transform_scale_y(c, 160, 0);
+        // Above the frame's flat top (outside the shape), tilted with the frame.
+        lv_obj_align(c, LV_ALIGN_CENTER, cx + (int)lroundf(44.0f * ux),
+                     cyb + (int)lroundf(44.0f * uy));
     }
 
     lv_obj_t *v = lv_label_create(f);
@@ -245,9 +245,9 @@ static lv_obj_t *chip(lv_obj_t *p, const lv_font_t *font, uint32_t color, int x,
     lv_obj_set_style_transform_pivot_x(v, LV_PCT(50), 0);
     lv_obj_set_style_transform_pivot_y(v, LV_PCT(50), 0);
     lv_obj_set_style_transform_rotation(v, rot, 0);
-    // Centre on the frame's centroid (= pivot), a touch toward the flat top to
-    // leave room for the caption; the tilt is applied about the label centre.
-    lv_obj_align(v, LV_ALIGN_CENTER, cx + (int)lroundf(6.0f * ux), cyb + (int)lroundf(6.0f * uy));
+    // Centre on the frame's centroid (= pivot); the tilt is applied about the
+    // label centre. The caption now lives above the shape, so no offset needed.
+    lv_obj_align(v, LV_ALIGN_CENTER, cx, cyb);
     return v;
 }
 
