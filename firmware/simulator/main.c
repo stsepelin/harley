@@ -199,6 +199,42 @@ static void maybe_screenshot(void)
     exit(0);
 }
 
+// Round-panel bezel: the physical 800x800 display only shows the inscribed
+// circle; the corners are hidden by the case. On the desktop the square
+// framebuffer makes the round edge invisible against the black gauge, so paint
+// the out-of-circle corners a distinct "bezel" grey on the top layer. Set
+// VROD_NO_BEZEL=1 to see the full square frame (e.g. for layout debugging).
+// Top-layer only, so it doesn't affect VROD_SHOT snapshots of the screen.
+static void add_bezel_mask(void)
+{
+    if (getenv("VROD_NO_BEZEL"))
+        return;
+    size_t   sz  = (size_t)DISPLAY_W * DISPLAY_H * 4;  // ARGB8888
+    uint8_t *buf = malloc(sz);
+    if (!buf)
+        return;
+    memset(buf, 0, sz);  // fully transparent inside the circle
+    int  cx = DISPLAY_W / 2, cy = DISPLAY_H / 2;
+    int  r  = DISPLAY_W / 2;
+    long r2 = (long)r * r;
+    for (int y = 0; y < DISPLAY_H; y++) {
+        for (int x = 0; x < DISPLAY_W; x++) {
+            long dx = x - cx, dy = y - cy;
+            if (dx * dx + dy * dy > r2) {
+                uint8_t *p = buf + ((size_t)y * DISPLAY_W + x) * 4;
+                p[0]       = 0x28;  // B
+                p[1]       = 0x24;  // G
+                p[2]       = 0x20;  // R  (a dark neutral bezel)
+                p[3]       = 0xFF;  // A
+            }
+        }
+    }
+    lv_obj_t *cv = lv_canvas_create(lv_layer_top());
+    lv_canvas_set_buffer(cv, buf, DISPLAY_W, DISPLAY_H, LV_COLOR_FORMAT_ARGB8888);
+    lv_obj_align(cv, LV_ALIGN_TOP_LEFT, 0, 0);
+    lv_obj_remove_flag(cv, LV_OBJ_FLAG_CLICKABLE);  // never eat touch input
+}
+
 // Synthesise a vehicle_data snapshot from speed alone, so the compact map's
 // gauge widgets show something plausible in VROD_MAP mode (which has no sim
 // engine feeding vehicle_data). Gear bands + within-band revs, fixed temp/fuel.
@@ -266,6 +302,7 @@ int main(void)
     }
     lv_sdl_window_set_title(display, "V-Rod cluster simulator");
     lv_sdl_mouse_create();
+    add_bezel_mask();  // paint the round-panel corners so the gauge edge shows
 
     // Map spike: VROD_MAP=<tiles_dir> renders the moving-map screen instead of
     // the gauge. VROD_MAP_CENTER="lat,lon" (default: tileset centre),
