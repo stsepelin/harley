@@ -323,7 +323,7 @@ lv_obj_t *screen_map_create(map_tileset_t *ts, int w, int h)
     // Sit on the fuel arc's circle just past E/F: same distance from the bezel
     // as the arc (~33 px), lower and toward the centre. chip_bezel_tilt makes
     // each frame tangent to the screen curve at its own spot.
-    const int gx = -205, tx = 205, cy = MAP_H + 104;
+    const int gx = -205, tx = 205, cy = MAP_H + 88;
     s_gear_v = chip(scr, &jbm_bold_45, VROD_ORANGE, gx, cy, gbuf, &gdsc, chip_bezel_tilt(gx, cy));
     s_temp_v = chip(scr, &jbm_bold_45, VROD_TEXT, tx, cy, tbuf, &tdsc, chip_bezel_tilt(tx, cy));
 
