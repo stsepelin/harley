@@ -63,6 +63,7 @@ static uint16_t *s_scratch;  // heading-up compositing buffer, lazily allocated
 
 static bool   s_have_last;
 static double s_last_tx, s_last_ty, s_last_ppt, s_last_heading;
+static double s_render_heading;  // eased heading actually applied to the rotation
 
 // Tile-bitmap LRU. Each slot holds one rasterised tile at TILE_PX*TILE_PX;
 // buffers are allocated lazily in PSRAM as tiles are first seen.
@@ -429,10 +430,38 @@ bool screen_map_render(double center_tx, double center_ty, double ppt, double he
 {
     if (!s_buf[0])
         return false;
-    // Skip if neither the view nor the heading moved since the last render.
-    bool heading_turned = heading_deg >= 0 && (!s_have_last || s_last_heading < 0 ||
-                                               fabs(heading_deg - s_last_heading) > 0.5);
-    if (s_have_last && ppt == s_last_ppt && !heading_turned) {
+
+    // Heading-up rotation eases toward the target so the map glides instead of
+    // snapping when the travel direction (which only updates at GPS/track
+    // samples) steps. Shortest-path angular low-pass; snapped on the first
+    // heading and when re-entering heading-up from north-up.
+    bool   north_up = heading_deg < 0;
+    double hdiff    = 0.0;  // shortest-path (target - eased), after easing
+    if (!north_up) {
+        if (!s_have_last || s_last_heading < 0) {
+            s_render_heading = heading_deg;
+        } else {
+            double d = heading_deg - s_render_heading;
+            while (d > 180.0)
+                d -= 360.0;
+            while (d < -180.0)
+                d += 360.0;
+            s_render_heading += 0.14 * d;  // ~converges in ~0.5 s at 30 FPS
+            if (s_render_heading < 0.0)
+                s_render_heading += 360.0;
+            else if (s_render_heading >= 360.0)
+                s_render_heading -= 360.0;
+        }
+        hdiff = heading_deg - s_render_heading;
+        while (hdiff > 180.0)
+            hdiff -= 360.0;
+        while (hdiff < -180.0)
+            hdiff += 360.0;
+    }
+
+    // Skip only if the view is still AND the eased heading has caught up.
+    bool heading_moving = !north_up && (!s_have_last || s_last_heading < 0 || fabs(hdiff) > 0.3);
+    if (s_have_last && ppt == s_last_ppt && !heading_moving) {
         double dpx = hypot((center_tx - s_last_tx) * ppt, (center_ty - s_last_ty) * ppt);
         if (dpx < MOVE_THRESH_PX)
             return false;
@@ -440,7 +469,7 @@ bool screen_map_render(double center_tx, double center_ty, double ppt, double he
     int       back = 1 - s_front;
     uint16_t *dst  = s_buf[back];
 
-    if (heading_deg < 0) {
+    if (north_up) {
         composite_tiles(dst, SCR_W, MAP_H, center_tx, center_ty, ppt);
     } else {
         if (!s_scratch)
@@ -449,7 +478,7 @@ bool screen_map_render(double center_tx, double center_ty, double ppt, double he
         if (!s_scratch)
             return false;
         composite_tiles(s_scratch, SCRATCH_SZ, SCRATCH_SZ, center_tx, center_ty, ppt);
-        rotate_blit(dst, s_scratch, heading_deg);
+        rotate_blit(dst, s_scratch, s_render_heading);
     }
 
     s_back_ready   = back;
