@@ -20,6 +20,9 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
+import ee.zeppl.companion.ble.OutboundSink
+import ee.zeppl.companion.ble.Protocol
+import ee.zeppl.companion.ble.TelemetryState
 import ee.zeppl.companion.notif.AllowList
 import ee.zeppl.companion.notif.NotifAccess
 
@@ -88,6 +91,28 @@ fun SettingsScreen(onConfigureApps: () -> Unit) {
             )
             InfoRow("Display units", "On cluster")
             InfoRow("Temperature units", "On cluster")
+
+            // Layout: only shown on a cluster that has the map. The checked state
+            // and the "no map loaded" hint come from the cluster's own telemetry,
+            // so the toggle reflects reality instead of an optimistic guess.
+            if (TelemetryState.mapSupported == true) {
+                val mapAvailable = TelemetryState.mapAvailable != false
+                SwitchRow(
+                    label = "Map view",
+                    sublabel = if (!mapAvailable)
+                        "No map loaded on the cluster - insert an SD card with map tiles."
+                    else
+                        "Show the moving map instead of the classic gauge.",
+                    checked = TelemetryState.layoutIsMap == true,
+                    onCheckedChange = { on ->
+                        OutboundSink.send(
+                            Protocol.encodeConfig(
+                                layout = if (on) Protocol.LAYOUT_MAP else Protocol.LAYOUT_CLASSIC,
+                            ),
+                        )
+                    },
+                )
+            }
         }
     }
 }

@@ -137,16 +137,36 @@ object Protocol {
         return buf.array()
     }
 
+    // CONFIG sub-field ids (mirror CONFIG_FIELD_* in firmware/main/phone/phone.h).
+    private const val CONFIG_FIELD_SPEED_DIVISOR: Byte = 0x01
+    private const val CONFIG_FIELD_LAYOUT: Byte = 0x02
+
+    /** layout_t values in settings.h. */
+    const val LAYOUT_CLASSIC = 0
+    const val LAYOUT_MAP = 1
+
     /**
      * Config write-back to the cluster. Mirrors `PHONE_EVT_CONFIG` in
-     * `firmware/main/phone/phone_protocol.c`: u16 speed_divisor (LE). The
-     * cluster applies it live and persists it to NVS.
+     * `firmware/main/phone/phone_protocol.c`: a run of {u8 field_id, u8 len,
+     * value} sub-fields. Only the fields passed here are sent, so writing the
+     * layout never disturbs the calibrated divisor (and vice versa). The cluster
+     * applies each present field live and persists it to NVS.
      */
-    fun encodeConfig(speedDivisor: Int): ByteArray {
-        val buf = ByteBuffer.allocate(3 + 2).order(ByteOrder.LITTLE_ENDIAN)
+    fun encodeConfig(speedDivisor: Int? = null, layout: Int? = null): ByteArray {
+        val payloadLen = (if (speedDivisor != null) 4 else 0) + (if (layout != null) 3 else 0)
+        val buf = ByteBuffer.allocate(3 + payloadLen).order(ByteOrder.LITTLE_ENDIAN)
         buf.put(TYPE_CONFIG)
-        buf.putShort(2)
-        buf.putShort(speedDivisor.toShort())
+        buf.putShort(payloadLen.toShort())
+        if (speedDivisor != null) {
+            buf.put(CONFIG_FIELD_SPEED_DIVISOR)
+            buf.put(2.toByte())
+            buf.putShort(speedDivisor.toShort())
+        }
+        if (layout != null) {
+            buf.put(CONFIG_FIELD_LAYOUT)
+            buf.put(1.toByte())
+            buf.put(layout.toByte())
+        }
         return buf.array()
     }
 

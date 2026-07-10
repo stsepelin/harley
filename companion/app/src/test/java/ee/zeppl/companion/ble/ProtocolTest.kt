@@ -241,10 +241,26 @@ class ProtocolTest {
     }
 
     @Test fun `encodes config speed divisor`() {
-        // Mirrors test_phone_protocol.c::test_parse_config_speed_divisor (188).
+        // Field-keyed: type, len=4, {id=1, len=2, u16 188}. Mirrors
+        // test_phone_protocol.c::test_parse_config_speed_divisor.
         assertArrayEquals(
-            byteArrayOf(0x04, 0x02, 0x00, 0xBC.toByte(), 0x00),
-            Protocol.encodeConfig(188),
+            byteArrayOf(0x04, 0x04, 0x00, 0x01, 0x02, 0xBC.toByte(), 0x00),
+            Protocol.encodeConfig(speedDivisor = 188),
+        )
+    }
+
+    @Test fun `encodes config layout`() {
+        // {id=2, len=1, u8 1}. Mirrors test_parse_config_layout.
+        assertArrayEquals(
+            byteArrayOf(0x04, 0x03, 0x00, 0x02, 0x01, 0x01),
+            Protocol.encodeConfig(layout = Protocol.LAYOUT_MAP),
+        )
+    }
+
+    @Test fun `encodes config both fields`() {
+        assertArrayEquals(
+            byteArrayOf(0x04, 0x07, 0x00, 0x01, 0x02, 0xC8.toByte(), 0x00, 0x02, 0x01, 0x00),
+            Protocol.encodeConfig(speedDivisor = 200, layout = Protocol.LAYOUT_CLASSIC),
         )
     }
 

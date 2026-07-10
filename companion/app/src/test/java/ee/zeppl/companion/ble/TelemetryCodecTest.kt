@@ -5,7 +5,7 @@ import org.junit.Assert.assertNull
 import org.junit.Test
 
 /**
- * Cluster -> phone telemetry decoder. The 36-byte fixture below is the exact
+ * Cluster -> phone telemetry decoder. The 37-byte fixture below is the exact
  * frame asserted by the firmware host test
  * (`test_telemetry_codec.c::test_encode_exact_frame`) - if either side's
  * layout moves, both fixtures move together.
@@ -14,7 +14,7 @@ class TelemetryCodecTest {
 
     // Byte-for-byte the expected[] from test_encode_exact_frame.
     private val fixture = intArrayOf(
-        0x40, 0x21, 0x00,             // type, payload_len = 33
+        0x40, 0x22, 0x00,             // type, payload_len = 34
         0x00, 0x30,                   // speed_raw  = 12288
         0x3F, 0x00,                   // speed_mph  = 63
         0x80, 0x0C,                   // rpm        = 3200
@@ -28,6 +28,7 @@ class TelemetryCodecTest {
         0x57, 0x04, 0x00, 0x00,       // trip1_fuel = 1111
         0xAE, 0x08, 0x00, 0x00,       // trip2_fuel = 2222
         0x08, 0x18,                   // clock 08:24
+        0x06,                         // status = LAYOUT_MAP | MAP_AVAILABLE
     ).map { it.toByte() }.toByteArray()
 
     @Test fun `decodes the firmware fixture frame`() {
@@ -46,6 +47,10 @@ class TelemetryCodecTest {
         assertEquals(2222L, f.trip2FuelTicks)
         assertEquals(8, f.clockHours)
         assertEquals(24, f.clockMinutes)
+        assertEquals(
+            TelemetryCodec.STATUS_LAYOUT_MAP or TelemetryCodec.STATUS_MAP_AVAILABLE,
+            f.status,
+        )
     }
 
     @Test fun `rejects a short buffer`() {
@@ -60,7 +65,7 @@ class TelemetryCodecTest {
 
     @Test fun `rejects a wrong payload length`() {
         val bad = fixture.copyOf()
-        bad[1] = 0x20  // 32, not 33
+        bad[1] = 0x21  // 33, not 34
         assertNull(TelemetryCodec.decode(bad))
     }
 
@@ -71,7 +76,11 @@ class TelemetryCodecTest {
         assertEquals(12288, TelemetryState.speedRaw)
         assertEquals(1000000L, TelemetryState.odometerM)
         assertEquals(4242L, TelemetryState.lastFrameMs)
+        assertEquals(true, TelemetryState.layoutIsMap)   // status bit 1
+        assertEquals(true, TelemetryState.mapAvailable)  // status bit 2
+        assertEquals(false, TelemetryState.mapSupported) // status bit 0 clear in the fixture
         TelemetryState.clear()
         assertNull(TelemetryState.speedMph)
+        assertNull(TelemetryState.layoutIsMap)
     }
 }

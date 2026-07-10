@@ -29,6 +29,12 @@ object TelemetryState {
     var trip1FuelTicks: Long? by mutableStateOf(null)
     var trip2FuelTicks: Long? by mutableStateOf(null)
 
+    // Cluster layout state (from the telemetry status byte) so the Layout
+    // toggle reflects reality rather than an optimistic guess.
+    var mapSupported:   Boolean? by mutableStateOf(null)  // a map build (else hide the toggle)
+    var layoutIsMap:    Boolean? by mutableStateOf(null)  // current view is the map
+    var mapAvailable:   Boolean? by mutableStateOf(null)  // map loaded OK (card/tiles present)
+
     /** Uptime-millis of the last frame, or null if none received this session. */
     var lastFrameMs:    Long? by mutableStateOf(null)
 
@@ -39,6 +45,9 @@ object TelemetryState {
         engineTempC = f.engineTempC; fuelLevel = f.fuelLevel; lamps = f.lamps
         odometerM = f.odometerM; trip1M = f.trip1M; trip2M = f.trip2M
         trip1FuelTicks = f.trip1FuelTicks; trip2FuelTicks = f.trip2FuelTicks
+        mapSupported = (f.status and TelemetryCodec.STATUS_MAP_SUPPORTED) != 0
+        layoutIsMap  = (f.status and TelemetryCodec.STATUS_LAYOUT_MAP) != 0
+        mapAvailable = (f.status and TelemetryCodec.STATUS_MAP_AVAILABLE) != 0
         lastFrameMs = atMs
     }
 
@@ -47,6 +56,7 @@ object TelemetryState {
         engineTempC = null; fuelLevel = null; lamps = null
         odometerM = null; trip1M = null; trip2M = null
         trip1FuelTicks = null; trip2FuelTicks = null
+        mapSupported = null; layoutIsMap = null; mapAvailable = null
         lastFrameMs = null
     }
 }

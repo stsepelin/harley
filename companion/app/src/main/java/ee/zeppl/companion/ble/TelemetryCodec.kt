@@ -23,6 +23,7 @@ data class TelemetryFrame(
     val trip2FuelTicks: Long,
     val clockHours: Int,
     val clockMinutes: Int,
+    val status: Int,
 )
 
 /**
@@ -33,8 +34,13 @@ data class TelemetryFrame(
  */
 object TelemetryCodec {
     const val TYPE: Byte = 0x40
-    private const val PAYLOAD_LEN = 33
-    const val FRAME_LEN = 3 + PAYLOAD_LEN  // 36
+    private const val PAYLOAD_LEN = 34
+    const val FRAME_LEN = 3 + PAYLOAD_LEN  // 37
+
+    // status bitfield (mirror TELEMETRY_STATUS_* in telemetry_codec.h).
+    const val STATUS_MAP_SUPPORTED = 1 shl 0
+    const val STATUS_LAYOUT_MAP    = 1 shl 1
+    const val STATUS_MAP_AVAILABLE = 1 shl 2
 
     // Lamp bitfield positions (mirror TELEMETRY_LAMP_* in telemetry_codec.h).
     const val LAMP_TURN_LEFT    = 1 shl 0
@@ -71,6 +77,7 @@ object TelemetryCodec {
             trip2FuelTicks = b.int.toLong() and 0xFFFFFFFFL,
             clockHours     = b.get().toInt() and 0xFF,
             clockMinutes   = b.get().toInt() and 0xFF,
+            status         = b.get().toInt() and 0xFF,
         )
     }
 }
