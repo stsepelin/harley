@@ -507,6 +507,10 @@ int main(void)
     //    screens so the settings → back path rejoins the original instead
     //    of rebuilding the ride each time.
     ui_manager_init();
+    // Jump straight to a settings sub-screen for headless review (VROD_SHOT),
+    // so screens behind a couple of taps can be screenshotted without driving.
+    if (getenv("VROD_SETTINGS"))
+        ui_manager_show_settings_general();
 
     // 4) Main loop: pump vehicle data + settings into the UI, then let
     //    LVGL render. The sim updates s_data on its own thread;

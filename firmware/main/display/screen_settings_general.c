@@ -230,7 +230,8 @@ lv_obj_t *screen_settings_general_create(void)
 
 #if CONFIG_VROD_MAP_DEMO || CONFIG_VROD_MAP_SD
     // LAYOUT — tap to toggle the driving view; applied on BACK (show_home).
-    lv_obj_t *layout_row = make_row(scr, 80, 515);
+    // y=530 keeps the same 20 px gap as the rows above (brightness ends at 510).
+    lv_obj_t *layout_row = make_row(scr, 80, 530);
     lv_obj_add_flag(layout_row, LV_OBJ_FLAG_CLICKABLE);
     lv_obj_add_event_cb(layout_row, layout_row_clicked_cb, LV_EVENT_CLICKED, NULL);
     make_caption(layout_row, "LAYOUT", LV_ALIGN_LEFT_MID, VROD_TEXT);
