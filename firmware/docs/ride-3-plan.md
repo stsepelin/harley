@@ -13,13 +13,14 @@ Carried over from `ride-1-findings.md` / `ride-2-findings.md`, still open:
 
 | Item | Question | How Ride 3 answers it |
 |---|---|---|
-| **Brake vs clutch** (`48 3B 40` bit5) | Ride 2 saw bit5 on braking, but brake+clutch co-occur when stopping | Part A tests 1-2: brake only, then clutch only |
-| **Neutral** | Confirmed NOT on the bus (`48 3B 40` disproven); is it truly discrete? | Part A test 3: hold N vs 1st, look for any *steady* frame |
-| **Oil pressure lamp** | On the bus or discrete (pin 9)? Untestable so far (engine-off capture was empty) | Part A test 6: key-on engine-OFF (lamp on) → start → diff |
-| **Immobiliser / security** | The key-on handshake frames | Part A test 7: key off→on, capture the settle |
-| **Fuel level + low-fuel** | Level not seen on bus; low-fuel bit never flipped (never ran low) | Part A test 8 + Part C: capture while the low-fuel lamp is ON |
-| **Lean / bank angle** | Any TSSM frame track lean? | Part A test 4 (off the stand, rock L/R) |
-| **Turn signals** | Re-confirm `48 DA 40 39` bit1=L / bit0=R | Part A test 5 |
+| **Brake vs clutch** (`48 3B 40` bit5) | Ride 2 saw bit5 on braking, but brake+clutch co-occur when stopping | Part A1 tests 4-5: brake only, then clutch only |
+| **Neutral** | Confirmed NOT on the bus (`48 3B 40` disproven); is it truly discrete? | Part A1 test 6: hold N vs 1st, look for any *steady* frame |
+| **Oil pressure lamp** | On the bus or discrete (pin 9)? Untestable so far (engine-off capture was empty) | Part A0 test 2: key-on engine-OFF (lamp on) → start → diff |
+| **Immobiliser / security** | The key-on handshake frames | Part A0 test 1: key off→on, capture the settle |
+| **Fuel level + low-fuel** | Level not seen on bus; low-fuel bit not yet decoded | Part C: decode from the **Ride 2 low-tank window** (lamp was on pre-fuel-stop); Part A8 for the level candidate |
+| **Speed-cal wizard** (Ride 2 action #2) | Never completed on Ride 2 (sampled ~3 s); fixed in PR #28 | Part B: re-run the wizard, write the divisor to NVS, record divisor/RMS/n |
+| **Lean / bank angle** | Any TSSM frame track lean? | Part A1 test 7 (off the stand, rock L/R) |
+| **Turn signals** | Re-confirm `48 DA 40 39` bit1=L / bit0=R | Part A1 test 3 |
 | **GPS map on bike** (#58) | Does the module drive the map at speed? | Part B: ride with the map view up |
 | **Speed 188 + gear** | Locked at bench; confirm against GPS/radar on the road | Part B: cross-check `speed_raw` vs phone-GPS speed |
 | **Odometer tick (0.4 m)** | Confirm tick size against GPS distance | Part B: compare `A8 69 10` ticks × 0.4 m to the GPS track length |
@@ -46,30 +47,45 @@ Carried over from `ride-1-findings.md` / `ride-2-findings.md`, still open:
 7. **A stopwatch / notes**: call each action out loud and note the clock, so the log
    can be sliced by time afterwards (the whole method in `signal-mapping-capture.md`).
 
-## Part A — stationary controlled capture (engine idling, on the stand)
+## Part A — stationary controlled capture (on the stand)
 
 The point: **one input at a time, 5+ reps, a few seconds apart**, so a real signal
-shows a repeatable pattern. Start the ride log (bench UI REC, or it auto-records),
-announce each test, do it, announce done. Full test table + analysis in
-`signal-mapping-capture.md`; ride-day order:
+shows a repeatable pattern. Start the ride log **before touching the key** (bench UI
+REC, or it auto-records), announce each test, do it, announce done. Full test table
++ analysis in `signal-mapping-capture.md`.
 
-1. **Turn signals** (warm-up + sanity): L only ×5, R only ×5, hazard. Confirms the
+Order matters: the **key-on handshake and the cold oil-lamp state are one-shot** —
+they exist only at the first key-on of the day, so **Part A0 (cold, key OFF) must
+run before the engine is ever started.** Only then move to the idling tests (A1).
+
+### A0 — cold start (key OFF → engine running), captured once
+
+1. **Immobiliser / security**: with the log already running, turn the key **OFF →
+   ON** (do **not** start yet) and hold. Capture the brief security/fob handshake
+   frames before the bus settles to idle keep-alives.
+2. **Oil pressure**: leave the engine **OFF** with the key on ~30 s (oil lamp lit),
+   then **start** the engine. Diff the frames for the bit that clears when oil
+   pressure comes up. (This is the capture Ride 1 never got — its engine-off log was
+   empty; and it can't be redone later in the session without cycling the key.)
+
+Do A0 first, in one continuous take. If the handshake or the oil clear looks
+ambiguous, kill the engine, wait, and repeat the whole OFF→ON→start once.
+
+### A1 — engine idling (after A0), one input at a time
+
+3. **Turn signals** (warm-up + sanity): L only ×5, R only ×5, hazard. Confirms the
    tap is live and re-confirms `48 DA 40 39` bit1=L / bit0=R.
-2. **Brake**: front brake only, 5×, **no clutch, no shift**. Watch `48 3B 40` bit5.
-3. **Clutch**: pull clutch only, 5×, in gear, stopped, **no brake**. Splits brake
+4. **Brake**: front brake only, 5×, **no clutch, no shift**. Watch `48 3B 40` bit5.
+5. **Clutch**: pull clutch only, 5×, in gear, stopped, **no brake**. Splits brake
    vs clutch on the same bit5.
-4. **Neutral**: N 30 s → 1st 30 s → N 30 s (clutch as needed). Looking for any frame
+6. **Neutral**: N 30 s → 1st 30 s → N 30 s (clutch as needed). Looking for any frame
    that holds a *steady* state across each block (expected: none → confirms the
    discrete pin-10 tap for Phase 6).
-5. **Lean**: off the stand, rock the bike L/R past ~10-20°, a few times each side.
+7. **Lean**: off the stand, rock the bike L/R past ~10-20°, a few times each side.
    Any `…40` (TSSM) byte that tracks lean?
-6. **Oil**: key-on **engine-OFF** ~30 s (oil lamp lit), then **start** the engine.
-   Diff the frames for the bit that clears when oil pressure comes up. (This is the
-   capture Ride 1 never got — the earlier engine-off log was empty.)
-7. **Immobiliser**: key OFF → ON, capture the brief security/fob handshake before
-   it settles.
 8. **Fuel level** (best-effort): hard stationary, note candidates `A8 83 61 12` /
-   anything level-shaped; may only confirm by watching over a tank (Part C).
+   anything level-shaped. Low-fuel itself is decoded from the **existing Ride 2
+   low-tank window** (Part C), not here.
 
 ## Part B — the ride (GPS map + speed/gear)
 
@@ -89,16 +105,29 @@ a radar sign).
 - **Gear**: watch the gear digit through the range; at divisor 188 it should read
   correctly ~91% of the time (Ride 2). Note any gear that's consistently wrong.
 - **Ride log** runs the whole time → `firmware/docs/captures/2026-…-ride-3.log`.
+- **Speed-calibration wizard — record the divisor (Ride 2 action #2, still open).**
+  The app wizard (phone GPS speed + `speed_raw` → `SpeedCalibrator` → divisor → NVS
+  write-back) **never completed on Ride 2** — it sampled only ~3 s in the Composable
+  and never hit the ≥5-sample floor; PR #28 moved sampling into the foreground BLE
+  service so it now survives screen-off. Re-run it here: **Dev tab → your cluster →
+  Speed calibration → Start**, hold two or three steady speeds on the GPS-referenced
+  stretch (an assistant/pillion taps, per `ride-2-calibration-plan.md` Part B), let
+  it solve, **Finish** to write the divisor to NVS. Record the solved divisor, RMS,
+  and sample count for the write-up; expect ~188. This is a hands-free rerun, so also
+  possible on a calm parking-lot loop rather than the open road.
 
-## Part C — targeted, opportunistic captures
+## Part C — low-fuel (mine Ride 2 first)
 
-- **Low-fuel lamp**: if the tank is low (or ride it down), capture a stretch with the
-  **low-fuel lamp ON** and note the clock. The low-fuel bit never flipped in Rides
-  1-2; this is the only way to locate it. (Also watch whether the fuel-gauge frame
-  `A8 83 61 12` even appears — it's likely IM-originated and may vanish with the
-  stock IM later.)
-- **Cold-start check**: the very first key-on of the day doubles as the oil +
-  immobiliser capture (Part A tests 6-7) if you'd rather do them first.
+- **Low-fuel lamp — already recorded on Ride 2.** Ride 2 bracketed a fuel stop, so
+  the leg **before** the stop ran on a low tank with the low-fuel lamp on; that
+  window is in the raw Ride 2 sniffer log. **Decode it from there first**: slice the
+  Ride 2 log at the pre-fuel-stop timestamp and diff the low-tank window against a
+  full-tank baseline for the bit that holds while the lamp is on. (Also watch whether
+  the fuel-gauge frame `A8 83 61 12` even appears — it's likely IM-originated and may
+  vanish with the stock IM later.)
+- **Only if that's inconclusive** (lamp window too short, or the bit is ambiguous),
+  capture a fresh low-fuel stretch on Ride 3: ride the tank down until the lamp lights
+  and note the clock.
 
 ## Post-ride analysis
 
@@ -119,3 +148,8 @@ a radar sign).
 - **GPS/map**: fold the on-bike result into task #58; note any rotation/handover
   tuning (`GPS_MODULE_STALE_MS`, frame rate) the road exposed.
 - **Speed/gear**: confirm 188 holds on the road, or open a re-calibration if not.
+- **Speed calibration recorded** (closes Ride 2 action #2): the wizard-solved divisor
+  written to NVS, plus divisor/RMS/sample-count in `ride-3-findings.md`; if it lands
+  off 188, update `SETTINGS_SPEED_DIVISOR_DEFAULT` / `J1850_SPEED_DIVISOR`.
+- **Low-fuel**: the bit located from the Ride 2 low-tank window (or a fresh Ride 3
+  capture if that was inconclusive), decoded in `j1850_parse.c` if it's on the bus.
