@@ -18,8 +18,9 @@ Output tree (copy the whole thing to /sdcard/map, or match CONFIG_VROD_MAP_SD_DI
 Pipeline (one filter, then batched single-pass multi-extract - never one osmium
 pass per cell, which would re-read the continent thousands of times):
 
-  1. osmium tags-filter: keep roads + water only -> rw.pbf (shrinks 32 GB -> a
-     few GB).
+  1. osmium tags-filter: keep roads + water + building footprints -> rw.pbf
+     (shrinks 32 GB -> a few GB; --no-buildings drops buildings, ~3x smaller
+     tiles, for a continent bake that would overflow the card).
   2. osmium extract -c <cfg>: cut every intersecting cell's bbox out of rw.pbf in
      a single read (batched so open output FDs stay bounded).
   3. Per cell: osmium export -> bake.py -> pack.py -> <lat>/<lon>.zmt, then delete
@@ -129,6 +130,9 @@ def main():
     ap.add_argument("--out", required=True, help="output map dir (-> /sdcard/map)")
     ap.add_argument("--batch", type=int, default=256,
                     help="cells cut per osmium-extract pass (bounds open FDs)")
+    ap.add_argument("--no-buildings", action="store_true",
+                    help="roads + water only (buildings ~3x the tile bytes; drop for a "
+                         "continent-scale bake that would overflow the card)")
     ap.add_argument("--python", default=sys.executable, help="python for bake/pack")
     ap.add_argument("--keep", action="store_true", help="keep the scratch dir")
     args = ap.parse_args()
@@ -162,9 +166,10 @@ def main():
     try:
         # 1. filter once: roads + water.
         rw = os.path.join(work, "rw.pbf")
-        run(["osmium", "tags-filter", pbf, "w/highway", "w/waterway",
-             "n/natural=water", "a/natural=water", "a/water",
-             "-o", rw, "--overwrite"])
+        keep = ["w/highway", "w/waterway", "n/natural=water", "a/natural=water", "a/water"]
+        if not args.no_buildings:
+            keep.append("a/building")
+        run(["osmium", "tags-filter", pbf, *keep, "-o", rw, "--overwrite"])
 
         # 2+3. batched single-pass extract, then bake each produced cell.
         for start in range(0, len(cells), args.batch):

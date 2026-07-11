@@ -146,8 +146,11 @@ bbox, so "no coverage" still lights correctly at the edge of the baked world.
 New `tools/maptiles/world.py`, reusing `styles.py` + the ZMT0/ZMTA writers:
 
 1. **Filter once.** `osmium tags-filter europe-latest.osm.pbf w/highway w/waterway
-   n/natural=water a/natural=water a/water -o europe_rw.pbf` — roads+water only,
-   shrinks 32 GB → a few GB.
+   n/natural=water a/natural=water a/water a/building -o europe_rw.pbf` — roads +
+   water + building footprints, shrinks 32 GB → a few GB. **Buildings ~3x the tile
+   bytes** (a dense-city 0.1° cell went 0.1→0.3-0.9 MB), so a whole-Europe bake with
+   buildings could exceed a 58 GB card — `world.py --no-buildings` drops them for a
+   continent-scale run while home regions keep them.
 2. **Single-pass multi-extract into cells.** Generate an `osmium extract` config
    listing every 1° cell bbox and run it **once** (`osmium extract -c cells.json
    europe_rw.pbf`) — one read of the input produces all per-cell pbfs. (Per-cell

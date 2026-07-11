@@ -137,9 +137,10 @@ void map_render_rgb565(uint16_t *buf, int w, int h, const map_tileset_t *ts, dou
 
     double sc = ppt / MAP_TILE_EXTENT;  // px per extent unit
 
-    // Draw fills first, then roads minor->major, so arterials sit on top and
-    // water sits under everything. Pass -1 = fills; 0..3 = line style ids.
-    for (int pass = -1; pass <= MAP_STYLE_MAJOR; pass++) {
+    // Layer order: water (base) -> buildings -> roads minor->major (on top), so
+    // arterials sit above buildings and water sits under everything. Pass -2 =
+    // water fills, -1 = building fills, 0..3 = line style ids.
+    for (int pass = -2; pass <= MAP_STYLE_MAJOR; pass++) {
         for (int t = 0; t < ts->ntiles; t++) {
             const map_tile_t *tile = &ts->tiles[t];
             double            sox  = w / 2.0 + ((double)tile->tx - center_tx) * ppt;
@@ -148,8 +149,11 @@ void map_render_rgb565(uint16_t *buf, int w, int h, const map_tileset_t *ts, dou
                 continue;  // tile fully off-screen
             for (int fi = 0; fi < tile->nfeat; fi++) {
                 const map_feature_t *f = &tile->feats[fi];
-                if (pass == -1) {
-                    if (f->type != 1)
+                if (pass == -2) {
+                    if (f->type != 1 || f->style != MAP_STYLE_WATER)
+                        continue;
+                } else if (pass == -1) {
+                    if (f->type != 1 || f->style != MAP_STYLE_BUILDING)
                         continue;
                 } else {
                     if (f->type != 0 || f->style != (uint8_t)pass)
@@ -174,11 +178,15 @@ void map_render_tile_data(uint16_t *dst, int px, const map_tile_t *tile)
         return;  // off the baked area / missing tile: background only
 
     double sc = (double)px / MAP_TILE_EXTENT;  // px per extent unit (tile-local)
-    for (int pass = -1; pass <= MAP_STYLE_MAJOR; pass++) {
+    // Water (base) -> buildings -> roads, same layering as map_render_rgb565.
+    for (int pass = -2; pass <= MAP_STYLE_MAJOR; pass++) {
         for (int fi = 0; fi < tile->nfeat; fi++) {
             const map_feature_t *f = &tile->feats[fi];
-            if (pass == -1) {
-                if (f->type != 1)
+            if (pass == -2) {
+                if (f->type != 1 || f->style != MAP_STYLE_WATER)
+                    continue;
+            } else if (pass == -1) {
+                if (f->type != 1 || f->style != MAP_STYLE_BUILDING)
                     continue;
             } else {
                 if (f->type != 0 || f->style != (uint8_t)pass)

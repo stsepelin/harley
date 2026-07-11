@@ -128,7 +128,7 @@ def main():
 
         rw = os.path.join(work, "rw.pbf")
         run(["osmium", "tags-filter", cur, "w/highway", "w/waterway",
-             "n/natural=water", "a/natural=water", "a/water",
+             "n/natural=water", "a/natural=water", "a/water", "a/building",
              "-o", rw, "--overwrite"])
 
         geo = os.path.join(work, "area.geojsonl")

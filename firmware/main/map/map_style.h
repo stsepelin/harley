@@ -7,11 +7,12 @@
 
 #define MAP_RGB565(r, g, b) ((uint16_t)((((r) & 0xF8) << 8) | (((g) & 0xFC) << 3) | ((b) >> 3)))
 
-#define MAP_STYLE_MINOR   0   // residential, service, unclassified
-#define MAP_STYLE_MID     1   // secondary, tertiary
-#define MAP_STYLE_PRIMARY 2   // primary
-#define MAP_STYLE_MAJOR   3   // motorway, trunk
-#define MAP_STYLE_WATER   10  // water fill
+#define MAP_STYLE_MINOR    0   // residential, service, unclassified
+#define MAP_STYLE_MID      1   // secondary, tertiary
+#define MAP_STYLE_PRIMARY  2   // primary
+#define MAP_STYLE_MAJOR    3   // motorway, trunk
+#define MAP_STYLE_WATER    10  // water fill
+#define MAP_STYLE_BUILDING 11  // building footprint fill
 
 #define MAP_BG565 MAP_RGB565(0x10, 0x11, 0x16)
 
@@ -32,6 +33,8 @@ static inline map_style_t map_style(uint8_t id)
         return (map_style_t){MAP_RGB565(0xE6, 0xB8, 0x4B), 12};
     case MAP_STYLE_WATER:
         return (map_style_t){MAP_RGB565(0x1E, 0x33, 0x49), 0};
+    case MAP_STYLE_BUILDING:
+        return (map_style_t){MAP_RGB565(0x26, 0x28, 0x2F), 0};
     case MAP_STYLE_MINOR:
     default:
         return (map_style_t){MAP_RGB565(0x53, 0x57, 0x5E), 3};

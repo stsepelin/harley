@@ -15,14 +15,16 @@ S_MID = 1        # secondary, tertiary
 S_PRIMARY = 2    # primary
 S_MAJOR = 3      # motorway, trunk
 S_WATER = 10     # water fill
+S_BUILDING = 11  # building footprint fill
 
 # style id -> (RGB, stroke width px at 256 px/tile). Width is ignored for fills.
 STYLE_TABLE = {
-    S_MINOR:   ((0x53, 0x57, 0x5E), 1),
-    S_MID:     ((0x7A, 0x80, 0x8A), 2),
-    S_PRIMARY: ((0xC9, 0xA2, 0x4B), 3),
-    S_MAJOR:   ((0xE6, 0xB8, 0x4B), 4),
-    S_WATER:   ((0x1E, 0x33, 0x49), 0),
+    S_MINOR:    ((0x53, 0x57, 0x5E), 1),
+    S_MID:      ((0x7A, 0x80, 0x8A), 2),
+    S_PRIMARY:  ((0xC9, 0xA2, 0x4B), 3),
+    S_MAJOR:    ((0xE6, 0xB8, 0x4B), 4),
+    S_WATER:    ((0x1E, 0x33, 0x49), 0),
+    S_BUILDING: ((0x26, 0x28, 0x2F), 0),  # a touch above the dark base, blocks read subtly
 }
 
 BACKGROUND = (0x10, 0x11, 0x16)   # dark base, matches the cluster's dark theme
@@ -48,6 +50,8 @@ def classify(props, is_polygon):
         if props.get("natural") == "water" or "water" in props \
                 or props.get("waterway") in ("riverbank", "dock"):
             return S_WATER
+        if props.get("building"):
+            return S_BUILDING
         return None
     hw = props.get("highway")
     if hw is None or hw in _ROAD_DROP:
