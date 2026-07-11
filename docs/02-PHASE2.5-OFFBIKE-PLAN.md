@@ -46,8 +46,8 @@ usable on the bench:
 
 | Hardware | Blocks |
 |---|---|
-| NEO-6M/M8N GPS module | Real GPS speed/position → speed-camera validation, GPS time → real RTC |
-| IRLZ44N + 2N2222 + zener + resistors | J1850 bidirectional transceiver → Phase 3 |
+| NEO-6M/M8N GPS module | Real GPS speed/position → speed-camera validation, GPS time → real RTC. **[Superseded July 2026: speed-camera dropped; a map-position-only NEO-6M returned separately — see `../firmware/docs/gps-module.md`.]** |
+| IRLZ44N + 2N2222 + zener + resistors | J1850 bidirectional transceiver → Phase 3. **[Corrected: the high-side TX needs a 2N2907A **PNP** for Q2 — the kit's 2N2222 is NPN and cannot serve; see the master plan's "J1850 BIDIRECTIONAL TRANSCEIVER CIRCUIT" resolved note.]** |
 | GT 12-pin connector + T-taps + buck converter | Wiring to the bike harness |
 
 ## Stage 1 — Touch + screen-switching framework

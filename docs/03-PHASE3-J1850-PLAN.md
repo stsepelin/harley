@@ -13,12 +13,18 @@
 > everything below runs on the bench transceiver + the bike's 12-pin
 > harness.
 >
-> **GPS was dropped (July 2026):** an *onboard* GPS module added a large
-> separate effort (module, antenna, NMEA parser, enclosure space, power) for
-> little benefit; the NEO-6M path and the speed-camera / POI feature that
-> depended on GPS position were removed. The **phone** GPS over the BLE link
-> is now built and is the primary divisor-lock (Stage 5 / Ride 2) — no new
-> hardware.
+> **GPS-for-speed was dropped (July 2026):** an *onboard* GPS added a large
+> separate effort for little benefit against the J1850 speed, so the
+> speed-camera / POI feature that depended on GPS position was removed. The
+> **phone** GPS over the BLE link is now built and is the primary divisor-lock
+> (Stage 5 / Ride 2) — no new hardware.
+>
+> **Later (map work): the NEO-6M came back in a NARROW form — map position
+> only.** An opt-in onboard module (`CONFIG_VROD_GPS_UART`, off by default)
+> reads NMEA on GPIO 21 (`VROD_GPS_RX_GPIO`) and feeds *only* the moving-map
+> position, dual-sourced with the phone GPS (module preferred, phone fallback;
+> `map_sd.c`, `GPS_MODULE_STALE_MS = 3000`). No speed / cameras / POI /
+> turn-by-turn. See `firmware/docs/gps-module.md` + `PINS.md`.
 
 ## Goal
 
@@ -110,8 +116,10 @@ Phase 3 kickoff — the old drawing would jam the bus:
   `firmware/docs/ble-bringup-bisect.md`. Phase 6's fuel ADC is
   unblocked by the same fix.)
 - **Pin choice resolved**: GPIO 20 (J1850 RX) is confirmed broken out on
-  the 40-pin header and unclaimed (GPIO 21 was the GPS input and is now
-  free) — full pin budget, header silkscreen map, and the GPIO 22 =
+  the 40-pin header and unclaimed. GPIO 21 is **reclaimed** as the optional
+  map-position NEO-6M NMEA input (`VROD_GPS_RX_GPIO`, `CONFIG_VROD_GPS_UART`,
+  off by default; free/ADC-capable when off) — full pin budget, header
+  silkscreen map, and the GPIO 22 =
   fuel-ADC reservation live in `firmware/docs/PINS.md`. For physical
   confirmation, set `VROD_PIN_WIGGLE_GPIO` in menuconfig and DMM-probe
   the header (0V↔3.3V every 2.5 s).
@@ -138,9 +146,10 @@ Phase 3 kickoff — the old drawing would jam the bus:
     Ride 1 overturned the mph-native guess: the ECM value is km/h-native,
     ~117-128 counts per km/h (gear-ratio fit vs stock speedo). `speed_mph`
     stays mph-canonical, so the parser divides counts→mph: **set to 195**
-    (was 128, which read ~1.5x high). Still ±~5% — lock with one GPS point
-    via the companion app; the ride log stores RAW counts (`speed_raw=`) so
-    it's re-derivable without another ride.
+    (was 128, which read ~1.5x high) — **later LOCKED to 188 in Ride 2**
+    (gear-ratio physics + roadside radar agree; compile-time default is now
+    188, PR #27; see `firmware/docs/ride-2-findings.md`). The ride log stores
+    RAW counts (`speed_raw=`) so it's re-derivable without another ride.
   - **Temp `A8 49 10 10` — SETTLED: `°C = raw − 40`.** Cold-start raw 0x3F
     at ~20-25°C ambient → 23°C, warm 0x81 → 89°C. Both correct.
   - **Gear — no sensor; compute from RPM/speed ratio.** The V-Rod has no
@@ -201,10 +210,12 @@ run headless.
 > is useless without bike power. Wiring is a Phase 6 / bench-harness step;
 > flagged here so it isn't forgotten before a capture ride.
 
-#### Speed DIV (/128) calibration reference
+#### Speed DIV (`J1850_SPEED_DIVISOR`, now 188) calibration reference
 
 The reference is the **STOCK SPEEDOMETER**, which is mechanically driven by
-the J1850 bus (there is **no onboard GPS**). Method: ride at a steady speed
+the J1850 bus (there is **no onboard GPS for speed** — the optional NEO-6M
+revived later feeds map position only, not speed; see `firmware/docs/gps-module.md`).
+Method: ride at a steady speed
 and compare the logged native speed from `vehicle_data` (the `speed:` line /
 ride-log `speed=` field) against the stock speedo read **in its native
 MILES** — ignore the km/h sticker, the mechanism reads mph. Match across
@@ -309,7 +320,8 @@ and brings a GPS. Builds on the existing NimBLE peripheral + Android central.
   for high-rate raw capture without a phone.
 - ✅ **GPS speed calibration.** Brick 2 — the `SpeedCalibrator` (pure,
   unit-tested) least-squares-fits the phone's GPS speed against `speed_raw` to
-  solve the divisor (replaces the provisional 195 — no eyeballing, no gear-ratio
+  solve the divisor (replaces the provisional 195; locked to 188 in Ride 2,
+  see `firmware/docs/ride-2-findings.md` — no eyeballing, no gear-ratio
   inference). A Developer-screen wizard collects samples and writes the result
   back. The on-bike lock is Ride 2.
 - ✅ **Config (GATT write) → NVS.** Brick 3 — `PHONE_EVT_CONFIG` (0x04) carries

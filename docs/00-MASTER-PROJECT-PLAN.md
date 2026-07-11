@@ -429,6 +429,12 @@ See `02-PHASE2.5-OFFBIKE-PLAN.md` for the full plan + ordering.
 > depended on GPS position, so it went with it. The **phone** GPS over the
 > existing BLE link is now built (companion Stage 5) and is the primary way
 > the speed divisor is locked — no new hardware.
+>
+> **Later (map work): a map-position-only onboard NEO-6M was revived** — an
+> opt-in module (`CONFIG_VROD_GPS_UART`, off by default, GPIO 21
+> `VROD_GPS_RX_GPIO`) that feeds *only* the moving-map position, dual-sourced
+> with the phone GPS (module preferred, phone fallback). Speed / cameras / POI
+> / turn-by-turn stay dropped. See `firmware/docs/gps-module.md` + `PINS.md`.
 
 ### Phase 4: BLE Phone Integration (Weekends 7-9) — Android done (2.5 relay + Phase 3 Stage 5); iOS deferred
 - iOS: ANCS + AMS via the C6 (cluster becomes a GATT client of the
@@ -451,10 +457,12 @@ See `02-PHASE2.5-OFFBIKE-PLAN.md` for the full plan + ordering.
 ### Phase 5: (removed — GPS + speed cameras dropped)
 
 > Removed in July 2026. This phase was the on-bike validation of the
-> speed-camera database, which depended on onboard GPS. With GPS and the
-> speed-camera feature dropped (see the Phase 3 note), there is nothing
-> left to validate here. Phase 6/7 numbering is kept as-is to avoid
-> breaking cross-references.
+> speed-camera database, which depended on onboard GPS. With the
+> speed-camera feature and GPS-for-speed dropped (see the Phase 3 note),
+> there is nothing left to validate here. Phase 6/7 numbering is kept
+> as-is to avoid breaking cross-references. (A **map-position-only**
+> NEO-6M was later revived as an opt-in map source — that is a map
+> feature, not this phase; see the Phase 3 note / `firmware/docs/gps-module.md`.)
 
 ### Phase 6: Full Cluster Replacement (Weekends 11-12)
 - Read all 12-pin discrete signals (turns, beam, oil, neutral, fuel)
@@ -491,7 +499,8 @@ See `02-PHASE2.5-OFFBIKE-PLAN.md` for the full plan + ordering.
     bench characterization session (sender + PSU, measured fills →
     ohms curve). Fallback/complement that needs no sender at all:
     integrate the ECM's J1850 fuel-consumption ticks (A8 83 10 0A,
-    0.000040 L each) from a full-tank reset — the classic fuel-computer
+    ~0.000309 L each — Ride 2 fill-up calibration, ml_per_tick=0.309)
+    from a full-tank reset — the classic fuel-computer
     approach, and likely *more* stable than the notoriously erratic
     ultrasonic sender. The J1850 fuel-gauge broadcast (A8 83 61 12) is
     almost certainly IM-originated (the sender wires to the IM), so it
@@ -563,20 +572,33 @@ See `02-PHASE2.5-OFFBIKE-PLAN.md` for the full plan + ordering.
 ```
 HEADER             DATA          MEANING
 28 1B 10 02 HH LL  HH LL        RPM = (HH<<8 | LL) / 4
-48 29 10 02 HH LL  HH LL        Speed = (HH<<8 | LL) / 128  [km/h]
-48 3B 40 XX         XX           Neutral if (XX & 0x20), Clutch if (XX & 0x80)
+48 29 10 02 HH LL  HH LL        Speed: km/h-native raw counts (~117
+                                 counts/km-h). speed_mph = speed_raw / 188
+                                 (LOCKED Ride 2 — physics + radar, PR #27).
+                                 The old /128 was an early bad guess.
+48 3B 40 XX         XX           TSSM status (NOT neutral/clutch — disproven
+                                 Ride 2): bit5 = brake/deceleration event,
+                                 bit7 = heartbeat. Neutral is NOT on the bus —
+                                 it is a discrete pin-10 tap (active-low), Ph.6.
 48 DA 40 39 XX      XX           Turn signals: bitfield, 3=both. On the
                                  2009 VRSCF (verified 2026-07-04):
                                  2=LEFT, 1=RIGHT (swapped vs HarleyDroid)
 68 88 10 03         —            Check Engine OFF
 68 88 10 83         —            Check Engine ON
-A8 3B 10 03 XX      XX           Gear: 1,3,7,15,31,63 → gears 1-6
-A8 49 10 10 XX      XX           Engine temp = raw byte °C (no offset).
-                                 CONFIRMED 2026-07-04: 0x40=64°C climbing
-                                 as engine warmed. (Old "°F" was wrong.)
+A8 3B 10 03 XX      XX           ECM engine-load/throttle (function 3B), NOT
+                                 gear (disproven Ride 1). Gear is DERIVED:
+                                 argmin |rpm/speed - ratio| over the exact
+                                 overall ratios; ~91% correct at divisor 188.
+A8 49 10 10 XX      XX           Engine temp: °C = raw - 40 (OBD-style offset).
+                                 Confirmed Ride 1: 0x3F(63)=23°C cold,
+                                 0x81(129)=89°C warm. (No-offset read 40°C high.)
 A8 69 10 06 HH LL  HH LL        Odometer: 1 tick = 0.4 meters
-A8 83 10 0A HH LL  HH LL        Fuel consumption: 1 tick = 0.000040 L
-A8 83 61 12 DX      DX           Fuel gauge 0-6 (0=empty, 6=full)
+A8 83 10 0A HH LL  HH LL        Fuel consumption ticks: ~0.000309 L/tick
+                                 (ml_per_tick=0.309, calibrated Ride 2 fill-up;
+                                 supersedes the 0.000040 placeholder). Economy/range.
+A8 83 61 12 DX      DX           Fuel gauge 0-6 — IM-ORIGINATED. Fuel LEVEL +
+                                 low-fuel are NOT bus-decoded and likely
+                                 disappear with the stock IM.
 ```
 
 ---

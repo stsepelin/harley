@@ -24,7 +24,9 @@ first guessed. Evidence:
 `vehicle_data.speed_mph` is mph-canonical, so the parser divides counts → mph:
 - gear-ratio physics → ~188  ·  stock-speedo peak → ~200  ·  naive 68≈70 → 206.
 - **Set to 195 provisionally** (was 128, which read ~1.5x high — matched the
-  ride: 30→40, 70→100+). Still ±~5%.
+  ride: 30→40, 70→100+). Still ±~5%. **[Updated: LOCKED to 188 in Ride 2**
+  **(gear-ratio physics + roadside radar agree); compile-time default is now**
+  **188, PR #27. See `ride-2-findings.md`.]**
 - **To lock:** one GPS-referenced point (companion app auto-correlates phone
   GPS speed with the logged `speed_raw` counts). The ride log stores RAW counts
   (`speed_raw=`) so the divisor is re-derivable from any capture.
@@ -80,7 +82,7 @@ Compared our cluster to the stock one during the ride:
 | id | n | meaning |
 |---|---|---|
 | `28 1B 10` | 8476 | RPM = (HH<<8\|LL)/4 (confirmed) |
-| `48 29 10` | 3041 | speed, km/h-native counts (÷~195 → mph) |
+| `48 29 10` | 3041 | speed, km/h-native counts (÷~195 provisional; ÷188 locked Ride 2) |
 | `A8 3B 10` | 1136 | engine load / throttle (NOT gear) |
 | `68 88 10` | 561 | check-engine/MIL bit (d3 & 0x80) |
 | `A8 83 10` | 391 | fuel-consumption ticks (ticks at idle → fuel, not distance) |
