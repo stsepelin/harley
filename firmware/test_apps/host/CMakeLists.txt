@@ -53,6 +53,7 @@ add_library(vrod_pure STATIC
     ${MAIN_DIR}/ble/ble_visibility.c
     ${MAIN_DIR}/gps/nmea.c
     ${MAIN_DIR}/gps/gps_source.c
+    ${MAIN_DIR}/map/map_cells.c
     external/freertos_stub/freertos_stub.c
     external/lvgl_tick_stub/lv_tick_stub.c
 )
@@ -66,6 +67,7 @@ target_include_directories(vrod_pure PUBLIC
     ${MAIN_DIR}/j1850
     ${MAIN_DIR}/ble
     ${MAIN_DIR}/gps
+    ${MAIN_DIR}/map
     external/freertos_stub
     external/lvgl_tick_stub
 )
@@ -138,6 +140,7 @@ add_unit_test(test_ride_log_format)
 add_unit_test(test_ble_visibility)
 add_unit_test(test_nmea)
 add_unit_test(test_gps_source)
+add_unit_test(test_map_cells)
 
 # Widget cache-regression tests link against the LVGL stub.
 function(add_widget_test name)

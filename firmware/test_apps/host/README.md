@@ -75,6 +75,7 @@ Today that's:
 | `main/ble/ble_visibility.c` | Pure decision: `(has_bond, override) → adv_mode`. Stage 8. |
 | `main/gps/nmea.c` | NMEA 0183 sentence framing + RMC parse (NEO-6M) → lat/lon/speed/heading |
 | `main/gps/gps_source.c` | Mutex-guarded latest-fix store (module producer, map consumer) |
+| `main/map/map_cells.c` | Cell-paging decision logic: which lat/lon cell a position is in (floor division), the working-set window, heading-ahead prefetch. Pure (cell manager owns the SD open/close). |
 | `main/j1850/j1850_vpw.c` | J1850 VPW symbol codec: pulse-width decoder + encoder + CRC-8/SAE-J1850. Round-trip tested. |
 | `main/j1850/j1850_parse.c` | J1850 message decoder: frame -> vehicle_data (RPM/temp/speed/turns/CEL), calibrated against real captures. Gear is not on the bus (see gear_calc). |
 | `main/j1850/j1850_driver.c` | J1850 producer glue: decoded frame -> j1850_parse (+ gear_calc, + odometer/fuel tick accumulation) -> vehicle_data_set (running aggregate). |
