@@ -23,7 +23,7 @@ with schemdraw.Drawing(file="bike-power-chain.svg", show=False) as d:
     # load-dump clamp: unidirectional TVS (drawn as a zener, cathode to the
     # +rail) from the mini560 input node down to the ground rail.
     d.add(elm.Zener().down().reverse().at(nA.center).toy(GNDY)
-          .label("D3\nSMBJ16A\nload-dump\nclamp", loc="bottom", ofst=0.15))
+          .label("TVS1\nP6KE16A\n(axial)\nload-dump clamp", loc="bottom", ofst=0.15))
     gA = d.add(elm.Dot())
 
     # ===== mini560 buck =====
@@ -34,13 +34,13 @@ with schemdraw.Drawing(file="bike-power-chain.svg", show=False) as d:
               elm.IcPin(name="VOUT", side="right", slot="2/2"),
               elm.IcPin(name="GO", side="right", slot="1/2")],
         size=(2.6, 2.6),
-        label="mini560\n12V->5V buck\n(MP1584)\nset 5.35V").anchor("VIN"))
+        label="mini560\n12V->5V buck\n(MP1584)\nset 5.0V").anchor("VIN"))
     d.add(elm.Line().down().at(mini.GI).toy(GNDY))
     gB = d.add(elm.Dot())
 
     # ===== output reverse-block + board header =====
     d.add(elm.Line().right().at(mini.VOUT).length(0.5))
-    d.add(elm.Schottky().right().label("D4  SS34\nreverse-block\n(~0.35V drop)"))
+    d.add(elm.Diode().right().label("D4  XL74610\nideal-diode module\n(LM74610, ~0V drop)"))
     vcc = d.add(elm.Dot().label("VCC_5V", loc="bottom", ofst=(0, -0.15)))
     d.add(elm.Line().right().length(1.1))
     board = d.add(elm.Ic(
@@ -75,11 +75,11 @@ with schemdraw.Drawing(file="bike-power-chain.svg", show=False) as d:
         "then the load-dump TVS on the mini560 input.\n"
         "Board draws ~1.0 A continuous / ~2.0 A peak at 5V (~1 A at 12V). "
         "Everything rated with >=2x margin.\n"
-        "D3 SMBJ16A: 16V standoff (stays off below the 15V charging spike), ~26V clamp "
+        "TVS1 P6KE16A (axial): 16V standoff (stays off below the 15V charging spike), ~26V clamp "
         "(safely under the mini560's ~28V max).\n"
-        "D4 gives the mini560 the reverse block the header lacks. Recommended: an ideal-diode "
-        "module (set mini560 to 5.0V, no math). Drawn: SS34 fallback -> set 5.35V, verify ~5.0V "
-        "at the board UNDER LOAD.\n"
+        "D4 gives the mini560 the reverse block the header lacks. Drawn: XL74610 ideal-diode "
+        "module (LM74610, ~0V drop -> set mini560 to 5.0V, no math). Fallback: SS34 Schottky -> "
+        "set 5.35V, verify ~5.0V at the board UNDER LOAD.\n"
         "USB-C 5V and mini560 5V OR at VCC_5V: D4 blocks back-feed into the buck, the "
         "on-board AO3401 blocks back-feed into the laptop.",
         fontsize=8.5, halign="left"))

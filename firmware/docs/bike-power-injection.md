@@ -7,6 +7,8 @@ deliberately conservative and every part is explained.
 
 Schematic: [`../../docs/schematics/bike-power-chain.svg`](../../docs/schematics/bike-power-chain.svg)
 (regenerate from `bike-power-chain.py`; see that dir's README).
+BOM: [`../../docs/schematics/bike-power-chain.bom.md`](../../docs/schematics/bike-power-chain.bom.md)
+(one row per chain component, bike-side to board; derived from the parts table below).
 
 Prerequisite for the **ride-log** (`live-gauge-bench-test.md` needs USB, but a
 real ride needs bike power) and any permanent install.
@@ -55,9 +57,9 @@ margin on these.
 |---|---|---|---|---|
 | **F1** | Automotive **blade fuse 2 A** + inline holder | 2 A, 32 V | ATM/mini | ~1 A peak on 12V → 2 A = 2× margin. Protects the **feed wiring** against a short (bike battery sources huge fault current), not just the load. Place at the tap. Blade fuses are slightly slow → tolerate the mini560 inrush. Bump to 3 A only if inrush nuisance-blows. |
 | **D2** | **Schottky, series reverse-polarity** — SB560 (60 V/5 A) or SS54 (40 V/5 A) | ≥40 V, ≥3 A | DO-201AD / SMC | Blocks a swapped +12V/GND at the mini560 input. ≥3 A ≫ 1 A load; 60 V (SB560) adds load-dump headroom on this part. ~0.4 V drop / ~0.4 W @ 1 A on the 12V side = negligible. **Alt (low-loss): a P-channel MOSFET** (see below). |
-| **D3** | **TVS, unidirectional — SMBJ16A** (across the mini560 12V input) | 16 V standoff, ~26 V clamp @ I_PP, **600 W** | SMB (DO-214AA) | Clamps load-dump / regulator spikes **below the mini560's ~28 V max**. 16 V standoff stays off through the ~15 V charging spike; ~26 V clamp keeps a safe margin under 28 V. For more energy margin (severe load-dump) use **1.5KE16A** (1500 W). |
+| **TVS1** | **TVS, unidirectional — P6KE16A** (across the mini560 12V input) | 16 V standoff, ~26 V clamp @ I_PP, **600 W** | axial (DO-15) | Clamps load-dump / regulator spikes **below the mini560's ~28 V max**. Leaded/axial so it mounts in the potted flying module (the SMD SMBJ was replaced by this through-hole part). 16 V standoff stays off through the ~15 V charging spike; ~26 V clamp keeps a safe margin under 28 V. Higher-energy axial alternative: **1.5KE16A** (1500 W) — note that either way the ~26 V clamp sits only ~2 V under the mini560 ~28 V abs-max, so it's a deliberate margin call, not the drawn part. |
 | **mini560** | MP1584-class **12V→5V buck module**, output trimmed | Vin 4.5–28 V, Iout ~3 A | module | Set the output so the board sees ~5.0 V **after D4** (below). |
-| **D4** | **Ideal-diode module (recommended)** or **SS34 Schottky** (fallback) | module / 40 V, 3 A | — / SMA (DO-214AC) | Gives the mini560 the reverse block the header lacks (blocks `VCC_5V` → mini560). **Ideal-diode module:** ~20–50 mV drop → set the mini560 to exactly **5.0 V**, no compensation math. **SS34:** cheaper/simpler but ~0.35 V drop @ 1–2 A → set the mini560 to **5.35 V** to compensate (see setpoint). |
+| **D4** | **XL74610 ideal-diode module (LM74610-based)** — primary/drawn; **SS34 Schottky** fallback | module (~1.5–36 V, 30 A) / SS34 40 V, 3 A | module / SMA (DO-214AC) | Gives the mini560 the reverse block the header lacks (blocks `VCC_5V` → mini560). **XL74610 (drawn):** LM74610 gate-driven MOSFET rectifier, ~tens-of-mV drop → set the mini560 to exactly **5.0 V**, no compensation math. **SS34 (fallback):** cheaper/simpler but ~0.35 V drop @ 1–2 A → set the mini560 to **5.35 V** to compensate (see setpoint). |
 
 ### Reverse-polarity: Schottky vs P-FET (D2)
 - **Series Schottky (recommended for a first build):** one part, foolproof, no
@@ -66,19 +68,21 @@ margin on these.
   clamped by a 12–15 V zener; pick a ≥40–60 V, low-R_DS(on) P-FET): near-zero
   drop, no heat, but more parts and easier to wire wrong. The low-loss upgrade.
 
-### Output reverse-block: ideal-diode vs Schottky (D4)
-- **Ideal-diode module (recommended for a first build):** an LM74700-Q1
-  controller + N-FET, or a prebuilt "ideal diode" board. ~20–50 mV drop, so the
-  mini560 stays at exactly **5.0 V** — **no setpoint-compensation math, nothing
-  to trim to hit 5.0 V at the board.** The safest first-timer choice.
+### Output reverse-block: ideal-diode (primary) vs Schottky fallback (D4)
+- **XL74610 ideal-diode module (ordered — the primary/drawn part):** an
+  LM74610-based gate-driven MOSFET rectifier (~1.5–36 V, 30 A). ~tens-of-mV
+  drop, so the mini560 stays at exactly **5.0 V** — **no setpoint-compensation
+  math, nothing to trim to hit 5.0 V at the board.** The safest choice; any
+  equivalent prebuilt "ideal diode" board works.
 - **SS34 Schottky (simpler-parts fallback):** one cheap part, no module — but
   the ~0.35 V drop means you must set the mini560 to **5.35 V** to compensate,
   and verify the result at the board *under load* (the drop grows with current).
 
 ### mini560 output setpoint
-- **Ideal-diode module (recommended):** set the mini560 to exactly **5.0 V** —
-  the module's drop is negligible, so that is what the board sees. No math.
-- **SS34 Schottky:** set the mini560 to **5.35 V**, then **verify the voltage AT
+- **XL74610 ideal-diode module (primary — the drawn part):** set the mini560 to
+  exactly **5.0 V** — the module's ~tens-of-mV drop is negligible, so that is
+  what the board sees. No math.
+- **SS34 Schottky (fallback):** set the mini560 to **5.35 V**, then **verify the voltage AT
   THE BOARD (after D4) UNDER REAL LOAD and re-trim if needed** — the Schottky
   drop grows with current (~0.35 V @ 1.5 A, a bit more near 2 A), so the setpoint
   must be dialed so it lands at ~5.0 V with the board actually running. Expect
@@ -87,10 +91,11 @@ margin on these.
   first connect can kill it).
 
 ### Buy as a kit vs single
-- Schottkys (SB560/SS34) and the TVS (SMBJ16A) are pennies — buy a small
-  **Schottky assortment** + **TVS assortment** so you have the exact values and
-  spares. Blade fuses + holder come as an automotive kit. The mini560 is a single
-  ~€1 module. If you go the ideal-diode route, buy one prebuilt module.
+- Schottkys (SB560/SS34) are pennies — buy a small **Schottky assortment** so
+  you have the exact values and spares. The **P6KE16A** TVS is axial/leaded (buy
+  a couple; a leaded TVS assortment covers it). Blade fuses + holder come as an
+  automotive kit. The mini560 is a single ~€1 module, and the **XL74610
+  ideal-diode module** (D4) is one prebuilt board.
 
 ## Bench-test procedure (before touching the bike)
 
@@ -100,21 +105,22 @@ the very end.
 1. **Build the chain minus the board.** Bench PSU → 12.0 V, current-limit ~1.5 A,
    into F1.
 2. **Trim the mini560.** Measure the mini560 output (before D4) with a DMM;
-   adjust the trimpot to **5.35 V** (or 5.0 V for an ideal-diode module).
+   adjust the trimpot to **5.0 V** (the XL74610 ideal-diode path — its drop is
+   negligible). *(SS34 fallback: 5.35 V instead.)*
 3. **Check after D4** (open-circuit at the header wire): ≈ setpoint (~0 V drop at
    ~0 A). It drops under load — that's expected.
 4. **Load test — verify ~5.0 V AT THE BOARD, UNDER LOAD.** Add a realistic load
    (a 5 Ω / 5 W resistor ≈ 1 A, or a USB load tester) at the header end. Measure
-   **after D4, under load**: with the SS34 fallback the Schottky drop grows with
-   current, so confirm the 5.35 V setpoint actually lands at **~5.0 V at the
-   board** at ~1–1.5 A and **re-trim if it's off**; ramp briefly to ~2 A and
-   re-check. (An ideal-diode module should already read ~5.0 V.) Check
-   D2 / D4 / mini560 for excess heat.
+   **after D4, under load**: the XL74610 ideal-diode should already read
+   **~5.0 V** (negligible drop). *(SS34 fallback: the Schottky drop grows with
+   current, so confirm the 5.35 V setpoint actually lands at ~5.0 V at the board
+   at ~1–1.5 A and re-trim if it's off; ramp briefly to ~2 A and re-check.)*
+   Check D2 / D4 / mini560 for excess heat.
 5. **Reverse-polarity test.** Swap the PSU leads at F1 — output must stay **0 V**
    (D2 blocks), no smoke, fuse intact. Restore polarity.
 6. **Load-dump test (optional, careful).** Briefly step the input to ~20 V — the
-   mini560 input node must clamp (D3) and stay < 28 V; the 5 V output holds. Skip
-   if unsure; D3 is a static safety net regardless.
+   mini560 input node must clamp (TVS1) and stay < 28 V; the 5 V output holds.
+   Skip if unsure; TVS1 is a static safety net regardless.
 7. **Common-ground check.** DMM continuity: bike-GND / mini560 GND-in / GND-out /
    board GND (and later the J1850 pin-5 ground) are all one continuous node — a
    single reference, no loops.
@@ -130,7 +136,7 @@ the very end.
   ground (**pin 5**) — one common reference for the buck, the board, and the bus
   tap.
 - **Physical placement:** F1 within a few cm of the 12V tap (protects the whole
-  run); D2 + D3 + mini560 + D4 together in a small heatshrunk/potted module near
+  run); D2 + TVS1 + mini560 + D4 together in a small heatshrunk/potted module near
   the cluster; **D4 right at the mini560 output**; short, strain-relieved,
   soldered + heatshrunk leads; secure against vibration; conformal-coat on the
   permanent build (Phase 6).
