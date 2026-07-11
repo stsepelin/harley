@@ -148,6 +148,22 @@ static void test_lonlat_projection(void)
     TEST_ASSERT_TRUE(ty > 19232 && ty < 19237);
 }
 
+static void test_lonlat_roundtrip(void)
+{
+    // Forward then inverse must return the original lon/lat (paged-cell routing
+    // relies on this to map a tile back to its cell).
+    double tx, ty, lon, lat;
+    map_lonlat_to_tilef(24.745, 59.437, 16, &tx, &ty);
+    map_tilef_to_lonlat(tx, ty, 16, &lon, &lat);
+    TEST_ASSERT_TRUE(fabs(lon - 24.745) < 1e-6);
+    TEST_ASSERT_TRUE(fabs(lat - 59.437) < 1e-6);
+    // A negative (S/W) position round-trips too.
+    map_lonlat_to_tilef(-0.5, -33.9, 16, &tx, &ty);
+    map_tilef_to_lonlat(tx, ty, 16, &lon, &lat);
+    TEST_ASSERT_TRUE(fabs(lon + 0.5) < 1e-6);
+    TEST_ASSERT_TRUE(fabs(lat + 33.9) < 1e-6);
+}
+
 // --- ZMTA archive (map_tileset_load_mem) -----------------------------------
 
 // Pack two tiles into a ZMTA archive. Returns length.
@@ -415,6 +431,7 @@ void RunTests(void)
     RUN_TEST(test_parse_zero_features);
     RUN_TEST(test_free_null_is_safe);
     RUN_TEST(test_lonlat_projection);
+    RUN_TEST(test_lonlat_roundtrip);
     RUN_TEST(test_load_mem_valid_archive);
     RUN_TEST(test_load_mem_bad_magic);
     RUN_TEST(test_load_mem_too_short);

@@ -1,8 +1,10 @@
 # Worldwide map: GPS-paged cell tiles
 
-> **Status: Stages 1-3 done (seam, cell math, format + build tooling); index
-> halved as a down-payment.** Next: Stage 4 cell manager (`map_source_open_cells`)
-> + a Baltics bake to a card, then the Europe bake. Goal: put a whole
+> **Status: Stages 1-4 done (seam, cell math, format + tooling, cell manager);
+> index halved as a down-payment.** The paged cell grid works end-to-end in the
+> sim on a real Tallinn bake and the device builds with it. Next: Stage 5 - the
+> Europe bake to the 58 GB card + the on-bike paging check (task #58). Goal: put a
+> whole
 > continent (Europe first, world later) on the SD card and keep only the tiles
 > near the rider's GPS resident, paged in and out as you move. Builds directly on
 > the streaming SD loader (task #60) and the SD-backed real map (task #57 / PR #34).
@@ -199,8 +201,22 @@ GeoJSON explosion. Never stage the whole continent as GeoJSON on the Mac.
    (`<lat>/<lon>.zmt` + `world.hdr`) with one filter pass + batched single-pass
    multi-extract. Still to run: an actual Baltics bake to a card dir + sim preview
    (folds into Stage 4 bring-up, which needs the cell manager to read the tree).
-4. **Cell manager wiring** — `map_source_open_cells`, loader task, prefetch,
-   `max_files` bump; sim + device bring-up on the Baltics tree.
+4. **Cell manager wiring** — DONE (July 2026). `map_source_open_cells` reads
+   `world.hdr` and keeps a 3x3 working set of open per-cell archives that follows
+   the rider: `map_source_set_center` maps the view centre to a cell, evicts cells
+   outside the window, and opens at most one missing cell per frame (bounded SD
+   work), biased to the centre then the heading-ahead cell. `map_source_render_tile`
+   / `covers` route a tile to its cell via the new `map_tilef_to_lonlat` inverse
+   projection; `map_world_covers` still answers "off area" from the baked set.
+   Kconfig `VROD_MAP_SD_CELLS` + `VROD_MAP_SD_DIR` pick the paged path; `max_files`
+   raised 6 -> 14 for the 9 cell FILE*s + ride log. Verified in the sim
+   (`VROD_MAP_CELLS=<dir>`) against a real 8-cell Tallinn bake - pages across cell
+   borders and renders correctly - and the device firmware builds with the cell
+   config. **Deferred:** a dedicated loader task; the one-open-per-frame lazy fill
+   over the 3x3 window keeps opens off the render critical path in practice (worst
+   case one `fopen`+index-read per frame, and the neighbour cells are long since
+   open by the time a border is reached), so the task is a later optimisation, not
+   a correctness need. On-bike paging check folds into Stage 5 / task #58.
 5. **Europe bake** — run the full pipeline to the 58 GB card; record real
    size/tile-count/index-RAM; on-bike Tallinn→Tartu paging check (task #58).
 6. **(Later) world / mixed-zoom** — lower zoom outside home regions, or migrate to

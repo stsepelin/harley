@@ -97,6 +97,8 @@ add_executable(vrod_sim
     ${MAIN_DIR}/map/map_tile.c
     ${MAIN_DIR}/map/map_render.c
     ${MAIN_DIR}/map/map_source.c
+    ${MAIN_DIR}/map/map_cells.c
+    ${MAIN_DIR}/map/map_world.c
     ${MAIN_DIR}/display/screen_map.c
 
     ${MAIN_DIR}/simulator/sim_engine.c

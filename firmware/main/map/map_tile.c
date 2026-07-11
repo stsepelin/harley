@@ -219,6 +219,13 @@ void map_lonlat_to_tilef(double lon, double lat, int zoom, double *tx, double *t
     *ty         = (1.0 - asinh(tan(latr)) / M_PI) / 2.0 * n;
 }
 
+void map_tilef_to_lonlat(double tx, double ty, int zoom, double *lon, double *lat)
+{
+    double n = (double)(1u << zoom);
+    *lon     = tx / n * 360.0 - 180.0;
+    *lat     = atan(sinh(M_PI * (1.0 - 2.0 * ty / n))) * 180.0 / M_PI;
+}
+
 // --- host/sim directory loader --------------------------------------------
 
 static int read_zoom(const char *dir)

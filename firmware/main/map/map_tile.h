@@ -90,3 +90,7 @@ bool map_tileset_covers(const map_tileset_t *ts, uint32_t tx, uint32_t ty);
 
 // Slippy-map projection: lon/lat degrees -> fractional tile coordinate at zoom.
 void map_lonlat_to_tilef(double lon, double lat, int zoom, double *tx, double *ty);
+
+// Inverse: fractional tile coordinate at zoom -> lon/lat degrees. Used by the
+// paged-cell source to map a rendered tile back to the cell that holds it.
+void map_tilef_to_lonlat(double tx, double ty, int zoom, double *lon, double *lat);

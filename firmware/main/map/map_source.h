@@ -18,6 +18,13 @@ typedef struct map_source map_source_t;
 // a flash-embedded or caller-managed tileset). NULL if `ts` is NULL or on OOM.
 map_source_t *map_source_from_tileset(map_tileset_t *ts, bool own);
 
+// Open a GPS-paged cell grid: read <dir>/world.hdr and manage a small working
+// set of open per-cell archives that follows the rider (map_source_set_center
+// pages them in/out). This is what puts a whole continent on the card - only the
+// cells near the current position are resident. NULL if world.hdr is missing or
+// bad. See firmware/docs/map-worldwide-plan.md and tools/maptiles/world.py.
+map_source_t *map_source_open_cells(const char *dir);
+
 // Zoom level of the tiles (all one zoom today).
 int map_source_zoom(const map_source_t *src);
 

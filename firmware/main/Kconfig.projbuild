@@ -380,7 +380,26 @@ menu "V-Rod cluster"
 
     config VROD_MAP_SD_PATH
         string "microSD path to the ZMTA map archive"
-        depends on VROD_MAP_SD
+        depends on VROD_MAP_SD && !VROD_MAP_SD_CELLS
         default "/sdcard/map.zmta"
+
+    config VROD_MAP_SD_CELLS
+        bool "Paged cell grid (whole continent) instead of one archive"
+        depends on VROD_MAP_SD
+        default n
+        help
+            Page a GPS-driven grid of per-cell ZMTA archives off the card
+            instead of loading a single region archive. world.hdr + one
+            <lat>/<lon>.zmt per cell (tools/maptiles/world.py) let a whole
+            continent live on the card while only the cells near the rider stay
+            resident - the index that would be gigabytes for Europe is paged by
+            position. See firmware/docs/map-worldwide-plan.md.
+
+            OFF: the single-archive path (CONFIG_VROD_MAP_SD_PATH), unchanged.
+
+    config VROD_MAP_SD_DIR
+        string "microSD directory of the paged cell map"
+        depends on VROD_MAP_SD_CELLS
+        default "/sdcard/map"
 
 endmenu

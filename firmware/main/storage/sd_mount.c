@@ -69,7 +69,7 @@ esp_err_t sd_mount(void)
 
     esp_vfs_fat_sdmmc_mount_config_t mcfg = {
         .format_if_mount_failed = false,  // never reformat the card
-        .max_files              = 6,      // ride log + map archive + a little slack
+        .max_files              = 14,     // ride log + up to 9 paged map cells + slack
         .allocation_unit_size   = 16 * 1024,
     };
     err = esp_vfs_fat_sdmmc_mount(SD_MOUNT_POINT, &host, &slot, &mcfg, &s_card);

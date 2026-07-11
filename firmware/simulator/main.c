@@ -428,47 +428,45 @@ int main(void)
     const char *mapdir    = getenv("VROD_MAP");
     const char *mapzmta   = getenv("VROD_MAP_ZMTA");
     const char *mapstream = getenv("VROD_MAP_STREAM");  // like the on-device SD path
-    if (mapdir || mapzmta || mapstream) {
-        // VROD_MAP_STREAM opens the archive for streaming (index in RAM, tiles
-        // read on demand) - the real on-device SD path; VROD_MAP_ZMTA loads a
-        // packed archive whole; VROD_MAP is the per-tile directory loader.
-        map_tileset_t *ts = mapstream ? map_tileset_open_file(mapstream)
-                            : mapzmta ? map_tileset_load_file(mapzmta)
-                                      : map_tileset_load_dir(mapdir);
-        if (!ts) {
+    const char *mapcells  = getenv("VROD_MAP_CELLS");   // paged cell grid (world.hdr dir)
+    if (mapdir || mapzmta || mapstream || mapcells) {
+        // VROD_MAP_CELLS opens a GPS-paged cell grid (the continent-scale SD
+        // path); VROD_MAP_STREAM opens one archive for streaming (index in RAM,
+        // tiles read on demand); VROD_MAP_ZMTA loads a packed archive whole;
+        // VROD_MAP is the per-tile directory loader. All render through the same
+        // map_source seam, so set_center pages the grid for the cells path.
+        map_source_t *src;
+        if (mapcells) {
+            src = map_source_open_cells(mapcells);
+        } else {
+            map_tileset_t *ts = mapstream ? map_tileset_open_file(mapstream)
+                                : mapzmta ? map_tileset_load_file(mapzmta)
+                                          : map_tileset_load_dir(mapdir);
+            src               = map_source_from_tileset(ts, true);
+        }
+        if (!src) {
             fprintf(stderr, "map: failed to load %s\n",
-                    mapstream ? mapstream
-                    : mapzmta ? mapzmta
-                              : mapdir);
+                    mapcells    ? mapcells
+                    : mapstream ? mapstream
+                    : mapzmta   ? mapzmta
+                                : mapdir);
             return 1;
         }
+        int         zoom = map_source_zoom(src);
         double      ctx = 0, cty = 0;
         const char *ctr = getenv("VROD_MAP_CENTER");
         if (ctr) {
             double lat, lon;
             if (sscanf(ctr, "%lf,%lf", &lat, &lon) == 2)
-                map_lonlat_to_tilef(lon, lat, ts->zoom, &ctx, &cty);
+                map_lonlat_to_tilef(lon, lat, zoom, &ctx, &cty);
         } else {
-            double minx = 1e18, miny = 1e18, maxx = -1e18, maxy = -1e18;
-            for (int i = 0; i < ts->ntiles; i++) {
-                double x = ts->tiles[i].tx, y = ts->tiles[i].ty;
-                if (x < minx)
-                    minx = x;
-                if (x > maxx)
-                    maxx = x;
-                if (y < miny)
-                    miny = y;
-                if (y > maxy)
-                    maxy = y;
-            }
-            ctx = (minx + maxx + 1) / 2.0;
-            cty = (miny + maxy + 1) / 2.0;
+            map_source_center(src, &ctx, &cty);
         }
         double ppt   = getenv("VROD_MAP_PPT") ? atof(getenv("VROD_MAP_PPT")) : 256.0;
         int    speed = getenv("VROD_MAP_SPEED") ? atoi(getenv("VROD_MAP_SPEED")) : 52;
-        fprintf(stderr, "map: %d tiles z%d, center (%.3f,%.3f), ppt %.0f\n", ts->ntiles, ts->zoom,
-                ctx, cty, ppt);
-        lv_screen_load(screen_map_create(map_source_from_tileset(ts, true), DISPLAY_W, DISPLAY_H));
+        fprintf(stderr, "map: z%d, center (%.3f,%.3f), ppt %.0f\n", zoom, ctx, cty, ppt);
+        map_source_set_center(src, ctx, cty, -1.0);  // page in the initial cell(s)
+        lv_screen_load(screen_map_create(src, DISPLAY_W, DISPLAY_H));
 
         // Route animation: VROD_TRACK=<file> (lines "lat lon speed_mph") drives
         // the map centre. With VROD_TRACK_OUT set, each frame is dumped to
@@ -509,11 +507,12 @@ int main(void)
             if (outdir) {
                 for (int i = 0; i < n; i++) {
                     double tx, ty;
-                    map_lonlat_to_tilef(lon_pt[i], lat_pt[i], ts->zoom, &tx, &ty);
+                    map_lonlat_to_tilef(lon_pt[i], lat_pt[i], zoom, &tx, &ty);
                     int    j = (i + 1) % n;
                     double heading =
                         head_up ? sim_bearing(lat_pt[i], lon_pt[i], lat_pt[j], lon_pt[j]) : -1.0;
                     vehicle_data_t vd = sim_map_vd((int)lrint(mph_pt[i]));
+                    map_source_set_center(src, tx, ty, heading);
                     screen_map_render(tx, ty, ppt, heading);
                     screen_map_commit(&vd, settings_store_current());
                     lv_timer_handler();
@@ -536,12 +535,13 @@ int main(void)
                 double lat = lat_pt[i0] + f * (lat_pt[i1] - lat_pt[i0]);
                 double lon = lon_pt[i0] + f * (lon_pt[i1] - lon_pt[i0]);
                 double tx, ty;
-                map_lonlat_to_tilef(lon, lat, ts->zoom, &tx, &ty);
+                map_lonlat_to_tilef(lon, lat, zoom, &tx, &ty);
                 double heading    = head_up ? sim_bearing(lat, lon, lat_pt[i1], lon_pt[i1]) : -1.0;
                 vehicle_data_t vd = sim_map_vd((int)lrint(mph_pt[i0]));
+                map_source_set_center(src, tx, ty, heading);
                 screen_map_render(tx, ty, ppt, heading);
                 screen_map_commit(&vd, settings_store_current());
-                screen_map_set_no_coverage(!map_tileset_covers(ts, (uint32_t)tx, (uint32_t)ty));
+                screen_map_set_no_coverage(!map_source_covers(src, (uint32_t)tx, (uint32_t)ty));
                 lv_timer_handler();
                 maybe_screenshot();
                 usleep(UI_TICK_MS * 1000);
@@ -553,9 +553,10 @@ int main(void)
 
         while (1) {
             vehicle_data_t vd = sim_map_vd(speed);
+            map_source_set_center(src, ctx, cty, -1.0);
             screen_map_render(ctx, cty, ppt, -1.0);
             screen_map_commit(&vd, settings_store_current());
-            screen_map_set_no_coverage(!map_tileset_covers(ts, (uint32_t)ctx, (uint32_t)cty));
+            screen_map_set_no_coverage(!map_source_covers(src, (uint32_t)ctx, (uint32_t)cty));
             lv_timer_handler();
             maybe_screenshot();
             usleep(UI_TICK_MS * 1000);

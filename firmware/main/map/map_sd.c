@@ -24,9 +24,11 @@ static const char *TAG = "map_sd";
 #define LOC_STALE_MS    5000
 #define GPS_MODULE_STALE_MS 3000  // module fix older than this -> fall back to the phone
 
-static map_tileset_t *s_ts;
-static map_source_t  *s_src;
-static lv_obj_t      *s_screen;
+#if !CONFIG_VROD_MAP_SD_CELLS
+static map_tileset_t *s_ts;  // single-archive path only; the cell grid owns its own
+#endif
+static map_source_t *s_src;
+static lv_obj_t     *s_screen;
 
 static void anim_task(void *arg)
 {
@@ -84,11 +86,21 @@ static void anim_task(void *arg)
 
 void map_sd_load(void)
 {
-    if (s_ts)
+    if (s_src)
         return;  // already loaded (lazy + idempotent)
     if (sd_mount() != ESP_OK)
         return;
 
+#if CONFIG_VROD_MAP_SD_CELLS
+    // GPS-paged cell grid: read <dir>/world.hdr and keep only the cells near the
+    // rider open, so a whole continent lives on the card (map-worldwide-plan.md).
+    s_src = map_source_open_cells(CONFIG_VROD_MAP_SD_DIR);
+    if (!s_src) {
+        ESP_LOGE(TAG, "bad/missing cell map at %s/world.hdr", CONFIG_VROD_MAP_SD_DIR);
+        return;
+    }
+    ESP_LOGI(TAG, "paged cell map z%d from %s", map_source_zoom(s_src), CONFIG_VROD_MAP_SD_DIR);
+#else
     // Streaming: read only the tile index into RAM and keep the file open, so a
     // country-sized archive (tens of MB) costs ~index bytes, not the whole file
     // in PSRAM. Tiles are read off the card on demand as the map scrolls.
@@ -102,6 +114,7 @@ void map_sd_load(void)
     ESP_LOGI(TAG, "streaming %d tiles z%d from %s", s_ts->ntiles, s_ts->zoom,
              CONFIG_VROD_MAP_SD_PATH);
     s_src = map_source_from_tileset(s_ts, true);  // owns the streamed tileset
+#endif
 
     bsp_display_lock(-1);
     s_screen = screen_map_create(s_src, 800, 800);
