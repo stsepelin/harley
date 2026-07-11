@@ -21,8 +21,10 @@ pass per cell, which would re-read the continent thousands of times):
   1. osmium tags-filter: keep roads + water + building footprints -> rw.pbf
      (shrinks 32 GB -> a few GB; --no-buildings drops buildings, ~3x smaller
      tiles, for a continent bake that would overflow the card).
-  2. osmium extract -c <cfg>: cut every intersecting cell's bbox out of rw.pbf in
-     a single read (batched so open output FDs stay bounded).
+  2. osmium extract -s simple -c <cfg>: cut every intersecting cell's bbox out of
+     rw.pbf in one streaming pass per batch (--batch cells at a time). Simple (not
+     the default complete_ways) avoids a second read of the multi-GB pbf per batch;
+     border-cut ways are re-clipped per tile anyway.
   3. Per cell: osmium export -> bake.py -> pack.py -> <lat>/<lon>.zmt, then delete
      the cell pbf. Bounded RAM: one cell at a time.
   4. world.hdr from the cells that produced tiles.
@@ -134,8 +136,9 @@ def main():
     ap.add_argument("--cell-deg", type=float, default=1.0,
                     help="cell edge in degrees (default 1.0; 0.5 for dense metros)")
     ap.add_argument("--out", required=True, help="output map dir (-> /sdcard/map)")
-    ap.add_argument("--batch", type=int, default=256,
-                    help="cells cut per osmium-extract pass (bounds open FDs)")
+    ap.add_argument("--batch", type=int, default=2048,
+                    help="cells cut per osmium-extract pass; bigger = fewer reads of "
+                         "the filtered pbf (simple strategy keeps memory low)")
     ap.add_argument("--no-buildings", action="store_true",
                     help="roads + water only (buildings ~3x the tile bytes; drop for a "
                          "continent-scale bake that would overflow the card)")
@@ -189,7 +192,13 @@ def main():
                 pbf_of[(lat, lon)] = os.path.join(work, name)
             cfg = os.path.join(work, "extracts.json")
             json.dump({"directory": work, "extracts": extracts}, open(cfg, "w"))
-            run(["osmium", "extract", "-c", cfg, rw, "--overwrite"])
+            # -s simple: single streaming pass, cutting ways at the cell border.
+            # The default (complete_ways) does TWO reads of the multi-GB rw.pbf per
+            # batch to pull in each way's out-of-bbox nodes - hours over a continent.
+            # We don't need that: bake.py re-clips every tile to its bounds and the
+            # neighbouring cell carries the continuation, so a border-cut way is
+            # cosmetically identical on the cluster. Simple is one pass + low memory.
+            run(["osmium", "extract", "-s", "simple", "-c", cfg, rw, "--overwrite"])
 
             for (lat, lon) in batch:
                 cell_pbf = pbf_of[(lat, lon)]
