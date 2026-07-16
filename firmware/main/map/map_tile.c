@@ -330,6 +330,7 @@ void map_tileset_free(map_tileset_t *ts)
     }
     free(ts->sidx);
     free(ts->owned);
+    free(ts->rbuf);
     if (ts->fp)
         fclose((FILE *)ts->fp);
     free(ts);
@@ -385,22 +386,47 @@ map_tileset_t *map_tileset_open_file(const char *path)
     return ts;
 }
 
+static uint32_t s_read_fails;  // streaming fseek/fread/parse errors, for on-device diagnostics
+
+uint32_t map_tileset_read_fails(void)
+{
+    return s_read_fails;
+}
+
 bool map_tileset_read_tile(map_tileset_t *ts, uint32_t tx, uint32_t ty, map_tile_t *out)
 {
     if (!ts || !ts->fp)
         return false;
     int i = find_index(ts, tx, ty);
     if (i < 0)
-        return false;
+        return false;  // tile genuinely absent (gap in the bake) - not a read error
     uint32_t off = ts->sidx[i].foff, len = ts->sidx[i].flen;
-    uint8_t *buf = malloc(len ? len : 1);
-    if (!buf)
+
+    // Reuse one growable buffer instead of malloc+free per tile: a ride streams
+    // thousands of tiles, and that variable-size churn fragments PSRAM until an
+    // allocation fails and the whole map blanks (only a reboot recovered). The
+    // buffer only ever grows to the largest tile; the tile views it directly
+    // (copy=false), which is valid until the next read - and cache_get renders
+    // then frees each tile before the next read.
+    if (len > ts->rcap) {
+        uint8_t *nb = realloc(ts->rbuf, len);
+        if (!nb) {
+            s_read_fails++;
+            return false;
+        }
+        ts->rbuf = nb;
+        ts->rcap = len;
+    }
+
+    FILE *f = (FILE *)ts->fp;
+    clearerr(
+        f);  // a prior transient SD error must not poison every later read (fseek clears only EOF)
+    if (fseek(f, (long)off, SEEK_SET) != 0 || fread(ts->rbuf, 1, len, f) != len ||
+        !parse_into(ts->rbuf, len, out, false)) {
+        s_read_fails++;
         return false;
-    FILE *f  = (FILE *)ts->fp;
-    bool  ok = fseek(f, (long)off, SEEK_SET) == 0 && fread(buf, 1, len, f) == len &&
-               parse_into(buf, len, out, true);  // copy=true: `out` owns its bytes
-    free(buf);
-    return ok;
+    }
+    return true;
 }
 
 map_tileset_t *map_tileset_load_file(const char *path)

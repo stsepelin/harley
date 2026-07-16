@@ -10,6 +10,7 @@
 #include "vehicle_data.h"
 
 #include "bsp/esp-bsp.h"
+#include "esp_heap_caps.h"
 #include "esp_log.h"
 #include "esp_timer.h"
 #include "freertos/FreeRTOS.h"
@@ -33,7 +34,8 @@ static lv_obj_t     *s_screen;
 static void anim_task(void *arg)
 {
     (void)arg;
-    double cx, cy;
+    uint32_t frame = 0;
+    double   cx, cy;
     map_source_center(s_src, &cx, &cy);  // hold here until a fix arrives
 
     for (;;) {
@@ -80,6 +82,16 @@ static void anim_task(void *arg)
         screen_map_set_phone_link(bt.connected);  // blue phone-link dot
         bsp_display_unlock();
 
+        // Map-health telemetry (~every 2 s): if the map blanks mid-ride this tells
+        // leak (free_kb falls steadily) from fragmentation (free_kb steady but
+        // largest_kb collapses) from SD trouble (read_fails climbs). PSRAM = SPIRAM.
+        if (++frame % 60 == 0) {
+            ESP_LOGI(TAG, "map heap: free=%uKB largest=%uKB min_ever=%uKB read_fails=%u",
+                     (unsigned)(heap_caps_get_free_size(MALLOC_CAP_SPIRAM) / 1024),
+                     (unsigned)(heap_caps_get_largest_free_block(MALLOC_CAP_SPIRAM) / 1024),
+                     (unsigned)(heap_caps_get_minimum_free_size(MALLOC_CAP_SPIRAM) / 1024),
+                     (unsigned)map_tileset_read_fails());
+        }
         vTaskDelay(pdMS_TO_TICKS(MAP_SD_FRAME_MS));
     }
 }

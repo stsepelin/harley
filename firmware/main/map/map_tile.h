@@ -43,6 +43,8 @@ typedef struct {
     map_sidx_t *sidx;   // compact index (streaming sets); NULL when whole-loaded
     uint8_t    *owned;  // backing archive buffer to free with the set, or NULL
     void       *fp;     // open FILE* when streaming from disk, else NULL
+    uint8_t    *rbuf;   // reusable streaming read buffer (grown, never per-tile malloc'd)
+    size_t      rcap;   // capacity of rbuf
     // Tile-coordinate bounding box of the baked area (inclusive). Used to tell
     // whether the rider's position has map data (else "off area", e.g. another
     // country). Valid only when ntiles > 0.
@@ -80,6 +82,10 @@ map_tileset_t *map_tileset_open_file(const char *path);
 // map_tile_free). false if the tile is absent or the read fails. The index is
 // sorted at open time, so the lookup is a binary search.
 bool map_tileset_read_tile(map_tileset_t *ts, uint32_t tx, uint32_t ty, map_tile_t *out);
+
+// Cumulative count of streaming read errors (fseek/fread/parse/alloc failures) -
+// for the on-device map diagnostics. A tile that is simply absent does not count.
+uint32_t map_tileset_read_fails(void);
 
 void map_tileset_free(map_tileset_t *ts);
 
