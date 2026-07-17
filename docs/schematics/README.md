@@ -3,7 +3,8 @@
 Source of truth for the analog/wiring drawings. Each `.py` is a
 [schemdraw](https://schemdraw.readthedocs.io/) script that renders the
 `.svg` next to it; the SVGs are committed so the docs render on GitHub
-without any toolchain.
+without any toolchain. (One exception: `j1850_perfboard.py` is a
+matplotlib layout, not schemdraw — see Regenerate.)
 
 > **TX polarity RESOLVED (2026-07-04): standard VPW → high-side TX.**
 > The bus idles LOW / dominant HIGH (bare-bus DMM + invert-off raw dump +
@@ -18,6 +19,7 @@ without any toolchain.
 |---|---|---|
 | `j1850_rx.py/.svg` | Phase 3 Stage 1–2 | J1850 RX front end alone: 7.5V zener clamp + 10k/4.7k divider → sniffer GPIO. Correct and unchanged. Build this first — it can't disturb the bus. (The temporary GPIO 22 ADC amplitude probe is a second wire off node B — firmware `CONFIG_VROD_J1850_ADC_GPIO`; not drawn.) **Phase 6:** the permanent harness needs a **comparator / Schmitt** stage here for noise immunity — not the P4 glitch filter (it desyncs decode; see the master plan Phase 6 note + `../../firmware/docs/j1850-toggling-isr-candidate.md`). This bare-divider drawing is the bench build. |
 | `j1850_tx.py/.svg` | Phase 3 Stage 4 — **canonical TX (high-side)** | High-side PNP source: dominant = drive bus HIGH. Correct for standard VPW (idle LOW / dominant HIGH), now confirmed on the bike. 2N2907A needed. |
+| `j1850_perfboard.py/.svg` | Phase 3 Stage 4 — perfboard build | Physical pad-per-hole layout (5x7 cm perfboard) of the validated bench transceiver (RX bare divider + high-side TX) for the **bike build** — **Rpd omitted** (the bench bus pull-down is bench-only; the vehicle holds the recessive state). The schemdraw `j1850_rx`/`j1850_tx` drawings stay the electrical source of truth; this only fixes where parts and jumpers physically go. Net list + solder/ring-out procedure in `j1850_perfboard.md`. **matplotlib, not schemdraw.** |
 | `discrete_divider.py/.svg` | Phase 6 | 12V discrete-signal divider (10k/2.7k + optional 3.3V zener), ×6 for turns/beam/neutral/oil/ignition. Sized for 14.4V charging voltage. |
 | `bike-power-chain.py/.svg` | Phase 6 (power) | Protected 12V→5V bike-power chain: fuse + reverse-polarity + load-dump TVS (TVS1 P6KE16A) → mini560 → output reverse-block (D4 XL74610 ideal-diode @ 5.0V) → board header 5V, with USB-C data coexisting via the board's own AO3401. Full parts list + bench test in `../../firmware/docs/bike-power-injection.md`; BOM in `bike-power-chain.bom.md`. |
 | `gps_module.py/.svg` | Map (optional) | NEO-6M / GY-NEO6MV2 map-position module: 5V/GND + module TX → GPIO 21 (3.3V TTL, no level shift), RX-only. Wiring + bring-up in `../../firmware/docs/gps-module.md`. |
@@ -30,6 +32,11 @@ for f in *.py; do .venv/bin/python "$f"; done
 ```
 
 Edit the `.py`, re-run, commit both files. Don't hand-edit the SVGs.
+
+`j1850_perfboard.py` is **matplotlib, not schemdraw** — regenerate it with
+`.venv/bin/pip install matplotlib` then `python3 j1850_perfboard.py` (it
+writes both `.svg` and a `.png`; only the `.py` + `.svg` are committed, the
+`.png` is gitignored).
 
 ## Conventions
 

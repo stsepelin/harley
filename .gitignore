@@ -21,6 +21,9 @@
 firmware/simulator/*.png
 .venv/
 
+# schematics: commit .py + .svg only; the matplotlib perfboard render also emits a .png
+docs/schematics/*.png
+
 # enclosure STLs are generated from enclosure.scad (large binaries) — keep .scad + PNG renders, regenerate STLs on demand
 hardware/enclosure/*.stl
 
