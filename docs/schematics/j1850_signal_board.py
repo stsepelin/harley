@@ -99,7 +99,12 @@ node(15,12,"NODE_B")
 
 jumper(6,9,7,9); jumper(8,8,8,9); jumper(8,5,11,5); jumper(11,4,11,2)
 jumper(11,6,11,7); jumper(11,10,13,10); jumper(13,10,15,10)
-jumper(9,9,9,15); jumper(7,12,7,15); jumper(13,13,13,15); jumper(15,12,17,12)
+jumper(9,9,9,15); jumper(7,12,7,15); jumper(13,13,13,15)
+# NOTE: removed jumper(15,12,17,12) — it extended NODE_B (RX) rightward to the
+# old RX pad column (col 17), which sat one hole from the BUS-terminal GND pin
+# (col 18) — a bridge hazard that shorts NODE_B to GND (bypasses R2 -> BUS-GND
+# reads R1=10k). The P4 RX pad now sits directly on NODE_B (col 15), so this
+# jumper is vestigial. Do not solder it.
 jumper(15,10,18,10)
 
 
