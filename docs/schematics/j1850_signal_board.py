@@ -1,15 +1,3 @@
-# J1850 signal board (Phase 3 Stage 4 -> bike): perfboard layout of the J1850
-# transceiver (RX bare divider + high-side TX) + the 6 discrete 12V input
-# dividers (10k/2.7k + 3V3 clamp; turn L/R, high-beam, neutral, oil, ignition).
-# Bike build (Rpd omitted). SINGLE central ground bus (row 15); dividers are
-# flipped (GND up to the central bus, harness inputs at the bottom edge).
-# Harness = physical screw terminals: one PWR 3-pin (+12V/GND/BUS, top-left,
-# orthogonally routed) + two signal 3-pin blocks sitting directly on the divider
-# inputs (5 mm divider pitch -> a 3-pin block lands on 3 divider inputs, no
-# routing). P4 = TX (gate) / RX (NODE_B) + 6 GPIO pads on the divider nodes.
-# Companion to schemdraw j1850_tx.py / j1850_rx.py / discrete_divider.py (the
-# electrical source of truth). Power chain is a SEPARATE board.
-# matplotlib, NOT schemdraw. Regenerate: python3 j1850_signal_board.py (matplotlib).
 import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
@@ -18,165 +6,159 @@ import matplotlib.patheffects as pe
 
 def X(c): return c
 def Y(r): return -r
-LBL=[pe.withStroke(linewidth=2.5,foreground="white")]
+LBL=[pe.withStroke(linewidth=2.0,foreground="white")]
 
-fig, ax = plt.subplots(figsize=(11,15))
-fig.patch.set_facecolor("white")
-ax.set_facecolor("white")
-ax.set_xlim(-1.2, 20.5)
-ax.set_ylim(-27.6, 1.8)
-ax.axis("off")
+fig, ax = plt.subplots(figsize=(12,15.5))
+fig.patch.set_facecolor("white"); ax.set_facecolor("white")
+ax.set_xlim(-0.6,19.4); ax.set_ylim(-25.2,1.7); ax.axis("off")
 
-# board outline (portrait 5x7cm ~ 19 x 27 holes)
-ax.add_patch(Rectangle((0.4,-27.3),19.2,28.0, facecolor="#fbfaf6",
-             edgecolor="#cfc9b4", lw=1.2, zorder=0))
-NC, NR = 19, 27
+NC,NR=18,24
+ax.add_patch(Rectangle((0.4,-24.4),18.2,25.0,facecolor="#fbfaf6",edgecolor="#cfc9b4",lw=1.2,zorder=0))
 for r in range(1,NR+1):
     for c in range(1,NC+1):
-        ax.add_patch(Circle((X(c),Y(r)),0.11,facecolor="white",edgecolor="#c9c2ac",lw=0.6,zorder=1))
+        ax.add_patch(Circle((X(c),Y(r)),0.095,facecolor="white",edgecolor="#c9c2ac",lw=0.5,zorder=1))
 
-def busline(row,x0,x1,color,label,lx,ly=0.0):
-    ax.plot([x0,x1],[Y(row),Y(row)],color=color,lw=5,solid_capstyle="round",zorder=2)
+def used(c,r,col="#e7dfbf"):
+    ax.add_patch(Circle((X(c),Y(r)),0.11,facecolor=col,edgecolor="#9a9068",lw=0.4,zorder=5))
+def bus(row,c0,c1,color,label,lx,ly=0.0):
+    ax.plot([X(c0),X(c1)],[Y(row),Y(row)],color=color,lw=4.2,solid_capstyle="round",zorder=2)
     if label:
-        t=ax.text(lx,Y(row)+ly,label,ha="center",va="center",fontsize=9,fontweight="bold",color=color,zorder=6)
-        t.set_path_effects(LBL)
-
-def res(c1,r1,c2,r2,label,color,loff=(0.3,0),fs=8):
-    x1,y1,x2,y2=X(c1),Y(r1),X(c2),Y(r2)
-    ax.plot([x1,x2],[y1,y2],color=color,lw=5,solid_capstyle="round",zorder=3,alpha=0.9)
-    t=ax.text((x1+x2)/2+loff[0],(y1+y2)/2+loff[1],label,ha="left",va="center",fontsize=fs,fontweight="bold",color="#222",zorder=6)
-    t.set_path_effects(LBL)
-
-def jumper(c1,r1,c2,r2):
-    ax.plot([X(c1),X(c2)],[Y(r1),Y(r2)],color="#b9b090",lw=1.6,zorder=4,solid_capstyle="round")
-    for (c,r) in [(c1,r1),(c2,r2)]:
-        ax.add_patch(Circle((X(c),Y(r)),0.12,facecolor="#e7dfbf",edgecolor="#9a9068",lw=0.5,zorder=5))
-
-def node(c,r,label,dx=0.26,dy=0.24,col="#ffd33d"):
-    ax.add_patch(Circle((X(c),Y(r)),0.15,facecolor=col,edgecolor="#555",lw=0.6,zorder=6))
+        t=ax.text(lx,Y(row)+ly,label,ha="center",fontsize=8,fontweight="bold",color=color,zorder=6); t.set_path_effects(LBL)
+def res(c1,r1,c2,r2,label,color,loff=(0.24,0),fs=6.2):
+    ax.plot([X(c1),X(c2)],[Y(r1),Y(r2)],color=color,lw=4.0,solid_capstyle="round",zorder=3,alpha=0.9); used(c1,r1);used(c2,r2)
+    t=ax.text((X(c1)+X(c2))/2+loff[0],(Y(r1)+Y(r2))/2+loff[1],label,ha="left",va="center",fontsize=fs,fontweight="bold",color="#222",zorder=6); t.set_path_effects(LBL)
+def zen(c1,r1,c2,r2,label,loff=(0.2,0),fs=5.5):
+    ax.plot([X(c1),X(c2)],[Y(r1),Y(r2)],color="#e3a008",lw=4.0,solid_capstyle="round",zorder=3); used(c1,r1);used(c2,r2)
+    ax.add_patch(Rectangle((X(c1)-0.14,Y(r1)-0.02),0.28,0.09,facecolor="#7a5c00",zorder=4))
+    t=ax.text((X(c1)+X(c2))/2+loff[0],(Y(r1)+Y(r2))/2,label,ha="left",va="center",fontsize=fs,fontweight="bold",color="#9a6700",zorder=6); t.set_path_effects(LBL)
+def jump(c1,r1,c2,r2,color="#b9b090",lw=1.4):
+    ax.plot([X(c1),X(c2)],[Y(r1),Y(r2)],color=color,lw=lw,zorder=2.5,solid_capstyle="round"); used(c1,r1);used(c2,r2)
+def node(c,r,label="",dx=0.22,dy=0.2,col="#ffd33d"):
+    ax.add_patch(Circle((X(c),Y(r)),0.14,facecolor=col,edgecolor="#555",lw=0.6,zorder=6))
     if label:
-        t=ax.text(X(c)+dx,Y(r)+dy,label,ha="left",va="bottom",fontsize=7.5,fontweight="bold",zorder=7)
-        t.set_path_effects(LBL)
-
-def transistor(cells,name,namexy):
+        t=ax.text(X(c)+dx,Y(r)+dy,label,ha="left",va="bottom",fontsize=6.5,fontweight="bold",zorder=7); t.set_path_effects(LBL)
+def tr(cells,name,nxy,fs=6):
     xs=[X(c) for c,r,_ in cells]; ys=[Y(r) for c,r,_ in cells]
-    ax.add_patch(FancyBboxPatch((min(xs)-0.42,min(ys)-0.42),max(xs)-min(xs)+0.84,max(ys)-min(ys)+0.84,
-        boxstyle="round,pad=0.02,rounding_size=0.1",facecolor="#eceae2",edgecolor="#555",lw=1.1,zorder=3))
+    ax.add_patch(FancyBboxPatch((min(xs)-0.38,min(ys)-0.38),max(xs)-min(xs)+0.76,max(ys)-min(ys)+0.76,
+        boxstyle="round,pad=0.02,rounding_size=0.1",facecolor="#eceae2",edgecolor="#555",lw=1.0,zorder=3))
     for c,r,pl in cells:
-        ax.add_patch(Circle((X(c),Y(r)),0.14,facecolor="#ffd33d",edgecolor="#555",lw=0.6,zorder=6))
-        ax.text(X(c)-0.3,Y(r),pl,ha="right",va="center",fontsize=7.5,fontweight="bold",color="#333",zorder=7)
-    t=ax.text(namexy[0],namexy[1],name,ha="center",va="center",fontsize=8,fontweight="bold",color="#333",zorder=7)
-    t.set_path_effects(LBL)
+        ax.add_patch(Circle((X(c),Y(r)),0.12,facecolor="#ffd33d",edgecolor="#555",lw=0.5,zorder=6))
+        ax.text(X(c),Y(r)-0.32,pl,ha="center",va="top",fontsize=5.5,fontweight="bold",color="#333",zorder=7)
+    t=ax.text(nxy[0],nxy[1],name,ha="center",va="center",fontsize=fs,fontweight="bold",color="#333",zorder=7); t.set_path_effects(LBL)
+def screw(pins,title,tx,ty,vert=False,flip=False):
+    # each screw position is 2 holes wide: vert -> spans cols c..c+1; horizontal -> spans rows r..r+1
+    # flip (vert only): single solder hole sits on the RIGHT edge, body extends LEFT (for terminals hugging the right board edge)
+    xs=[X(c) for c,r,_,_ in pins]; ys=[Y(r) for c,r,_,_ in pins]
+    if vert:
+        bx = min(xs)-1.55 if flip else min(xs)-0.55
+        ax.add_patch(FancyBboxPatch((bx,min(ys)-0.7),(max(xs)-min(xs))+2.1,(max(ys)-min(ys))+1.4,
+            boxstyle="round,pad=0.03,rounding_size=0.12",facecolor="#e8e2d0",edgecolor="#444",lw=1.3,zorder=5.5))
+    else:
+        ax.add_patch(FancyBboxPatch((min(xs)-0.7,min(ys)-0.7),(max(xs)-min(xs))+1.4,(max(ys)-min(ys))+2.0,
+            boxstyle="round,pad=0.03,rounding_size=0.12",facecolor="#e8e2d0",edgecolor="#444",lw=1.3,zorder=5.5))
+    for c,r,lab,co in pins:
+        if vert:
+            bodyx = X(c)-1.32 if flip else X(c)-0.32
+            labx  = X(c)-0.62 if flip else X(c)+0.62
+            ax.add_patch(FancyBboxPatch((bodyx,Y(r)-0.3),1.64,0.6,boxstyle="round,pad=0.02,rounding_size=0.16",facecolor=co,edgecolor="#222",lw=1,zorder=7))
+            ax.add_patch(Circle((X(c),Y(r)),0.09,facecolor="#fff",edgecolor="#333",lw=0.6,zorder=8))   # single solder hole (left, or right if flip)
+            ax.text(labx,Y(r),lab,ha="center",va="center",fontsize=4.6,fontweight="bold",color="white",zorder=9)
+        else:
+            ax.add_patch(FancyBboxPatch((X(c)-0.3,Y(r)-0.32),0.6,1.64,boxstyle="round,pad=0.02,rounding_size=0.16",facecolor=co,edgecolor="#222",lw=1,zorder=7))
+            ax.add_patch(Circle((X(c),Y(r)),0.09,facecolor="#fff",edgecolor="#333",lw=0.6,zorder=8))   # single solder hole
+            ax.text(X(c),Y(r)+0.62,lab,ha="center",va="center",fontsize=4.4,fontweight="bold",color="white",zorder=9)
+    ax.text(tx,ty,title,ha="center",fontsize=6.0,fontweight="bold",color="#3d3524",zorder=8)
 
-def extpad(c,r,label,tx,ty,fs=8.5):
-    ax.add_patch(Circle((X(c),Y(r)),0.17,facecolor="#c7f0cf",edgecolor="#2da44e",lw=1.0,zorder=6))
-    ax.annotate(label, xy=(X(c),Y(r)), xytext=(tx,ty), fontsize=fs, fontweight="bold",
-                ha="center", va="center", zorder=8, color="#1a5c30",
-                arrowprops=dict(arrowstyle="->",color="#2da44e",lw=1.4))
+RED="#d1242f"; BLU="#1f6feb"; PUR="#7a5cff"; GRN="#1a7f37"; TEAL="#0a7ea4"; VIO="#6f42c1"; GPIO="#2f8f4e"
 
-# ================= J1850 transceiver (rows 2-15) =================
-busline(2,4,18,"#d1242f","+12V",11,0.35)
-busline(15,2,19,"#1f6feb","GND  (single central bus)",10,-0.35)
+# ===== rails =====
+bus(1,1,18,RED,"+12V",9,0.3)
+# GND now runs down the RIGHT edge (col18), fed from the transceiver rail at row11 —
+# no staircase and no central rail needed (see comb + divider block below).
 
-res(8,2,8,5,"R6 10k","#bf3989")
-res(8,5,8,8,"R4 10k","#0969da")
-res(4,9,6,9,"R3 1k","#8250df",loff=(0,0.4))
-res(7,9,7,12,"Rg 10k","#8250df")
-res(11,7,11,10,"R5 100Ω","#cf222e")
-res(13,10,13,13,"D1 7.5V","#e3a008",loff=(-1.85,0))
-ax.text(12.5,Y(11)+0.5,"band=top",ha="right",va="center",fontsize=7,color="#9a6700",path_effects=LBL)
-res(15,10,15,12,"R1 10k","#1a7f37")
-res(15,12,15,15,"R2 4.7k","#1a7f37")
+# ===== left: ONE 3-pin terminal (+12V / BUS / GND), pins 2 holes wide =====
+screw([(1,3,"12V",RED),(1,5,"BUS",PUR),(1,7,"GND",BLU)],"PWR/BUS 3p",2.4,-1.7,vert=True)
+jump(1,3,1,1,RED,1.8)                                             # +12V -> rail (from the single left hole)
+jump(1,5,3,5,PUR,1.6); jump(3,5,3,9,PUR,1.6); jump(3,9,4,9,PUR,1.6)  # BUS -> BUS node
+jump(1,7,1,11,BLU,1.6)                                            # GND -> rail
 
-transistor([(7,9,"G"),(8,9,"D"),(9,9,"S")],"",(8,Y(9)))
-ax.text(8,Y(9)-0.95,"Q1 IRLZ44N",ha="center",va="center",fontsize=7.5,fontweight="bold",color="#333",path_effects=LBL)
-transistor([(11,4,"E"),(11,5,"B"),(11,6,"C")],"",(11,Y(5)))
-ax.text(12.1,Y(5),"Q2\n2N2907A",ha="left",va="center",fontsize=7.5,fontweight="bold",color="#333",path_effects=LBL)
+# ===== transceiver (rows 2-12) — ORTHOGONAL (wires run under components) =====
+bus(11,1,18,BLU,"",0)   # transceiver GND rail
+# Q2 high-side PNP, placed so its base sits on the NODE_A row
+tr([(4,3,"E"),(4,4,"B"),(4,5,"C")],"Q2 2N2907A",(5.6,Y(4)))
+jump(4,3,4,1,RED,1.6)                                  # E -> +12V (vertical)
+# R6 + R4 STACKED in col6: +12V - R6 - NODE_A - R4 - drain
+res(6,1,6,4,"R6 10k",RED); node(6,4,"NODE_A")
+jump(4,4,6,4,"#8a6d3b",1.6)                            # B -> NODE_A (horizontal, under nothing)
+res(6,4,6,7,"R4 10k","#0969da")
+# Q1 low-side NFET as D-S-G so the gate exits right with no crossings
+tr([(6,8,"D"),(7,8,"S"),(8,8,"G")],"Q1 IRLZ44N",(7,Y(8)+0.9))
+jump(6,7,6,8,"#0969da")                                # R4 bottom -> drain (vertical)
+jump(7,8,7,11,BLU)                                     # source -> GND (vertical)
+jump(8,8,9,8,VIO,1.5)                                  # IRL gate leg -> gate NODE (resistors don't share the FET hole)
+node(9,8,"",col="#ffd33d")
+res(9,8,9,11,"Rg 10k",VIO)                             # Rg: gate node -> GND
+res(9,8,12,8,"R3 1k",VIO,loff=(0,0.42))                # R3: gate node -> TX
+node(12,8,"TX",dx=-0.2,dy=-0.7,col="#c9b6ff")
+# Q2 collector -> R5 -> BUS
+jump(4,5,4,6,RED); res(4,6,4,9,"R5 100Ω",RED); node(4,9,"BUS")  # BUS fed from the 3-pin (see left)
+zen(4,9,4,11,"D1 7.5V",loff=(0.2,0))                   # BUS -> GND clamp
+# BUS span to the RX divider: up at col5, then along row6 UNDER R4 (keeps it off the TX row)
+jump(4,9,5,9,PUR,1.6); jump(5,9,5,6,PUR,1.6); jump(5,6,10,6,PUR,1.6)
+res(10,6,13,6,"R1 10k",GRN); node(13,6,"NODE_B")
+res(13,6,13,9,"R2 4.7k",GRN); jump(13,9,13,11,BLU)     # R1 & R2 SHARE NODE_B (13,6) — shifted LEFT so RX goes straight into the comb
+node(13,6,"RX",dx=0.25,dy=-0.55,col="#c9b6ff")
 
-node(8,5,"NODE_A")
-node(11,10,"BUS")
-node(15,12,"NODE_B")
+# ===== GND rail down the RIGHT edge (col18) + P4 comb at col15 (3-hole room for the 3V3 clamps) =====
+ax.plot([X(18),X(18)],[Y(11),Y(24)],color=BLU,lw=4.2,solid_capstyle="round",zorder=2)   # right-edge GND rail (fed from transceiver rail @ row11)
+# comb shell drawn as a light BACKGROUND (low zorder) so the RX/TX wires that meet the pins stay visible
+ax.add_patch(FancyBboxPatch((X(15)-0.42,Y(24)-0.45),0.84,(Y(6)-Y(24))+0.9,boxstyle="round,pad=0.02,rounding_size=0.1",
+    facecolor="#efeaff",edgecolor=VIO,lw=1.4,zorder=1.3))
+comb_pins=[("RX·GP20",6,GRN),("TX",8,PUR),("GND",11,BLU),
+           ("t-L",12,GPIO),("t-R",14,GPIO),("beam",16,GPIO),
+           ("neu",20,GPIO),("oil",22,GPIO),("ign",24,GPIO)]
+jump(12,8,15,8,PUR,1.5)                             # TX node(12,8) -> comb(15,8) STRAIGHT; (13,8) passes UNDER R2 body
+jump(13,6,15,6,GRN,1.5)                             # RX NODE_B(13,6) -> comb(15,6) STRAIGHT (no bend)
+for lab,r,co in comb_pins:
+    ax.add_patch(Circle((X(15),Y(r)),0.17,facecolor=co,edgecolor="#222",lw=0.9,zorder=7))
+    ax.text(X(18)+0.32,Y(r),lab,ha="left",va="center",fontsize=5.4,fontweight="bold",color="#42287a",zorder=8)
+# GND comb pin (15,11) sits on the transceiver GND rail (row11), which reaches the col18 rail — connected
 
-jumper(6,9,7,9); jumper(8,8,8,9); jumper(8,5,11,5); jumper(11,4,11,2)
-jumper(11,6,11,7); jumper(11,10,13,10); jumper(13,10,15,10)
-jumper(9,9,9,15); jumper(7,12,7,15); jumper(13,13,13,15)
-# NOTE: removed jumper(15,12,17,12) — it extended NODE_B (RX) rightward to the
-# old RX pad column (col 17), which sat one hole from the BUS-terminal GND pin
-# (col 18) — a bridge hazard that shorts NODE_B to GND (bypasses R2 -> BUS-GND
-# reads R1=10k). The P4 RX pad now sits directly on NODE_B (col 15), so this
-# jumper is vestigial. Do not solder it.
-jumper(15,10,18,10)
+# ===== +12V/GND transit OUTPUT (screw) -> power board — hugs the RIGHT edge, holes flipped to the right =====
+screw([(18,2,"12V",RED),(18,4,"GND",BLU)],"+12V/GND → power board",16.6,-0.2,vert=True,flip=True)
+jump(18,2,18,1,RED,1.6)      # +12V out -> +12V rail (extended to col18)
+# GND out drops STRAIGHT down the right edge (col18) to the GND rail — no staircase needed
+jump(18,4,18,11,BLU,1.5)
 
+# ===== 6 dividers — GND on the RIGHT edge; middle carries only thin input wires =====
+# Each lane: thin input wire -> Ra 10k -> node -> output to comb. Rb (2k7) lies HORIZONTAL in the
+# empty gap row next to the lane and hops to the right GND rail; 3V3 is a clamp right at the connector.
+# two 3-pin screw terminals on the LEFT — PITCH-2 (pins every other hole), lanes aligned
+screw([(1,12,"t-L","#2da44e"),(1,14,"t-R","#2da44e"),(1,16,"beam","#2da44e")],"3p harness A",2.2,-10.6,vert=True)
+screw([(1,20,"neu","#2da44e"),(1,22,"oil","#2da44e"),(1,24,"ign","#2da44e")],"3p harness B",2.2,-25.4,vert=True)
 
-ax.text(10,-16.7,"— J1850 transceiver (Phase 3) —",ha="center",fontsize=9,style="italic",color="#777")
+def lane(g,rr,gap):
+    jump(1,rr,8,rr,"#2da44e",1.2)                      # thin input wire: screw -> Ra
+    res(8,rr,11,rr,"10k",TEAL,loff=(0,-0.55),fs=4.2)   # Ra 10k, node at col11
+    node(11,rr)
+    jump(11,rr,15,rr,GPIO,1.4)                          # node -> comb pin (output, col15)
+    jump(15,rr,16,rr,"#8a6d3b",1.1)                     # comb pin -> zener via a short jumper (like the Rb; keeps the pin hole free)
+    zen(16,rr,18,rr,"",fs=4)                            # 3V3 clamp: -> GND rail(18)
+    jump(11,rr,11,gap,TEAL,1.1)                         # node -> gap row
+    res(11,gap,14,gap,"2k7",TEAL,loff=(0,0.42),fs=3.8) # Rb HORIZONTAL in the gap row (body clear of the comb col)
+    jump(14,gap,18,gap,BLU,1.1)                         # Rb -> right GND rail (thin wire under the header)
 
-# ===== 6 discrete 12V dividers - FLIPPED, single central GND (row 15) =====
-# terminal(bottom) -> Ra -> node -> Rb/Z -> GND(top, central bus)
-DIV=[("turn-L",3),("turn-R",5),("beam",7),("neutral",9),("oil",11),("ign",13)]
-for name,c in DIV:
-    res(c,16,c,19,"2.7k","#0a7ea4",loff=(0.22,0),fs=7)     # Rb: central GND(top)->node
-    jumper(c,15,c,16)                                      # -> central GND bus
-    res(c,19,c,22,"10k","#0a7ea4",loff=(0.22,0),fs=7)      # Ra: node->terminal(bottom)
-    # 3V3 clamp zener node->GND in adjacent column (band/cathode at node side)
-    jumper(c,19,c+1,19)
-    res(c+1,16,c+1,19,"Z\n3V3","#e3a008",loff=(0.18,0),fs=6.5)
-    jumper(c+1,15,c+1,16)
-    # harness screw terminal at the BOTTOM edge (sits on the divider input)
-    ax.add_patch(Rectangle((X(c)-0.32,Y(22)-0.32),0.64,0.64,facecolor="#e8e2d0",edgecolor="#444",lw=1.1,zorder=6))
-    ax.add_patch(Circle((X(c),Y(22)),0.15,facecolor="#2da44e",edgecolor="#222",lw=0.8,zorder=7))
-    t=ax.text(X(c),Y(22)-0.5,name,ha="center",va="top",fontsize=7.5,fontweight="bold",color="#1a5c30",zorder=8); t.set_path_effects(LBL)
-    # P4 GPIO dupont pad at the node
-    ax.add_patch(Circle((X(c),Y(19)),0.16,facecolor="#dcd0ff",edgecolor="#6f42c1",lw=1.0,zorder=6))
-    ax.text(X(c)-0.28,Y(19),"G",ha="right",va="center",fontsize=6,fontweight="bold",color="#5a32a3",zorder=8)
+DECKA=[("G1",12,13),("G2",14,15),("G3",16,17)]   # gap row BELOW each lane
+DECKB=[("G4",20,19),("G5",22,21),("G6",24,23)]   # gap row ABOVE each lane
+for g,rr,gap in DECKA+DECKB: lane(g,rr,gap)
 
-
-
-# ---- orthogonal grid router ----
-def orout(pts,color,lw=2.0):
-    xs=[X(c) for c,r in pts]; ys=[Y(r) for c,r in pts]
-    ax.plot(xs,ys,color=color,lw=lw,zorder=1.7,solid_capstyle="round",solid_joinstyle="round",alpha=0.9)
-    for c,r in [pts[0],pts[-1]]:
-        ax.add_patch(Circle((X(c),Y(r)),0.12,facecolor=color,edgecolor="#333",lw=0.4,zorder=5))
-# ---- PWR 2-pin screw terminal (top-left): +12V / GND ----
-ax.add_patch(FancyBboxPatch((0.3,Y(4)-0.55),1.5,3.1,boxstyle="round,pad=0.03,rounding_size=0.1",facecolor="#d8cdb0",edgecolor="#444",lw=1.5,zorder=5.5))
-ax.text(1.05,Y(1)+0.15,"PWR 2-pin",ha="center",fontsize=7,fontweight="bold")
-for r,lab,co in [(2,"12V","#d1242f"),(4,"GND","#1f6feb")]:
-    ax.add_patch(Circle((1.05,Y(r)),0.21,facecolor=co,edgecolor="#222",lw=1,zorder=7))
-    ax.text(1.05,Y(r),lab,ha="center",va="center",fontsize=5.4,fontweight="bold",color="white",zorder=8)
-orout([(1,2),(4,2)],"#d1242f")             # +12V -> +12V bus
-orout([(1,4),(1,15),(2,15)],"#1f6feb")     # GND  -> central bus
-# ---- BUS 2-pin screw terminal sits ON the BUS node (right side): no long routing ----
-ax.add_patch(FancyBboxPatch((X(18)-0.62,Y(12)-0.62),1.24,3.0,boxstyle="round,pad=0.03,rounding_size=0.1",facecolor="#d8cdb0",edgecolor="#444",lw=1.5,zorder=5.4))
-ax.text(X(18),Y(9)+0.15,"BUS 2-pin (pin7)",ha="center",fontsize=6.2,fontweight="bold")
-ax.add_patch(Circle((X(18),Y(10)),0.21,facecolor="#7a5cff",edgecolor="#222",lw=1,zorder=7))
-ax.text(X(18),Y(10),"BUS",ha="center",va="center",fontsize=4.8,fontweight="bold",color="white",zorder=8)
-ax.add_patch(Circle((X(18),Y(12)),0.21,facecolor="#1f6feb",edgecolor="#222",lw=1,zorder=7))
-ax.text(X(18),Y(12),"GND",ha="center",va="center",fontsize=4.8,fontweight="bold",color="white",zorder=8)
-orout([(18,12),(18,15)],"#1f6feb")         # BUS-terminal GND pin -> central bus (short)
-
-# ---- two 3-pin harness screw terminals sit DIRECTLY on the divider inputs (row 22) ----
-for cols,lab in [([3,5,7],"turn-L / turn-R / beam"),([9,11,13],"neutral / oil / ign")]:
-    x0,x1=X(cols[0]),X(cols[-1])
-    ax.add_patch(FancyBboxPatch((x0-0.62,Y(23)-0.15),x1-x0+1.24,1.5,boxstyle="round,pad=0.03,rounding_size=0.1",
-        facecolor="#d8cdb0",edgecolor="#444",lw=1.5,zorder=5.4))
-    ax.text((x0+x1)/2,Y(24.55),"3-pin screw terminal ("+lab+")",ha="center",fontsize=6.0,fontweight="bold",color="#3d3524",zorder=8)
-
-# ---- P4 dupont pads: TX at gate, RX at NODE_B (6x GPIO already marked on the divider nodes) ----
-for c,r,lab in [(4,9,"TX"),(15,12,"RX")]:
-    ax.add_patch(Circle((X(c),Y(r)),0.19,facecolor="#c9b6ff",edgecolor="#6f42c1",lw=1.2,zorder=7))
-    ax.text(X(c)-0.32 if lab=="TX" else X(c)+0.32,Y(r),lab,ha="right" if lab=="TX" else "left",va="center",fontsize=6.5,fontweight="bold",color="#42287a",zorder=8)
-ax.text(10,1.05,"Physical screw terminals: PWR 2-pin (top-left) + BUS 2-pin (on its node, right) + 2x signal 3-pin (bottom, on divider inputs). "
-        "Single central ground. P4 = violet (6 GPIO + TX/RX).",ha="center",fontsize=7.0,color="#555")
-
-# title + minimal note
-ax.text(10,1.35,"Zeppl signal board (5×7cm) — J1850 transceiver + 6 discrete dividers",
-        ha="center",fontsize=12.5,fontweight="bold")
-ax.text(10,-26.6,
- "Power chain (12V→5V, mini560) stays on a SEPARATE board (switcher noise / current).  "
- "Verify transistor pinouts + D1 band before solder; ring out every net before power.",
- ha="center",fontsize=8,color="#666")
+ax.text(9,1.3,"Zeppl signal board v4 (18×24) — J1850 transceiver + 6× 12V dividers → single P4 comb",ha="center",fontsize=10.5,fontweight="bold")
+ax.text(9,0.62,"GND rail down the right edge · Rb in the gaps · zener clamps via a jumper at the connector · inputs 2×3p on the left",
+        ha="center",fontsize=6.0,color="#666")
+ax.text(9,0.05,"P4: RX=GPIO20 · TX=J1850 drive · GND · 6 outputs = turn-L/R, beam, neu, oil, ign (free header GPIOs — assign and confirm via wiggle test, PINS.md) · BUS=IM pin7",
+        ha="center",fontsize=5.4,color="#888")
 
 plt.tight_layout()
-fig.savefig("j1850_signal_board.png", dpi=140, facecolor="white", bbox_inches="tight")
+fig.savefig("j1850_signal_board.png", dpi=150, facecolor="white", bbox_inches="tight")
 fig.savefig("j1850_signal_board.svg", facecolor="white", bbox_inches="tight")
 print("ok")
