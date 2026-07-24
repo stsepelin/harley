@@ -126,9 +126,22 @@ bool j1850_tx_reset(void)
     if (!s_ready)
         return false;
     if (s_faulted) {
-        // A trip handed the pad to the GPIO peripheral; give it back to RMT
-        // (which idles LOW), then re-enable the watchdog readback.
-        if (rmt_tx_switch_gpio(s_chan, TX_GPIO, false) != ESP_OK)
+        // A trip handed the pad to the GPIO peripheral (already driven LOW);
+        // give it back to RMT (which idles LOW), then re-enable the watchdog
+        // readback. rmt_tx_switch_gpio() rejects an enabled channel with
+        // ESP_ERR_INVALID_STATE, so the channel must be disabled around the
+        // switch. The pad stays LOW (recessive) throughout: the ISR left the
+        // GPIO output LOW, and the disabled/re-enabled RMT channel idles LOW
+        // (init_level = 0) -- no transient dominant on the bus.
+        gpio_set_level(TX_GPIO, 0);
+
+        if (rmt_disable(s_chan) != ESP_OK)
+            return false;
+        if (rmt_tx_switch_gpio(s_chan, TX_GPIO, false) != ESP_OK) {
+            (void)rmt_enable(s_chan);  // best-effort: leave the channel usable
+            return false;
+        }
+        if (rmt_enable(s_chan) != ESP_OK)
             return false;
         gpio_input_enable(TX_GPIO);
         gpio_set_level(TX_GPIO, 0);

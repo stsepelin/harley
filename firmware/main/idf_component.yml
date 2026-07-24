@@ -10,7 +10,7 @@ dependencies:
   # controller lives on the ESP32-C6 coproc; esp_hosted talks to it over
   # SDIO. Gated to P4/H2 so other targets don't pick it up by mistake.
   espressif/esp_hosted:
-    version: '*'
+    version: '~2.12.7'
     rules:
       - if: target in [esp32p4, esp32h2]
   # esp_hosted depends on esp_wifi_remote transitively, but only IDF <6.1

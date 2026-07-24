@@ -136,6 +136,11 @@ transceiver on a GPIO — the C6 is only the phone radio.)
 
 ## V-ROD INSTRUMENT MODULE 12-PIN CONNECTOR PINOUT
 
+> Physical face map for building a mating quick-connect (cavity positions +
+> wire colours): [`schematics/im_connector_face.svg`](schematics/im_connector_face.svg).
+> Connector is a **Deutsch DTM06-12S** socket (molded marking); the bottom row
+> numbering is **inverted** (12,11,10,9,8,7 left→right), verified on the bike.
+
 | Pin | Wire Color | Signal | Type | T-tap Color | ESP32-P4 Connection |
 |---|---|---|---|---|---|
 | 1 | R/O (Red/Orange) | +12V Battery (constant) | Power | **Blue** | NOT used for cluster power (constant → would drain the battery key-off); switched pin 6 is the source instead |

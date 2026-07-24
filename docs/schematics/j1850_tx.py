@@ -3,6 +3,10 @@
 # through R4 -> Q2 sources +12V through R5 onto the bus; D1 (in the RX
 # drawing) clamps the driven level at ~7.5V. TX low -> Q1 off, R6 holds
 # Q2's base at the emitter rail -> Q2 hard off -> bus released to 0V.
+# Rg holds Q1 off while the P4 TX pad is high-Z (boot/reset, before the
+# firmware drives it LOW): a floating gate through R3 could bias Q1 on and
+# jam the bus with no watchdog armed yet. This is the watchdog "layer 3"
+# hardware backstop the Stage 4 plan calls for.
 # Regenerate: see README.md in this directory.
 import schemdraw
 import schemdraw.elements as elm
@@ -12,8 +16,15 @@ with schemdraw.Drawing(file="j1850_tx.svg", show=False) as d:
 
     gpio = d.add(elm.Dot(open=True).label("ESP32-P4 TX GPIO", loc="left"))
     d.add(elm.Resistor().right().label("R3\n1k"))
+    gate = d.add(elm.Dot())
     q1 = d.add(elm.NFet(bulk=False).right().anchor("gate").label("Q1\nIRLZ44N", loc="right"))
     d.add(elm.Ground().at(q1.source))
+
+    # Gate pull-down: keeps Q1 (and therefore the bus) off when the P4 pad
+    # is high-Z. Large vs R3 (1k) so it barely loads the drive when the pad
+    # is active.
+    d.add(elm.Resistor().down().at(gate.center).label("Rg\n10k"))
+    d.add(elm.Ground())
 
     d.add(elm.Line().up().at(q1.drain).length(0.4))
     d.add(elm.Resistor().up().label("R4\n10k"))
